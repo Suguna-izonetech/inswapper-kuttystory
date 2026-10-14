@@ -15,10 +15,12 @@ from reportlab.lib.units import mm
 from app.config import settings
 from app.services.storage import storage
 
-# 210 mm x 210 mm standard square picture book trim size
+# Standard square picture book trim size configured via settings
 POINTS_PER_MM = 72.0 / 25.4
-PAGE_WIDTH_PT = 210.0 * POINTS_PER_MM   # ~595.275 pt
-PAGE_HEIGHT_PT = 210.0 * POINTS_PER_MM  # ~595.275 pt
+PAGE_WIDTH_PT = settings.PRINT_TRIM_WIDTH_MM * POINTS_PER_MM
+PAGE_HEIGHT_PT = settings.PRINT_TRIM_HEIGHT_MM * POINTS_PER_MM
+BLEED_PT = settings.PRINT_BLEED_MM * POINTS_PER_MM
+MARGIN_PT = settings.PRINT_SAFE_MARGIN_MM * POINTS_PER_MM
 
 class PDFComposerService:
     """

@@ -48,8 +48,8 @@ class JobRunner:
             
             # Choose pages to personalize for preview
             preview_limit = min(settings.PREVIEW_PAGE_LIMIT, len(story_pages))
-            # Pick representative beats: 1 (cover), 3, 6, 7, 10
-            preview_page_indices = [0, 2, 5, 6, 9] if len(story_pages) >= 10 else list(range(preview_limit))
+            # Pick representative beats with prominent character presence: 1 (cover), 3 (garden walk), 7 (unicorn portrait), 10 (meadow run), 13 (bird rescue)
+            preview_page_indices = [0, 2, 6, 9, 12] if len(story_pages) >= 13 else list(range(preview_limit))
             target_pages = [story_pages[i] for i in preview_page_indices if i < len(story_pages)]
 
             job.total_pages = len(target_pages)

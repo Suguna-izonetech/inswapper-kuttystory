@@ -31,8 +31,9 @@ class Settings(BaseSettings):
     # AI Providers Configuration
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     HF_TOKEN: str = os.getenv("HF_TOKEN", "")
+    FAL_KEY: str = os.getenv("FAL_KEY", "")
     ACTIVE_STORY_PROVIDER: str = os.getenv("ACTIVE_STORY_PROVIDER", "gemini") # gemini, rule_based
-    ACTIVE_IMAGE_PROVIDER: str = os.getenv("ACTIVE_IMAGE_PROVIDER", "huggingface") # huggingface, local_diffusers, mock_poc
+    ACTIVE_IMAGE_PROVIDER: str = os.getenv("ACTIVE_IMAGE_PROVIDER", "fal_ai") # fal_ai, huggingface, template_fusion, mock_poc
     HF_MODEL_NAME: str = os.getenv("HF_MODEL_NAME", "stabilityai/stable-diffusion-xl-base-1.0")
     
     # Budgets & Limits
