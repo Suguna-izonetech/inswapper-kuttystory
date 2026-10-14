@@ -17,8 +17,9 @@
   --gold-subtle: #FAF5E8;
   --border-light: #EBE3D9;
   --border-card: #E3D9CD;
-  --font-serif: 'Cormorant Garamond', Georgia, serif;
-  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-heading: 'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', 'Outfit', system-ui, -apple-system, sans-serif;
+  --font-story: 'Fraunces', Georgia, serif;
 }
 
 body {
@@ -29,19 +30,25 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Modern Heading Typography (Replacing thin serif with modern, friendly Outfit) */
 .font-editorial-serif {
-  font-family: var(--font-serif);
+  font-family: var(--font-heading);
+  letter-spacing: -0.025em;
 }
 
 .font-editorial-sans {
   font-family: var(--font-sans);
 }
 
+.font-story {
+  font-family: var(--font-story);
+}
+
 /* Luxury card styling */
 .editorial-card {
   background-color: #FFFFFF;
   border: 1px solid var(--border-light);
-  border-radius: 16px;
+  border-radius: 20px;
   box-shadow: 0 4px 20px -2px rgba(45, 34, 42, 0.04), 0 2px 6px -1px rgba(45, 34, 42, 0.02);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
