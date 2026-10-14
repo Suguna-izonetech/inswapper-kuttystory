@@ -1,0 +1,77 @@
+# ==============================================================================
+# Baby Story - Root .gitignore
+# ==============================================================================
+
+# Environment variables & secrets (keep .env.example tracked)
+.env
+.env.*
+*.env
+!.env.example
+!.env.template
+
+# Python Virtual Environments
+venv/
+venv*/
+.venv/
+.venv*/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python cache & compiler files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node & Frontend dependencies and build outputs
+node_modules/
+dist/
+dist-ssr/
+build/
+.next/
+.vercel/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Local SQLite databases
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+storybook.db
+
+# Storage, Uploaded Child Photos, and Generated Outputs (Private/Dynamic)
+backend/storage/child_photos/*
+backend/storage/generated_assets/*
+backend/storage/previews/*
+backend/storage/final_books/*
+backend/storage/original_pdfs/*
+storage/*
+uploads/
+test_outputs/
+test-output/
+
+# Template storybook source pages and sample PDF are kept for story generation
+!backend/storage/source_pages/
+!sample-assets/
+
+# Personal test photo uploaded in root
+suguna ai
+test-assets/
+
+# OS & IDE metadata
+.DS_Store
+Thumbs.db
+ehthumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo

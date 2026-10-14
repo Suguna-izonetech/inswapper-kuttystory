@@ -1,0 +1,196 @@
+import datetime
+import uuid
+from sqlalchemy import Column, String, Integer, Float, Boolean, Text, ForeignKey, DateTime
+from sqlalchemy.orm import relationship
+from app.database import Base
+
+def gen_uuid():
+    return str(uuid.uuid4())
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    name = Column(String(100), nullable=False)
+    email = Column(String(150), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    role = Column(String(20), default="customer")  # "admin", "customer"
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    child_profiles = relationship("ChildProfile", back_populates="parent")
+    personalization_jobs = relationship("PersonalizationJob", back_populates="user")
+    orders = relationship("Order", back_populates="user")
+
+
+class ChildProfile(Base):
+    __tablename__ = "child_profiles"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    parent_user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    child_display_name = Column(String(100), nullable=False)
+    photo_storage_path = Column(String(500), nullable=False)
+    consent_status = Column(Boolean, default=False)
+    consent_timestamp = Column(DateTime, nullable=True)
+    retention_status = Column(String(50), default="active")  # "active", "scheduled_deletion", "deleted"
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    parent = relationship("User", back_populates="child_profiles")
+    personalization_jobs = relationship("PersonalizationJob", back_populates="child_profile")
+
+
+class StoryTemplate(Base):
+    __tablename__ = "story_templates"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    slug = Column(String(100), unique=True, index=True, nullable=False)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(String(50), default="Fairytale & Adventure")
+    age_range = Column(String(50), default="3-8 years")
+    language = Column(String(20), default="English")
+    source_pdf_path = Column(String(500), nullable=False)
+    page_count = Column(Integer, default=26)
+    status = Column(String(30), default="draft")  # "draft", "published", "archived"
+    cover_image_path = Column(String(500), nullable=True)
+    price_digital = Column(Float, default=14.99)
+    price_print = Column(Float, default=29.99)
+    currency = Column(String(10), default="USD")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    pages = relationship("StoryPage", back_populates="story", cascade="all, delete-orphan", order_by="StoryPage.page_index")
+    personalization_jobs = relationship("PersonalizationJob", back_populates="story")
+
+
+class StoryPage(Base):
+    __tablename__ = "story_pages"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    story_id = Column(String(36), ForeignKey("story_templates.id"), nullable=False)
+    page_index = Column(Integer, nullable=False)  # 0 to 25
+    page_number = Column(Integer, nullable=False)  # 1 to 26
+    page_type = Column(String(30), default="story")  # "cover", "story", "ending", "dedication", "other"
+    original_image_path = Column(String(500), nullable=False)
+    story_text = Column(Text, default="")
+    extracted_text = Column(Text, default="")
+    scene_description = Column(Text, default="")
+    character_guidance = Column(Text, default="")
+    prompt_template = Column(Text, default="")
+    personalization_required = Column(Boolean, default=True)
+    allow_illustration_generation = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    story = relationship("StoryTemplate", back_populates="pages")
+    assets = relationship("GeneratedAsset", back_populates="story_page")
+
+
+class PersonalizationJob(Base):
+    __tablename__ = "personalization_jobs"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    story_id = Column(String(36), ForeignKey("story_templates.id"), nullable=False)
+    child_profile_id = Column(String(36), ForeignKey("child_profiles.id"), nullable=True)
+    child_name = Column(String(100), nullable=False)
+    photo_path = Column(String(500), nullable=False)
+    
+    status = Column(String(40), default="queued")  # "queued", "analyzing", "generating", "assembling_preview", "completed", "failed"
+    current_stage = Column(String(100), default="Job initiated")
+    total_pages = Column(Integer, default=5)
+    completed_pages = Column(Integer, default=0)
+    failed_pages = Column(Integer, default=0)
+    retry_count = Column(Integer, default=0)
+    error_details = Column(Text, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="personalization_jobs")
+    story = relationship("StoryTemplate", back_populates="personalization_jobs")
+    child_profile = relationship("ChildProfile", back_populates="personalization_jobs")
+    assets = relationship("GeneratedAsset", back_populates="job", cascade="all, delete-orphan")
+    books = relationship("Book", back_populates="job", cascade="all, delete-orphan")
+
+
+class GeneratedAsset(Base):
+    __tablename__ = "generated_assets"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    job_id = Column(String(36), ForeignKey("personalization_jobs.id"), nullable=False)
+    story_page_id = Column(String(36), ForeignKey("story_pages.id"), nullable=False)
+    page_number = Column(Integer, nullable=False)
+    asset_version = Column(Integer, default=1)
+    storage_path = Column(String(500), nullable=False)
+    provider = Column(String(50), default="huggingface")
+    model = Column(String(100), default="stabilityai/stable-diffusion-xl-base-1.0")
+    prompt_used = Column(Text, default="")
+    generation_status = Column(String(30), default="completed")  # "pending", "completed", "failed"
+    review_status = Column(String(30), default="pending_review")  # "pending_review", "approved", "rejected"
+    cost_estimate = Column(Float, default=0.0)
+    generation_time_sec = Column(Float, default=0.0)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    job = relationship("PersonalizationJob", back_populates="assets")
+    story_page = relationship("StoryPage", back_populates="assets")
+
+
+class Book(Base):
+    __tablename__ = "books"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    job_id = Column(String(36), ForeignKey("personalization_jobs.id"), nullable=False)
+    book_type = Column(String(20), default="preview")  # "preview", "final"
+    version = Column(Integer, default=1)
+    pdf_storage_path = Column(String(500), nullable=False)
+    page_count = Column(Integer, default=0)
+    validation_status = Column(String(30), default="valid")  # "valid", "flagged", "failed"
+    validation_details = Column(Text, default="{}")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    job = relationship("PersonalizationJob", back_populates="books")
+    orders = relationship("Order", back_populates="book")
+
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    book_id = Column(String(36), ForeignKey("books.id"), nullable=True)
+    job_id = Column(String(36), ForeignKey("personalization_jobs.id"), nullable=False)
+    format_type = Column(String(30), default="digital")  # "digital", "print_hardcover", "print_softcover"
+    amount = Column(Float, default=14.99)
+    currency = Column(String(10), default="USD")
+    payment_status = Column(String(30), default="unpaid")  # "unpaid", "authorized", "captured", "failed"
+    payment_intent_id = Column(String(100), nullable=True)
+    shipping_address = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="orders")
+    book = relationship("Book", back_populates="orders")
+
+
+class AISettings(Base):
+    __tablename__ = "ai_settings"
+
+    id = Column(String(36), primary_key=True, default="default")
+    active_story_provider = Column(String(50), default="gemini")
+    active_image_provider = Column(String(50), default="huggingface")
+    active_model = Column(String(100), default="stabilityai/stable-diffusion-xl-base-1.0")
+    preview_page_limit = Column(Integer, default=5)
+    max_retries = Column(Integer, default=3)
+    concurrency_limit = Column(Integer, default=2)
+    per_book_budget = Column(Float, default=2.50)
+    is_paid_enabled = Column(Boolean, default=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    event_type = Column(String(100), nullable=False)
+    actor = Column(String(100), default="system")
+    details = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
