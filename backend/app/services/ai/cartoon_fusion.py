@@ -46,7 +46,8 @@ class CartoonCharacterFusionEngine:
         if cls._hf_client is None:
             try:
                 from gradio_client import Client
-                cls._hf_client = Client("tonyassi/face-swap")
+                token = settings.HF_TOKEN.strip() if getattr(settings, "HF_TOKEN", None) else None
+                cls._hf_client = Client("tonyassi/face-swap", hf_token=token)
             except Exception as e:
                 print(f"Error initializing HuggingFace face-swap client: {e}")
                 return None
