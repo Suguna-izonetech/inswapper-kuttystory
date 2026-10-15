@@ -54,6 +54,8 @@ backend/storage/generated_assets/*
 backend/storage/previews/*
 backend/storage/final_books/*
 backend/storage/original_pdfs/*
+backend/storage/*.png
+backend/storage/*.jpg
 storage/*
 uploads/
 test_outputs/

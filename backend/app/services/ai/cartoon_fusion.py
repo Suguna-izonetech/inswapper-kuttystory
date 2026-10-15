@@ -20,14 +20,14 @@ class CartoonCharacterFusionEngine:
 
     # Verified character face coordinates for pages in unicorn Story.pdf (1241x1241 canvas)
     PAGE_ANCHORS: Dict[int, Dict[str, Any]] = {
-        1:  {"cx": 430, "cy": 490, "w": 210, "h": 230, "angle": 0, "tone": "warm_gold"},
+        1:  {"cx": 510, "cy": 600, "w": 210, "h": 230, "angle": 0, "tone": "warm_gold"},
         3:  {"cx": 630, "cy": 285, "w": 195, "h": 210, "angle": 0, "tone": "daylight"},
         4:  {"cx": 490, "cy": 430, "w": 200, "h": 210, "angle": 3, "tone": "daylight"},
         7:  {"cx": 405, "cy": 350, "w": 220, "h": 235, "angle": 0, "tone": "sunset_gold"},
         8:  {"cx": 395, "cy": 460, "w": 205, "h": 215, "angle": -2, "tone": "sunset_gold"},
-        10: {"cx": 440, "cy": 340, "w": 200, "h": 215, "angle": 6, "tone": "meadow_sun"},
+        10: {"cx": 480, "cy": 380, "w": 200, "h": 215, "angle": 6, "tone": "meadow_sun"},
         11: {"cx": 460, "cy": 500, "w": 190, "h": 200, "angle": -4, "tone": "rainbow_sky"},
-        13: {"cx": 525, "cy": 420, "w": 205, "h": 215, "angle": -4, "tone": "forest_lantern"},
+        13: {"cx": 490, "cy": 460, "w": 205, "h": 215, "angle": -4, "tone": "forest_lantern"},
         14: {"cx": 510, "cy": 475, "w": 200, "h": 210, "angle": 2, "tone": "forest_daylight"},
         15: {"cx": 450, "cy": 465, "w": 190, "h": 200, "angle": 3, "tone": "stream_water"},
         17: {"cx": 480, "cy": 485, "w": 200, "h": 210, "angle": -2, "tone": "treehouse_warm"},
@@ -47,7 +47,13 @@ class CartoonCharacterFusionEngine:
             try:
                 from gradio_client import Client
                 token = settings.HF_TOKEN.strip() if getattr(settings, "HF_TOKEN", None) else None
-                cls._hf_client = Client("tonyassi/face-swap", hf_token=token)
+                try:
+                    cls._hf_client = Client("tonyassi/face-swap", token=token, httpx_kwargs={"timeout": 120.0})
+                except TypeError:
+                    try:
+                        cls._hf_client = Client("tonyassi/face-swap", token=token)
+                    except TypeError:
+                        cls._hf_client = Client("tonyassi/face-swap")
             except Exception as e:
                 print(f"Error initializing HuggingFace face-swap client: {e}")
                 return None
@@ -140,18 +146,37 @@ class CartoonCharacterFusionEngine:
                 client = cls._get_hf_client()
                 if client:
                     src = handle_file(child_reference_path)
-                    dest = handle_file(str(page_file))
-                    result_path = client.predict(
-                        src_img=src,
-                        dest_img=dest,
-                        api_name="/swap_faces"
-                    )
-                    if result_path and os.path.exists(result_path):
-                        with Image.open(result_path) as sw_img:
-                            base_page = sw_img.convert("RGB")
-                        provider_name = "Hugging Face Free AI Face Swap"
-                        model_name = "tonyassi/face-swap"
-                        swapped_with_ai = True
+                    
+                    # Optimize page image upload (compress 4MB PNG to ~400KB high-quality JPEG to prevent upload timeouts)
+                    temp_dest_file = None
+                    upload_target = str(page_file)
+                    try:
+                        if page_file.suffix.lower() == ".png":
+                            temp_dest_file = settings.STORAGE_DIR / f"temp_upload_p{page_number:02d}_{os.getpid()}.jpg"
+                            base_page.save(str(temp_dest_file), format="JPEG", quality=92)
+                            upload_target = str(temp_dest_file)
+                    except Exception:
+                        upload_target = str(page_file)
+
+                    try:
+                        dest = handle_file(upload_target)
+                        result_path = client.predict(
+                            src_img=src,
+                            dest_img=dest,
+                            api_name="/swap_faces"
+                        )
+                        if result_path and os.path.exists(result_path):
+                            with Image.open(result_path) as sw_img:
+                                base_page = sw_img.convert("RGB")
+                            provider_name = "Hugging Face Free AI Face Swap"
+                            model_name = "tonyassi/face-swap"
+                            swapped_with_ai = True
+                    finally:
+                        if temp_dest_file and temp_dest_file.exists():
+                            try:
+                                temp_dest_file.unlink()
+                            except Exception:
+                                pass
             except Exception as ai_err:
                 print(f"Notice: Free AI Neural Swap on Page {page_number}: {ai_err}. Using calibrated local fusion fallback.")
 
