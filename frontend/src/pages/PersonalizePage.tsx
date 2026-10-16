@@ -11,7 +11,9 @@ import {
   ChevronLeft,
   ChevronRight,
   FlipHorizontal,
-  RotateCcw
+  RotateCcw,
+  BookOpen,
+  Layout
 } from "lucide-react";
 import { api, StoryTemplate, PersonalizationJob, GeneratedAsset } from "@/lib/api";
 import { processSolidBackground } from "@/lib/imageProcessor";
@@ -19,6 +21,7 @@ import { validateChildPhoto, PhotoValidationReport } from "@/lib/photoValidator"
 import PersonalizationRoadmap from "@/components/PersonalizationRoadmap";
 import PhotoTipsGuide from "@/components/PhotoTipsGuide";
 import PhotoValidationStatus from "@/components/PhotoValidationStatus";
+import RealisticBookFlipViewer from "@/components/RealisticBookFlipViewer";
 
 export default function PersonalizePage() {
   const params = useParams<{ slug?: string }>();
@@ -66,6 +69,7 @@ export default function PersonalizePage() {
   const [job, setJob] = useState<PersonalizationJob | null>(null);
   const [currentPageIdx, setCurrentPageIdx] = useState(0);
   const [retryingAssetId, setRetryingAssetId] = useState<string | null>(null);
+  const [viewerMode, setViewerMode] = useState<"flipbook" | "spread">("flipbook");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -751,113 +755,160 @@ export default function PersonalizePage() {
             </div>
           </div>
 
-          {/* Book Viewer when assets are ready */}
+          {/* 3D Realistic Book Flip Viewer & Editorial Spread Viewer */}
           {assets.length > 0 ? (
-            <div className="editorial-card p-8 bg-white space-y-6">
-              <div className="flex items-center justify-between border-b border-[#EBE3D9] pb-4">
-                <div>
-                  <h3 className="font-editorial-serif text-2xl font-bold text-[#2D222A]">
-                    Interactive Book Preview
-                  </h3>
-                  <span className="text-xs text-[#695B64]">
-                    Page {currentPageIdx + 1} of {assets.length} (Page #{currentAsset?.page_number})
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
+            <div className="space-y-4">
+              {/* Preview Mode Selector */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#695B64]">
+                  Personalized Book Preview
+                </span>
+                <div className="inline-flex rounded-full p-1 bg-[#F5EEDB] border border-[#DDD6C0] text-xs">
                   <button
-                    onClick={() => setCurrentPageIdx((prev) => Math.max(0, prev - 1))}
-                    disabled={currentPageIdx === 0}
-                    className="p-2 rounded-full border border-[#EBE3D9] hover:bg-[#FAF7F2] text-[#2D222A] disabled:opacity-30 cursor-pointer"
+                    onClick={() => setViewerMode("flipbook")}
+                    className={`px-3 py-1 rounded-full flex items-center gap-1.5 transition cursor-pointer font-medium ${
+                      viewerMode === "flipbook"
+                        ? "bg-[#C98A84] text-white shadow-xs"
+                        : "text-[#695B64] hover:text-[#2D222A]"
+                    }`}
                   >
-                    <ChevronLeft className="w-5 h-5" />
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>3D Realistic Flipbook</span>
                   </button>
                   <button
-                    onClick={() => setCurrentPageIdx((prev) => Math.min(assets.length - 1, prev + 1))}
-                    disabled={currentPageIdx === assets.length - 1}
-                    className="p-2 rounded-full border border-[#EBE3D9] hover:bg-[#FAF7F2] text-[#2D222A] disabled:opacity-30 cursor-pointer"
+                    onClick={() => setViewerMode("spread")}
+                    className={`px-3 py-1 rounded-full flex items-center gap-1.5 transition cursor-pointer font-medium ${
+                      viewerMode === "spread"
+                        ? "bg-[#C98A84] text-white shadow-xs"
+                        : "text-[#695B64] hover:text-[#2D222A]"
+                    }`}
                   >
-                    <ChevronRight className="w-5 h-5" />
+                    <Layout className="w-3.5 h-3.5" />
+                    <span>Editorial Spread</span>
                   </button>
                 </div>
               </div>
 
-              {/* Large Spread Viewer */}
-              {currentAsset && (
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
-                  {/* Left: Illustration */}
-                  <div className="md:col-span-7">
-                    <div className="relative aspect-square rounded-2xl overflow-hidden shadow-lg border border-[#EBE3D9] bg-[#FAF7F2]">
-                      <img
-                        src={currentAsset.image_url}
-                        alt={`Page ${currentAsset.page_number}`}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-[#FAEEED]/90 backdrop-blur-md text-[#C98A84] text-[10px] font-bold tracking-wider">
-                        PERSONALIZED PREVIEW
-                      </div>
+              {viewerMode === "flipbook" ? (
+                <RealisticBookFlipViewer
+                  assets={assets}
+                  currentPageIdx={currentPageIdx}
+                  onPageChange={(idx) => setCurrentPageIdx(idx)}
+                  childPhotoUrl={cleanPreview || originalPreview || job.photo_url}
+                  childName={job.child_name || childName || "Your Child"}
+                  storyTitle={story?.title || "The Girl and the Magical Unicorn"}
+                  onRetryPage={handleRetryPage}
+                  isRetrying={Boolean(retryingAssetId)}
+                />
+              ) : (
+                <div className="editorial-card p-8 bg-white space-y-6">
+                  <div className="flex items-center justify-between border-b border-[#EBE3D9] pb-4">
+                    <div>
+                      <h3 className="font-editorial-serif text-2xl font-bold text-[#2D222A]">
+                        Interactive Book Preview
+                      </h3>
+                      <span className="text-xs text-[#695B64]">
+                        Page {currentPageIdx + 1} of {assets.length} (Page #{currentAsset?.page_number})
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCurrentPageIdx((prev) => Math.max(0, prev - 1))}
+                        disabled={currentPageIdx === 0}
+                        className="p-2 rounded-full border border-[#EBE3D9] hover:bg-[#FAF7F2] text-[#2D222A] disabled:opacity-30 cursor-pointer"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => setCurrentPageIdx((prev) => Math.min(assets.length - 1, prev + 1))}
+                        disabled={currentPageIdx === assets.length - 1}
+                        className="p-2 rounded-full border border-[#EBE3D9] hover:bg-[#FAF7F2] text-[#2D222A] disabled:opacity-30 cursor-pointer"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Right: Narrative text & Metadata */}
-                  <div className="md:col-span-5 space-y-6">
-                    <div className="p-6 rounded-2xl bg-[#F7F3EC] border border-[#EBE3D9] space-y-3">
-                      <span className="text-[11px] uppercase tracking-wider text-[#C98A84] font-semibold">
-                        Story Narrative
-                      </span>
-                      <p className="font-editorial-serif text-xl text-[#2D222A] leading-relaxed italic">
-                        "{currentAsset.story_text || currentAsset.prompt_used}"
-                      </p>
-                    </div>
+                  {/* Large Spread Viewer */}
+                  {currentAsset && (
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+                      {/* Left: Illustration */}
+                      <div className="md:col-span-7">
+                        <div className="relative aspect-square rounded-2xl overflow-hidden shadow-lg border border-[#EBE3D9] bg-[#FAF7F2]">
+                          <img
+                            src={currentAsset.image_url}
+                            alt={`Page ${currentAsset.page_number}`}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-[#FAEEED]/90 backdrop-blur-md text-[#C98A84] text-[10px] font-bold tracking-wider">
+                            PERSONALIZED PREVIEW
+                          </div>
+                        </div>
+                      </div>
 
-                    <div className="space-y-3 text-xs text-[#695B64]">
-                      <div className="flex justify-between py-1.5 border-b border-[#EBE3D9]">
-                        <span>AI Provider:</span>
-                        <span className="font-medium text-[#2D222A]">{currentAsset.provider}</span>
-                      </div>
-                      <div className="flex justify-between py-1.5 border-b border-[#EBE3D9]">
-                        <span>Model:</span>
-                        <span className="font-medium text-[#2D222A]">{currentAsset.model}</span>
-                      </div>
-                      <div className="flex justify-between py-1.5 border-b border-[#EBE3D9]">
-                        <span>Generation Latency:</span>
-                        <span className="font-medium text-[#2D222A]">{currentAsset.generation_time_sec}s</span>
-                      </div>
-                      <div className="flex justify-between py-1.5 border-b border-[#EBE3D9]">
-                        <span>Asset Version:</span>
-                        <span className="font-medium text-[#2D222A]">v{currentAsset.asset_version}</span>
+                      {/* Right: Narrative text & Metadata */}
+                      <div className="md:col-span-5 space-y-6">
+                        <div className="p-6 rounded-2xl bg-[#F7F3EC] border border-[#EBE3D9] space-y-3">
+                          <span className="text-[11px] uppercase tracking-wider text-[#C98A84] font-semibold">
+                            Story Narrative
+                          </span>
+                          <p className="font-editorial-serif text-xl text-[#2D222A] leading-relaxed italic">
+                            "{currentAsset.story_text || currentAsset.prompt_used}"
+                          </p>
+                        </div>
+
+                        <div className="space-y-3 text-xs text-[#695B64]">
+                          <div className="flex justify-between py-1.5 border-b border-[#EBE3D9]">
+                            <span>AI Provider:</span>
+                            <span className="font-medium text-[#2D222A]">{currentAsset.provider}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 border-b border-[#EBE3D9]">
+                            <span>Model:</span>
+                            <span className="font-medium text-[#2D222A]">{currentAsset.model}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 border-b border-[#EBE3D9]">
+                            <span>Generation Latency:</span>
+                            <span className="font-medium text-[#2D222A]">{currentAsset.generation_time_sec}s</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 border-b border-[#EBE3D9]">
+                            <span>Asset Version:</span>
+                            <span className="font-medium text-[#2D222A]">v{currentAsset.asset_version}</span>
+                          </div>
+                        </div>
+
+                        {/* Single page regenerate button */}
+                        <button
+                          onClick={() => handleRetryPage(currentAsset.id)}
+                          disabled={retryingAssetId === currentAsset.id}
+                          className="w-full py-3 rounded-full border border-[#C98A84] text-[#C98A84] hover:bg-[#FAEEED] text-xs font-semibold transition flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${retryingAssetId === currentAsset.id ? "animate-spin" : ""}`} />
+                          <span>{retryingAssetId === currentAsset.id ? "Regenerating Page..." : "Regenerate This Page"}</span>
+                        </button>
                       </div>
                     </div>
+                  )}
 
-                    {/* Single page regenerate button */}
-                    <button
-                      onClick={() => handleRetryPage(currentAsset.id)}
-                      disabled={retryingAssetId === currentAsset.id}
-                      className="w-full py-3 rounded-full border border-[#C98A84] text-[#C98A84] hover:bg-[#FAEEED] text-xs font-semibold transition flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${retryingAssetId === currentAsset.id ? "animate-spin" : ""}`} />
-                      <span>{retryingAssetId === currentAsset.id ? "Regenerating Page..." : "Regenerate This Page"}</span>
-                    </button>
+                  {/* Thumbnails strip */}
+                  <div className="pt-6 border-t border-[#EBE3D9] flex gap-3 overflow-x-auto pb-2">
+                    {assets.map((ast, idx) => (
+                      <button
+                        key={ast.id}
+                        onClick={() => setCurrentPageIdx(idx)}
+                        className={`relative w-20 h-20 rounded-xl overflow-hidden shrink-0 border-2 transition cursor-pointer ${
+                          currentPageIdx === idx ? "border-[#C98A84] shadow-md scale-105" : "border-[#EBE3D9] opacity-70 hover:opacity-100"
+                        }`}
+                      >
+                        <img src={ast.image_url} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                        <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] px-1 rounded">
+                          #{ast.page_number}
+                        </span>
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
-
-              {/* Thumbnails strip */}
-              <div className="pt-6 border-t border-[#EBE3D9] flex gap-3 overflow-x-auto pb-2">
-                {assets.map((ast, idx) => (
-                  <button
-                    key={ast.id}
-                    onClick={() => setCurrentPageIdx(idx)}
-                    className={`relative w-20 h-20 rounded-xl overflow-hidden shrink-0 border-2 transition cursor-pointer ${currentPageIdx === idx ? "border-[#C98A84] shadow-md scale-105" : "border-[#EBE3D9] opacity-70 hover:opacity-100"
-                      }`}
-                  >
-                    <img src={ast.image_url} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
-                    <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] px-1 rounded">
-                      #{ast.page_number}
-                    </span>
-                  </button>
-                ))}
-              </div>
             </div>
           ) : (
             /* Generating skeleton */
