@@ -11,8 +11,11 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Personalized AI Children's Storybook"
     API_V1_PREFIX: str = "/api/v1"
     
-    # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BACKEND_DIR}/storybook.db")
+    # Database (PostgreSQL)
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL", 
+        "postgresql+pg8000://postgres:Narmadha19%40izone@localhost:5432/kuttystory_db"
+    )
     
     # Auth & Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "editorial-storybook-super-secret-key-2026-production")
