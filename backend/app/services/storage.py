@@ -67,6 +67,8 @@ class StorageManager:
     def get_public_url(abs_path: Optional[str]) -> Optional[str]:
         if not abs_path:
             return None
+        if abs_path.startswith("http://") or abs_path.startswith("https://") or abs_path.startswith("/") or abs_path.startswith("data:"):
+            return abs_path
         path_obj = Path(abs_path)
         try:
             rel = path_obj.relative_to(settings.STORAGE_DIR)

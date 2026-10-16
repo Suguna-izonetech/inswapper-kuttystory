@@ -117,29 +117,79 @@ class CartoonCharacterFusionEngine:
         cls,
         page_number: int,
         child_reference_path: Optional[str] = None,
-        story_slug: str = "unicorn-story"
+        story_slug: str = "unicorn-story",
+        page_image_path: Optional[str] = None,
+        face_outline_points: Optional[str] = None
     ) -> GenerationResult:
         """
-        Fuses the child's real face into the exact storybook page artwork from unicorn Story.pdf,
-        preserving the identical cartoon unicorn, fairytale backgrounds, and book aesthetics.
+        Fuses the child's real face into the storybook page artwork for any story template,
+        preserving original illustrations, characters, and aesthetics.
         Uses 100% Free AI Neural Face Swap with instant calibrated local fallback.
         """
         start_time = time.time()
 
-        # Locate original page image extracted from unicorn Story.pdf
-        source_dir = settings.SOURCE_PAGES_DIR / story_slug
-        page_file = source_dir / f"page_{page_number:02d}.png"
-        if not page_file.exists():
-            page_file = source_dir / "page_01.png"
+        # Locate original page image for this specific story
+        page_file = None
+        if page_image_path and os.path.exists(page_image_path):
+            page_file = Path(page_image_path)
+        else:
+            source_dir = settings.SOURCE_PAGES_DIR / story_slug
+            candidates = [
+                source_dir / f"page_{page_number:02d}.png",
+                source_dir / f"page_{page_number}.png",
+                source_dir / f"page_{page_number:02d}.jpg",
+                source_dir / f"page_{page_number}.jpg",
+            ]
+            for c in candidates:
+                if c.exists():
+                    page_file = c
+                    break
+
+            if not page_file or not page_file.exists():
+                all_pages = sorted(list(source_dir.glob("page_*.png")) + list(source_dir.glob("page_*.jpg")))
+                if all_pages:
+                    page_file = all_pages[0]
+                else:
+                    page_file = settings.SOURCE_PAGES_DIR / "unicorn-story" / f"page_{page_number:02d}.png"
+                    if not page_file.exists():
+                        page_file = settings.SOURCE_PAGES_DIR / "unicorn-story" / "page_01.png"
 
         base_page = Image.open(str(page_file)).convert("RGB")
-        anchor = cls.PAGE_ANCHORS.get(page_number)
+        base_w, base_h = base_page.size
+
+        # Resolve anchor: from editor points, or from static anchors if unicorn-story
+        anchor = None
+        if face_outline_points and face_outline_points not in ["", "[]"]:
+            try:
+                import json
+                pts = json.loads(face_outline_points) if isinstance(face_outline_points, str) else face_outline_points
+                if pts and len(pts) > 0:
+                    xs = [pt[0] for pt in pts]
+                    ys = [pt[1] for pt in pts]
+                    min_x = (min(xs) / 100.0) * base_w
+                    max_x = (max(xs) / 100.0) * base_w
+                    min_y = (min(ys) / 100.0) * base_h
+                    max_y = (max(ys) / 100.0) * base_h
+                    anchor = {
+                        "cx": int((min_x + max_x) / 2),
+                        "cy": int((min_y + max_y) / 2),
+                        "w": max(60, int(max_x - min_x)),
+                        "h": max(60, int(max_y - min_y)),
+                        "angle": 0,
+                        "tone": "warm_gold"
+                    }
+            except Exception as e:
+                print(f"Notice: Could not parse face_outline_points: {e}")
+
+        if not anchor and story_slug == "unicorn-story":
+            anchor = cls.PAGE_ANCHORS.get(page_number)
+
         provider_name = "100% Free Realistic Face Engine"
         model_name = "calibrated-fusion-v2"
         swapped_with_ai = False
 
-        # If this page has a character anchor and a child reference photo is provided
-        if anchor and child_reference_path and os.path.exists(child_reference_path):
+        # If a child reference photo is provided
+        if child_reference_path and os.path.exists(child_reference_path):
             # 1. First Priority: Free AI Neural Face Swap (Hugging Face Spaces)
             try:
                 from gradio_client import handle_file
@@ -147,14 +197,13 @@ class CartoonCharacterFusionEngine:
                 if client:
                     src = handle_file(child_reference_path)
                     
-                    # Optimize page image upload (compress 4MB PNG to ~400KB high-quality JPEG to prevent upload timeouts)
+                    # Optimize page image upload (compress to high-quality JPEG to prevent upload timeouts)
                     temp_dest_file = None
                     upload_target = str(page_file)
                     try:
-                        if page_file.suffix.lower() == ".png":
-                            temp_dest_file = settings.STORAGE_DIR / f"temp_upload_p{page_number:02d}_{os.getpid()}.jpg"
-                            base_page.save(str(temp_dest_file), format="JPEG", quality=92)
-                            upload_target = str(temp_dest_file)
+                        temp_dest_file = settings.STORAGE_DIR / f"temp_upload_{story_slug}_p{page_number:02d}_{os.getpid()}_{int(time.time())}.jpg"
+                        base_page.save(str(temp_dest_file), format="JPEG", quality=92)
+                        upload_target = str(temp_dest_file)
                     except Exception:
                         upload_target = str(page_file)
 
@@ -178,16 +227,26 @@ class CartoonCharacterFusionEngine:
                             except Exception:
                                 pass
             except Exception as ai_err:
-                print(f"Notice: Free AI Neural Swap on Page {page_number}: {ai_err}. Using calibrated local fusion fallback.")
+                print(f"Notice: Free AI Neural Swap on {story_slug} Page {page_number}: {ai_err}. Using calibrated local fusion fallback.")
 
             # 2. Seamless Local Fusion Fallback if AI space was busy/offline
             if not swapped_with_ai:
+                effective_anchor = anchor
+                if not effective_anchor:
+                    effective_anchor = {
+                        "cx": int(base_w * 0.50),
+                        "cy": int(base_h * 0.40),
+                        "w": int(base_w * 0.22),
+                        "h": int(base_h * 0.24),
+                        "angle": 0,
+                        "tone": "warm_gold"
+                    }
                 try:
                     with Image.open(child_reference_path) as ref_img:
-                        w, h = anchor["w"], anchor["h"]
-                        cx, cy = anchor["cx"], anchor["cy"]
-                        angle = anchor.get("angle", 0)
-                        scene_tone = anchor.get("tone", "warm_gold")
+                        w, h = effective_anchor["w"], effective_anchor["h"]
+                        cx, cy = effective_anchor["cx"], effective_anchor["cy"]
+                        angle = effective_anchor.get("angle", 0)
+                        scene_tone = effective_anchor.get("tone", "warm_gold")
 
                         # Extract and stylize the child's face with realistic fidelity
                         stylized_face = cls.extract_and_stylize_face(ref_img, w, h, scene_tone)
@@ -214,16 +273,17 @@ class CartoonCharacterFusionEngine:
         base_page.save(buf, format="PNG", optimize=True)
         duration = round(time.time() - start_time, 3)
 
+        story_title = story_slug.replace("-", " ").replace("_", " ").title()
         return GenerationResult(
             image_bytes=buf.getvalue(),
             format="png",
             provider=provider_name,
             model=model_name,
-            prompt=f"Preserved Unicorn Storybook Page {page_number} with personalized realistic character",
+            prompt=f"Preserved {story_title} Page {page_number} with personalized realistic character",
             generation_time_sec=duration,
             cost_estimate_usd=0.00,
             is_simulated=False,
-            metadata={"fused_page": page_number, "character_fused": bool(anchor), "ai_swapped": swapped_with_ai}
+            metadata={"fused_page": page_number, "character_fused": bool(anchor or swapped_with_ai), "ai_swapped": swapped_with_ai}
         )
 
 cartoon_fusion_engine = CartoonCharacterFusionEngine()

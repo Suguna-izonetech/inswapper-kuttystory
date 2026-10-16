@@ -230,6 +230,9 @@ class PDFImporterService:
         description: str = "A heartwarming personalized tale of a brave young child and a magical unicorn on an enchanted quest through secret meadows and starlit skies.",
         category: str = "Fairytale & Adventure",
         age_range: str = "3-8 years",
+        price_digital: float = 799.0,
+        price_print: float = 1399.0,
+        currency: str = "INR",
         force_reimport: bool = False
     ) -> StoryTemplate:
         """
@@ -258,6 +261,13 @@ class PDFImporterService:
         if existing_story:
             story = existing_story
             story.page_count = page_count
+            story.title = title
+            story.description = description
+            story.category = category
+            story.age_range = age_range
+            story.price_digital = price_digital
+            story.price_print = price_print
+            story.currency = currency
             story.source_pdf_path = str(dest_pdf_path)
             # Remove old pages if reimporting
             db.query(StoryPage).filter(StoryPage.story_id == story.id).delete()
@@ -270,9 +280,10 @@ class PDFImporterService:
                 age_range=age_range,
                 source_pdf_path=str(dest_pdf_path),
                 page_count=page_count,
-                status="published",  # Prototype story is published by default for the demo
-                price_digital=14.99,
-                price_print=29.99
+                status="published",
+                price_digital=price_digital,
+                price_print=price_print,
+                currency=currency
             )
             db.add(story)
             db.commit()
@@ -295,15 +306,20 @@ class PDFImporterService:
             # Selectable text
             extracted = page.get_text().strip()
 
-            # Beat matching
-            beat_info = UNICORN_DEFAULT_BEATS[idx] if idx < len(UNICORN_DEFAULT_BEATS) else {
-                "page": page_num,
-                "type": "story",
-                "personalize": True,
-                "text": f"Page {page_num} of {title}.",
-                "scene": f"Illustration for page {page_num}",
-                "prompt": f"Children's book illustration for page {page_num}"
-            }
+            # Beat matching: use unicorn template beats if applicable, otherwise generate smart beats
+            if "unicorn" in slug.lower() and idx < len(UNICORN_DEFAULT_BEATS):
+                beat_info = UNICORN_DEFAULT_BEATS[idx]
+            else:
+                p_type = "cover" if idx == 0 else ("ending" if idx == page_count - 1 else "story")
+                default_text = f"Front Cover: {title}" if idx == 0 else (f"The End of {title}." if idx == page_count - 1 else f"Narrative scene for page {page_num}.")
+                beat_info = {
+                    "page": page_num,
+                    "type": p_type,
+                    "personalize": True if idx > 0 and idx < page_count - 1 else False,
+                    "text": extracted if extracted else default_text,
+                    "scene": f"Illustration for page {page_num} of {title}",
+                    "prompt": f"Children's storybook illustration for {title}, page {page_num}, digital art"
+                }
 
             story_page = StoryPage(
                 story_id=story.id,
@@ -314,7 +330,7 @@ class PDFImporterService:
                 story_text=beat_info.get("text", ""),
                 extracted_text=extracted,
                 scene_description=beat_info.get("scene", ""),
-                character_guidance="Preserve child's face likeness, hair style, skin tone, wearing sparkling pink dress",
+                character_guidance="Preserve child's face likeness, hair style, skin tone, vibrant and whimsical storybook style",
                 prompt_template=beat_info.get("prompt", ""),
                 personalization_required=beat_info.get("personalize", True),
                 allow_illustration_generation=True

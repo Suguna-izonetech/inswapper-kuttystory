@@ -1,13 +1,13 @@
 import os
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.database import engine, Base, SessionLocal
+from app.database import engine, Base, SessionLocal, get_db
 from app.services.pdf_importer import PDFImporterService
-from app.routers import stories, personalization, books, admin, ai_admin, storage
+from app.routers import stories, personalization, books, admin, ai_admin, storage, auth
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -62,6 +62,7 @@ app.include_router(books.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(ai_admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(storage.router, prefix=settings.API_V1_PREFIX)
+app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/api/health")
 def health_check():
@@ -72,10 +73,16 @@ def health_check():
         "storage": str(settings.STORAGE_DIR)
     }
 
+@app.get("/admin_dashboard")
+@app.get("/api/v1/admin_dashboard")
+def admin_dashboard_alias(db = Depends(get_db)):
+    return admin.get_dashboard_data(db)
+
 @app.get("/")
 def root():
     return {
         "message": "Welcome to Personalized AI Children's Storybook API",
         "docs_url": "/docs",
-        "api_v1": settings.API_V1_PREFIX
+        "api_v1": settings.API_V1_PREFIX,
+        "admin_dashboard": "/admin_dashboard"
     }

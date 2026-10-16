@@ -6,14 +6,31 @@ from datetime import datetime
 class UserBase(BaseModel):
     name: str
     email: str
-    role: str = "customer"
+    phone: Optional[str] = None
+    role: str = "admin"
+
+class UserRegister(BaseModel):
+    name: str
+    phone: Optional[str] = None
+    email: str
+    password: str
+    confirm_password: str
 
 class UserCreate(UserBase):
     password: str
 
 class UserLogin(BaseModel):
-    email: str
+    username: str  # Can be username or email
     password: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    code: str
+    new_password: str
+    confirm_password: str
 
 class UserOut(UserBase):
     id: str
@@ -37,6 +54,20 @@ class StoryPageBase(BaseModel):
     prompt_template: str = ""
     personalization_required: bool = True
     allow_illustration_generation: bool = True
+    face_outline_points: Optional[str] = ""
+    text_x: Optional[float] = 50.0
+    text_y: Optional[float] = 89.5
+    font_size: Optional[int] = 20
+    font_family: Optional[str] = "Sans (DejaVu Bold)"
+    font_color: Optional[str] = "#000000"
+    letter_spacing: Optional[int] = 0
+    stroke_color: Optional[str] = "#FFFFFF"
+    stroke_width: Optional[int] = 0
+    has_shadow: Optional[bool] = True
+    soft_line_break: Optional[bool] = True
+    has_background_box: Optional[bool] = False
+    warp_style: Optional[str] = "None"
+    gender_variant: Optional[str] = "boy"
 
 class StoryPageUpdate(BaseModel):
     story_text: Optional[str] = None
@@ -46,6 +77,21 @@ class StoryPageUpdate(BaseModel):
     prompt_template: Optional[str] = None
     personalization_required: Optional[bool] = None
     allow_illustration_generation: Optional[bool] = None
+    original_image_path: Optional[str] = None
+    face_outline_points: Optional[str] = None
+    text_x: Optional[float] = None
+    text_y: Optional[float] = None
+    font_size: Optional[int] = None
+    font_family: Optional[str] = None
+    font_color: Optional[str] = None
+    letter_spacing: Optional[int] = None
+    stroke_color: Optional[str] = None
+    stroke_width: Optional[int] = None
+    has_shadow: Optional[bool] = None
+    soft_line_break: Optional[bool] = None
+    has_background_box: Optional[bool] = None
+    warp_style: Optional[str] = None
+    gender_variant: Optional[str] = None
 
 class StoryPageOut(StoryPageBase):
     id: str
@@ -68,9 +114,30 @@ class StoryTemplateBase(BaseModel):
     price_print: float = 29.99
     currency: str = "USD"
     status: str = "draft"
+    target_gender: Optional[str] = "both"
+    min_age: Optional[int] = 2
+    max_age: Optional[int] = 13
+
+class StoryTemplateCreate(BaseModel):
+    title: str
+    slug: Optional[str] = None
+    category: str = "ADVENTURE"
+    min_age: Optional[int] = 3
+    max_age: Optional[int] = 7
+    age_range: Optional[str] = None
+    price_digital: float = 799.0
+    price_print: float = 1399.0
+    currency: str = "INR"
+    page_count: int = 28
+    description: Optional[str] = None
+    cover_image_url: Optional[str] = None
+    cover_image_path: Optional[str] = None
+    status: str = "published"
+    target_gender: Optional[str] = "both"
 
 class StoryTemplateUpdate(BaseModel):
     title: Optional[str] = None
+    slug: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
     age_range: Optional[str] = None
@@ -79,6 +146,15 @@ class StoryTemplateUpdate(BaseModel):
     price_print: Optional[float] = None
     currency: Optional[str] = None
     status: Optional[str] = None
+    cover_image_url: Optional[str] = None
+    cover_image_path: Optional[str] = None
+    page_count: Optional[int] = None
+    target_gender: Optional[str] = None
+    min_age: Optional[int] = None
+    max_age: Optional[int] = None
+    cover_image_url: Optional[str] = None
+    cover_image_path: Optional[str] = None
+    page_count: Optional[int] = None
 
 class StoryTemplateOut(StoryTemplateBase):
     id: str
@@ -103,6 +179,7 @@ class GeneratedAssetOut(BaseModel):
     provider: str
     model: str
     prompt_used: str
+    story_text: Optional[str] = ""
     generation_status: str
     review_status: str
     cost_estimate: float
@@ -126,6 +203,8 @@ class PersonalizationOut(BaseModel):
     id: str
     user_id: Optional[str] = None
     story_id: str
+    story_title: Optional[str] = "Storybook"
+    story_slug: Optional[str] = ""
     child_name: str
     photo_path: str
     photo_url: Optional[str] = None
@@ -138,6 +217,10 @@ class PersonalizationOut(BaseModel):
     error_details: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    pages_label: Optional[str] = "4 free"
+    is_purchased: Optional[bool] = False
+    created_formatted: Optional[str] = None
+    pdf_download_url: Optional[str] = None
     assets: Optional[List[GeneratedAssetOut]] = []
     class Config:
         from_attributes = True
@@ -206,3 +289,40 @@ class POCTestResult(BaseModel):
     pages: List[POCTestPageResult]
     summary: str
     status: str
+
+# Order & Admin Dashboard Schemas
+class OrderBase(BaseModel):
+    order_number: Optional[str] = None
+    customer_name: str
+    customer_email: Optional[str] = None
+    book_id: Optional[str] = None
+    job_id: Optional[str] = None
+    format_type: str = "print_hardcover"
+    amount: float = 1299.0
+    currency: str = "INR"
+    status: str = "Pending"
+    payment_status: str = "paid"
+    shipping_address: Optional[str] = None
+
+class OrderCreate(OrderBase):
+    pass
+
+class OrderStatusUpdate(BaseModel):
+    status: str
+
+class OrderOut(OrderBase):
+    id: str
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+class DashboardStatsOut(BaseModel):
+    revenue: float
+    revenue_formatted: str
+    currency_symbol: str
+    currency: str
+    paid_orders: int
+    previews_created: int
+    live_stories: int
+    recent_orders: List[OrderOut]
+    status_counts: Dict[str, int]

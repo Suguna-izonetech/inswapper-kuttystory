@@ -36,8 +36,18 @@ class JobRunner:
             if not job:
                 return
 
+            story = job.story or db.query(StoryTemplate).filter(StoryTemplate.id == job.story_id).first()
+            story_slug = story.slug if story else "unicorn-story"
+            story_title = story.title if story else "Storybook"
+
+            # Remove previous assets and books if re-running this job
+            db.query(GeneratedAsset).filter(GeneratedAsset.job_id == job.id).delete()
+            db.query(Book).filter(Book.job_id == job.id).delete()
+            job.completed_pages = 0
+            job.failed_pages = 0
+
             job.status = "analyzing"
-            job.current_stage = "Analyzing story scenes & preparing character reference"
+            job.current_stage = f"Analyzing {story_title} scenes & preparing character reference"
             db.commit()
 
             # Normalize child reference photo
@@ -48,7 +58,7 @@ class JobRunner:
             
             # Choose pages to personalize for preview
             preview_limit = min(settings.PREVIEW_PAGE_LIMIT, len(story_pages))
-            # Pick representative beats with prominent character presence: 1 (cover), 3 (garden walk), 7 (unicorn portrait), 10 (meadow run), 13 (bird rescue)
+            # Pick representative beats across the story
             preview_page_indices = [0, 2, 6, 9, 12] if len(story_pages) >= 13 else list(range(preview_limit))
             target_pages = [story_pages[i] for i in preview_page_indices if i < len(story_pages)]
 
@@ -63,7 +73,13 @@ class JobRunner:
                 job.current_stage = f"Fusing cartoon character for Page {page.page_number} ({idx+1}/{len(target_pages)})"
                 db.commit()
 
-                prompt = page.prompt_template or f"Children's book illustration for page {page.page_number}"
+                # Personalized story narrative
+                raw_text = page.story_text or page.extracted_text or f"Story scene for page {page.page_number}"
+                personalized_text = raw_text
+                for tag in ["[Name]", "{name}", "[child_name]", "{child_name}"]:
+                    personalized_text = personalized_text.replace(tag, job.child_name)
+
+                prompt = page.prompt_template or f"Children's book illustration for {story_title}, page {page.page_number}"
                 expanded = await gemini_provider.expand_prompt(prompt, job.child_name)
 
                 try:
@@ -78,7 +94,9 @@ class JobRunner:
                         gen_res = cartoon_fusion_engine.fuse_page(
                             page_number=page.page_number,
                             child_reference_path=norm_ref,
-                            story_slug="unicorn-story"
+                            story_slug=story_slug,
+                            page_image_path=page.original_image_path,
+                            face_outline_points=page.face_outline_points
                         )
 
                     # Save generated image
@@ -97,7 +115,7 @@ class JobRunner:
                         storage_path=asset_path,
                         provider=gen_res.provider,
                         model=gen_res.model,
-                        prompt_used=expanded,
+                        prompt_used=personalized_text or expanded,
                         generation_status="completed",
                         review_status="approved",
                         cost_estimate=gen_res.cost_estimate_usd,
@@ -111,7 +129,7 @@ class JobRunner:
                         "page_number": page.page_number,
                         "page_type": page.page_type,
                         "image_path": asset_path,
-                        "story_text": page.story_text
+                        "story_text": personalized_text
                     })
                 except Exception as e:
                     job.failed_pages += 1
@@ -128,7 +146,8 @@ class JobRunner:
                 pages_data=generated_pages_data,
                 output_filename=preview_filename,
                 book_type="preview",
-                child_name=job.child_name
+                child_name=job.child_name,
+                story_title=story_title
             )
 
             import json
@@ -169,7 +188,16 @@ class JobRunner:
             if not job or not page:
                 return None
 
-            prompt = page.prompt_template or f"Illustration for page {page.page_number}"
+            story = job.story or db.query(StoryTemplate).filter(StoryTemplate.id == job.story_id).first()
+            story_slug = story.slug if story else "unicorn-story"
+            story_title = story.title if story else "Storybook"
+
+            raw_text = page.story_text or page.extracted_text or f"Story scene for page {page.page_number}"
+            personalized_text = raw_text
+            for tag in ["[Name]", "{name}", "[child_name]", "{child_name}"]:
+                personalized_text = personalized_text.replace(tag, job.child_name)
+
+            prompt = page.prompt_template or f"Children's book illustration for {story_title}, page {page.page_number}"
             expanded = await gemini_provider.expand_prompt(prompt, job.child_name)
 
             if settings.ACTIVE_IMAGE_PROVIDER == "huggingface" and settings.HF_TOKEN:
@@ -183,7 +211,9 @@ class JobRunner:
                 gen_res = cartoon_fusion_engine.fuse_page(
                     page_number=page.page_number,
                     child_reference_path=job.photo_path,
-                    story_slug="unicorn-story"
+                    story_slug=story_slug,
+                    page_image_path=page.original_image_path,
+                    face_outline_points=page.face_outline_points
                 )
 
             asset_filename = f"job_{job.id}_p{page.page_number:02d}_v{asset.asset_version + 1}_{int(time.time())}.{gen_res.format}"
@@ -197,6 +227,7 @@ class JobRunner:
             asset.asset_version += 1
             asset.generation_status = "completed"
             asset.review_status = "pending_review"
+            asset.prompt_used = personalized_text or expanded
             asset.generation_time_sec = gen_res.generation_time_sec
             asset.cost_estimate = gen_res.cost_estimate_usd
             db.commit()

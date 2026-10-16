@@ -72,9 +72,11 @@ class GeminiStoryProvider(StoryAnalysisProvider):
         Inject personalization guidance into the prompt.
         """
         features_desc = child_features or "a cheerful young child with expressive eyes and a radiant smile"
+        clean_base = (base_prompt or "")
+        for tag in ["[Name]", "{name}", "[child_name]", "{child_name}"]:
+            clean_base = clean_base.replace(tag, child_name)
         prompt = (
-            f"Children's storybook illustration of {child_name}, {features_desc}, "
-            f"wearing a fairytale pink gown, {base_prompt}. "
+            f"Children's storybook illustration of {child_name}, {features_desc}, {clean_base}. "
             f"Soft editorial children's book art style, rich atmospheric depth, cinematic lighting, masterpiece, clean 3D digital storybook painting."
         )
         return prompt

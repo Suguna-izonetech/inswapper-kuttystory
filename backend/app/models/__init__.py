@@ -13,8 +13,11 @@ class User(Base):
     id = Column(String(36), primary_key=True, default=gen_uuid)
     name = Column(String(100), nullable=False)
     email = Column(String(150), unique=True, index=True, nullable=False)
+    phone = Column(String(30), nullable=True)
     hashed_password = Column(String(255), nullable=False)
-    role = Column(String(20), default="customer")  # "admin", "customer"
+    role = Column(String(20), default="admin")  # "admin", "customer"
+    reset_token = Column(String(100), nullable=True)
+    reset_token_expires = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     child_profiles = relationship("ChildProfile", back_populates="parent")
@@ -48,13 +51,16 @@ class StoryTemplate(Base):
     category = Column(String(50), default="Fairytale & Adventure")
     age_range = Column(String(50), default="3-8 years")
     language = Column(String(20), default="English")
-    source_pdf_path = Column(String(500), nullable=False)
+    source_pdf_path = Column(String(500), nullable=True, default="")
     page_count = Column(Integer, default=26)
     status = Column(String(30), default="draft")  # "draft", "published", "archived"
     cover_image_path = Column(String(500), nullable=True)
-    price_digital = Column(Float, default=14.99)
-    price_print = Column(Float, default=29.99)
-    currency = Column(String(10), default="USD")
+    price_digital = Column(Float, default=799.0)
+    price_print = Column(Float, default=1399.0)
+    currency = Column(String(10), default="INR")
+    target_gender = Column(String(20), default="both")  # "both", "boy", "girl"
+    min_age = Column(Integer, default=2)
+    max_age = Column(Integer, default=13)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
@@ -70,7 +76,7 @@ class StoryPage(Base):
     page_index = Column(Integer, nullable=False)  # 0 to 25
     page_number = Column(Integer, nullable=False)  # 1 to 26
     page_type = Column(String(30), default="story")  # "cover", "story", "ending", "dedication", "other"
-    original_image_path = Column(String(500), nullable=False)
+    original_image_path = Column(String(500), nullable=True, default="")
     story_text = Column(Text, default="")
     extracted_text = Column(Text, default="")
     scene_description = Column(Text, default="")
@@ -78,6 +84,22 @@ class StoryPage(Base):
     prompt_template = Column(Text, default="")
     personalization_required = Column(Boolean, default=True)
     allow_illustration_generation = Column(Boolean, default=True)
+    
+    # Page Editor CMS: Face tracing, positioning & typography settings
+    face_outline_points = Column(Text, default="")
+    text_x = Column(Float, default=50.0)
+    text_y = Column(Float, default=89.5)
+    font_size = Column(Integer, default=20)
+    font_family = Column(String(100), default="Sans (DejaVu Bold)")
+    font_color = Column(String(30), default="#000000")
+    letter_spacing = Column(Integer, default=0)
+    stroke_color = Column(String(30), default="#FFFFFF")
+    stroke_width = Column(Integer, default=0)
+    has_shadow = Column(Boolean, default=True)
+    soft_line_break = Column(Boolean, default=True)
+    has_background_box = Column(Boolean, default=False)
+    warp_style = Column(String(50), default="None")
+    gender_variant = Column(String(20), default="boy")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     story = relationship("StoryTemplate", back_populates="pages")
@@ -156,13 +178,17 @@ class Order(Base):
     __tablename__ = "orders"
 
     id = Column(String(36), primary_key=True, default=gen_uuid)
+    order_number = Column(String(50), nullable=True, index=True)
     user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    customer_name = Column(String(100), default="Valued Customer")
+    customer_email = Column(String(150), nullable=True)
     book_id = Column(String(36), ForeignKey("books.id"), nullable=True)
-    job_id = Column(String(36), ForeignKey("personalization_jobs.id"), nullable=False)
-    format_type = Column(String(30), default="digital")  # "digital", "print_hardcover", "print_softcover"
-    amount = Column(Float, default=14.99)
-    currency = Column(String(10), default="USD")
-    payment_status = Column(String(30), default="unpaid")  # "unpaid", "authorized", "captured", "failed"
+    job_id = Column(String(36), ForeignKey("personalization_jobs.id"), nullable=True)
+    format_type = Column(String(30), default="print_hardcover")  # "digital", "print_hardcover", "print_softcover"
+    amount = Column(Float, default=1299.0)
+    currency = Column(String(10), default="INR")
+    status = Column(String(50), default="Pending")  # "In Production", "Paid", "Delivered", "Shipped", "Pending"
+    payment_status = Column(String(30), default="paid")  # "unpaid", "authorized", "captured", "failed", "paid"
     payment_intent_id = Column(String(100), nullable=True)
     shipping_address = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import {
   Sparkles,
   Upload,
@@ -22,7 +22,9 @@ import PhotoValidationStatus from "@/components/PhotoValidationStatus";
 
 export default function PersonalizePage() {
   const params = useParams<{ slug?: string }>();
+  const [searchParams] = useSearchParams();
   const slug = params?.slug || "unicorn-story";
+  const urlJobId = searchParams.get("job_id");
 
   // Story & page state
   const [story, setStory] = useState<StoryTemplate | null>(null);
@@ -60,7 +62,7 @@ export default function PersonalizePage() {
   const [isProcessingBg, setIsProcessingBg] = useState(false);
 
   // Job & Preview states
-  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(urlJobId);
   const [job, setJob] = useState<PersonalizationJob | null>(null);
   const [currentPageIdx, setCurrentPageIdx] = useState(0);
   const [retryingAssetId, setRetryingAssetId] = useState<string | null>(null);
@@ -88,6 +90,11 @@ export default function PersonalizePage() {
   // Polling job progress when job is active
   useEffect(() => {
     if (!jobId) return;
+
+    // Immediately fetch current job state
+    api.getPersonalizationJob(jobId)
+      .then((data) => setJob(data))
+      .catch((err) => console.error("Initial job load error:", err));
 
     const interval = setInterval(async () => {
       try {
@@ -799,7 +806,7 @@ export default function PersonalizePage() {
                         Story Narrative
                       </span>
                       <p className="font-editorial-serif text-xl text-[#2D222A] leading-relaxed italic">
-                        "{currentAsset.prompt_used.slice(0, 150)}..."
+                        "{currentAsset.story_text || currentAsset.prompt_used}"
                       </p>
                     </div>
 

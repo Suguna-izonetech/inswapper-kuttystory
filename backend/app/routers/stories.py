@@ -25,6 +25,9 @@ def enrich_story_urls(story: StoryTemplate) -> dict:
         "page_count": story.page_count,
         "cover_image_path": story.cover_image_path,
         "cover_image_url": storage.get_public_url(story.cover_image_path),
+        "target_gender": getattr(story, "target_gender", "both") or "both",
+        "min_age": getattr(story, "min_age", 2) or 2,
+        "max_age": getattr(story, "max_age", 13) or 13,
         "created_at": story.created_at,
         "updated_at": story.updated_at,
         "pages": []
@@ -44,7 +47,21 @@ def enrich_story_urls(story: StoryTemplate) -> dict:
             "personalization_required": page.personalization_required,
             "allow_illustration_generation": page.allow_illustration_generation,
             "original_image_path": page.original_image_path,
-            "original_image_url": storage.get_public_url(page.original_image_path)
+            "original_image_url": storage.get_public_url(page.original_image_path),
+            "face_outline_points": getattr(page, "face_outline_points", "") or "",
+            "text_x": getattr(page, "text_x", 50.0) if getattr(page, "text_x", None) is not None else 50.0,
+            "text_y": getattr(page, "text_y", 89.5) if getattr(page, "text_y", None) is not None else 89.5,
+            "font_size": getattr(page, "font_size", 20) or 20,
+            "font_family": getattr(page, "font_family", "Sans (DejaVu Bold)") or "Sans (DejaVu Bold)",
+            "font_color": getattr(page, "font_color", "#000000") or "#000000",
+            "letter_spacing": getattr(page, "letter_spacing", 0) or 0,
+            "stroke_color": getattr(page, "stroke_color", "#FFFFFF") or "#FFFFFF",
+            "stroke_width": getattr(page, "stroke_width", 0) if getattr(page, "stroke_width", None) is not None else 0,
+            "has_shadow": getattr(page, "has_shadow", True) if getattr(page, "has_shadow", None) is not None else True,
+            "soft_line_break": getattr(page, "soft_line_break", True) if getattr(page, "soft_line_break", None) is not None else True,
+            "has_background_box": getattr(page, "has_background_box", False) or False,
+            "warp_style": getattr(page, "warp_style", "None") or "None",
+            "gender_variant": getattr(page, "gender_variant", "boy") or "boy",
         })
     return data
 
