@@ -242,11 +242,47 @@ def delete_story(story_id: str, db: Session = Depends(get_db)):
     if not story:
         raise HTTPException(status_code=404, detail="Story not found")
 
-    # Delete all pages
-    db.query(StoryPage).filter(StoryPage.story_id == story_id).delete()
+    story_title = story.title
+
+    # 1. Get all pages of the story
+    pages = db.query(StoryPage).filter(StoryPage.story_id == story_id).all()
+    page_ids = [p.id for p in pages]
+
+    # 2. Get all personalization jobs of the story
+    jobs = db.query(PersonalizationJob).filter(PersonalizationJob.story_id == story_id).all()
+    job_ids = [j.id for j in jobs]
+
+    # 3. Clean up books and orders referencing these jobs
+    if job_ids:
+        books = db.query(Book).filter(Book.job_id.in_(job_ids)).all()
+        book_ids = [b.id for b in books]
+        if book_ids:
+            db.query(Order).filter(Order.book_id.in_(book_ids)).update({Order.book_id: None}, synchronize_session=False)
+        db.query(Order).filter(Order.job_id.in_(job_ids)).update({Order.job_id: None}, synchronize_session=False)
+        db.query(Book).filter(Book.job_id.in_(job_ids)).delete(synchronize_session=False)
+
+    # 4. Clean up generated assets linked to these jobs or these pages
+    if page_ids or job_ids:
+        conditions = []
+        if page_ids:
+            conditions.append(GeneratedAsset.story_page_id.in_(page_ids))
+        if job_ids:
+            conditions.append(GeneratedAsset.job_id.in_(job_ids))
+        from sqlalchemy import or_
+        db.query(GeneratedAsset).filter(or_(*conditions)).delete(synchronize_session=False)
+
+    # 5. Delete personalization jobs
+    if job_ids:
+        db.query(PersonalizationJob).filter(PersonalizationJob.id.in_(job_ids)).delete(synchronize_session=False)
+
+    # 6. Delete all pages
+    if page_ids:
+        db.query(StoryPage).filter(StoryPage.id.in_(page_ids)).delete(synchronize_session=False)
+
+    # 7. Delete the story
     db.delete(story)
     db.commit()
-    return {"status": "success", "message": f"Story '{story.title}' deleted"}
+    return {"status": "success", "message": f"Story '{story_title}' deleted successfully"}
 
 @router.post("/stories/import-pdf", response_model=StoryTemplateOut)
 async def import_pdf_story(
@@ -430,6 +466,8 @@ def delete_page(page_id: str, db: Session = Depends(get_db)):
     if not page:
         raise HTTPException(status_code=404, detail="Story page not found")
     story_id = page.story_id
+    # Clean up any generated assets referencing this page first
+    db.query(GeneratedAsset).filter(GeneratedAsset.story_page_id == page_id).delete(synchronize_session=False)
     db.delete(page)
     story = db.query(StoryTemplate).filter(StoryTemplate.id == story_id).first()
     if story:

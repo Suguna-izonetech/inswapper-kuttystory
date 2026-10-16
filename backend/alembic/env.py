@@ -21,9 +21,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Dynamically set sqlalchemy.url from app settings if placeholder or empty
-if not config.get_main_option("sqlalchemy.url") or "driver://" in str(config.get_main_option("sqlalchemy.url")):
-    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
+# Dynamically set sqlalchemy.url from app settings
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
 
 # Target metadata for autogenerate
 target_metadata = Base.metadata
