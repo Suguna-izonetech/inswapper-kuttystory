@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     ACTIVE_STORY_PROVIDER: str = os.getenv("ACTIVE_STORY_PROVIDER", "gemini") # gemini, rule_based
     ACTIVE_IMAGE_PROVIDER: str = os.getenv("ACTIVE_IMAGE_PROVIDER", "fal_ai") # fal_ai, huggingface, template_fusion, mock_poc
     HF_MODEL_NAME: str = os.getenv("HF_MODEL_NAME", "stabilityai/stable-diffusion-xl-base-1.0")
+    HF_FACE_SWAP_SPACE: str = os.getenv("HF_FACE_SWAP_SPACE", "ovi054/face-swap-pro")
+    HF_FACE_SWAP_ENHANCE: bool = os.getenv("HF_FACE_SWAP_ENHANCE", "true").lower() == "true"
     
     # Budgets & Limits
     PER_BOOK_BUDGET_USD: float = 2.50
