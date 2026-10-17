@@ -83,6 +83,8 @@ Both backend and frontend can be started with simple commands:
 ```powershell
 cd backend
 pip install -r requirements.txt
+alembic upgrade head
+python seed_stories.py
 uvicorn app.main:app --reload
 ```
 - API Health Check: `http://127.0.0.1:8000/api/health`
