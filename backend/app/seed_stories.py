@@ -42,13 +42,8 @@ def seed():
             else:
                 print(f"Sample PDF not found at: {sample_pdf}")
 
-        # 2. Clean up any non-unicorn mock stories from database
-        mock_stories = db.query(StoryTemplate).filter(StoryTemplate.slug != "unicorn-story").all()
-        for s in mock_stories:
-            print(f"Removing mock story: {s.title}")
-            db.query(StoryPage).filter(StoryPage.story_id == s.id).delete(synchronize_session=False)
-            db.delete(s)
-        db.commit()
+        # 2. Verified story catalog status
+        print("Seed verified: keeping all admin-uploaded and existing stories intact.")
 
         total = db.query(StoryTemplate).count()
         live = db.query(StoryTemplate).filter(StoryTemplate.status == "published").count()

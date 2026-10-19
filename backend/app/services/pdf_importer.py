@@ -222,12 +222,58 @@ UNICORN_DEFAULT_BEATS = [
 
 class PDFImporterService:
     @staticmethod
+    def detect_page_character_face(img_path: str) -> str:
+        """
+        Dynamically detect character face in rendered page and return JSON string of outline points.
+        """
+        try:
+            import cv2
+            import math
+            import json
+            yunet_path = Path(__file__).parent / "ai" / "face_detection_yunet.onnx"
+            if not yunet_path.exists():
+                return ""
+            img_bgr = cv2.imread(img_path)
+            if img_bgr is None:
+                return ""
+            h, w = img_bgr.shape[:2]
+            det = cv2.FaceDetectorYN_create(str(yunet_path), "", (w, h), score_threshold=0.20)
+            res = det.detect(img_bgr)
+            if res[1] is not None and len(res[1]) > 0:
+                best_box = None
+                best_score = -1
+                for f in res[1]:
+                    bx, by, bw, bh = [int(v) for v in f[:4]]
+                    score = float(f[14]) if len(f) > 14 else (bw * bh)
+                    area = bw * bh
+                    if area > (w * h * 0.003) and score > best_score:
+                        best_score = score
+                        best_box = (bx, by, bw, bh)
+                if best_box:
+                    bx, by, bw, bh = best_box
+                    cx = bx + bw / 2.0
+                    cy = by + bh / 2.0
+                    rx = (bw / 2.0) * 1.05
+                    ry = (bh / 2.0) * 1.15
+                    pts = []
+                    for i in range(16):
+                        angle = (2 * math.pi * i) / 16
+                        px = round(((cx + rx * math.cos(angle)) / w) * 100.0, 2)
+                        py = round(((cy + ry * math.sin(angle)) / h) * 100.0, 2)
+                        pts.append([px, py])
+                    pts.append(pts[0])
+                    return json.dumps(pts)
+        except Exception as e:
+            print(f"Notice: Face detection on import failed: {e}")
+        return ""
+
+    @staticmethod
     def import_story_from_pdf(
         pdf_path: str,
         db: Session,
         title: str = "The Girl and the Magical Unicorn",
         slug: str = "unicorn-story",
-        description: str = "A heartwarming personalized tale of a brave young child and a magical unicorn on an enchanted quest through secret meadows and starlit skies.",
+        description: str = "A heartwarming personalized tale of a brave young child on an enchanted quest through secret meadows and starlit skies.",
         category: str = "Fairytale & Adventure",
         age_range: str = "3-8 years",
         price_digital: float = 799.0,
@@ -237,7 +283,8 @@ class PDFImporterService:
     ) -> StoryTemplate:
         """
         Idempotently import a storybook from a PDF file.
-        Renders every page into high-resolution PNGs and extracts selectable text.
+        Renders every page into high-resolution PNGs, extracts text,
+        and dynamically detects character face anchors for seamless AI personalization.
         """
         if not os.path.exists(pdf_path):
             raise FileNotFoundError(f"Source PDF not found at: {pdf_path}")
@@ -306,19 +353,32 @@ class PDFImporterService:
             # Selectable text
             extracted = page.get_text().strip()
 
+            # Dynamic Face Detection on the imported illustration
+            detected_face_points = PDFImporterService.detect_page_character_face(str(page_dest))
+
             # Beat matching: use unicorn template beats if applicable, otherwise generate smart beats
             if "unicorn" in slug.lower() and idx < len(UNICORN_DEFAULT_BEATS):
                 beat_info = UNICORN_DEFAULT_BEATS[idx]
             else:
                 p_type = "cover" if idx == 0 else ("ending" if idx == page_count - 1 else "story")
-                default_text = f"Front Cover: {title}" if idx == 0 else (f"The End of {title}." if idx == page_count - 1 else f"Narrative scene for page {page_num}.")
+                if idx == 0:
+                    default_text = f"{title}"
+                elif idx == page_count - 1:
+                    default_text = f"And so the wondrous journey of {title} concluded with warmth and joy. {{child_name}} smiled brightly, knowing that courage, kindness, and friendship make every dream come true."
+                elif idx == 1:
+                    default_text = f"Every morning, young {{child_name}} greeted the morning sun with a heart full of curiosity, ready to discover the secret wonders of {title}."
+                elif idx == 2:
+                    default_text = f"Suddenly, a magical breeze swept across the path. {{child_name}} looked around with wide, delighted eyes as an adventure began to unfold."
+                else:
+                    default_text = f"Together, {{child_name}} stepped bravely forward, exploring new vistas and discovering that the greatest power of all was believing in oneself."
+
                 beat_info = {
                     "page": page_num,
                     "type": p_type,
-                    "personalize": True if idx > 0 and idx < page_count - 1 else False,
+                    "personalize": True,  # All pages are personalizable!
                     "text": extracted if extracted else default_text,
                     "scene": f"Illustration for page {page_num} of {title}",
-                    "prompt": f"Children's storybook illustration for {title}, page {page_num}, digital art"
+                    "prompt": f"Children's storybook illustration for {title}, page {page_num}, 3D digital picture book art style"
                 }
 
             story_page = StoryPage(
@@ -326,19 +386,20 @@ class PDFImporterService:
                 page_index=idx,
                 page_number=page_num,
                 page_type=beat_info.get("type", "story"),
-                original_image_path=str(page_dest),
+                original_image_path=str(page_dest.resolve()),
                 story_text=beat_info.get("text", ""),
                 extracted_text=extracted,
                 scene_description=beat_info.get("scene", ""),
                 character_guidance="Preserve child's face likeness, hair style, skin tone, vibrant and whimsical storybook style",
                 prompt_template=beat_info.get("prompt", ""),
                 personalization_required=beat_info.get("personalize", True),
-                allow_illustration_generation=True
+                allow_illustration_generation=True,
+                face_outline_points=detected_face_points or ""
             )
             db.add(story_page)
 
             if page_num == 1:
-                story.cover_image_path = str(page_dest)
+                story.cover_image_path = str(page_dest.resolve())
 
         db.commit()
         db.refresh(story)

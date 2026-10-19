@@ -72,6 +72,31 @@ export default function PersonalizePage() {
   const [retryingAssetId, setRetryingAssetId] = useState<string | null>(null);
   const [viewerMode, setViewerMode] = useState<"flipbook" | "spread">("flipbook");
 
+  // Multi-Language Translation states
+  const [selectedLanguage, setSelectedLanguage] = useState("english");
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [isTranslating, setIsTranslating] = useState(false);
+
+  const handleLanguageChange = async (targetLang: string) => {
+    setSelectedLanguage(targetLang);
+    if (targetLang === "english") {
+      setTranslations({});
+      return;
+    }
+    if (!jobId) return;
+    setIsTranslating(true);
+    try {
+      const res = await api.translateJob(jobId, targetLang);
+      if (res && res.translations) {
+        setTranslations(res.translations);
+      }
+    } catch (err) {
+      console.error("Translation error:", err);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch story template
@@ -98,13 +123,21 @@ export default function PersonalizePage() {
 
     // Immediately fetch current job state
     api.getPersonalizationJob(jobId)
-      .then((data) => setJob(data))
+      .then((data) => {
+        setJob(data);
+        if (data.story_slug && data.story_slug !== slug) {
+          api.getStory(data.story_slug).then(s => setStory(s)).catch(() => {});
+        }
+      })
       .catch((err) => console.error("Initial job load error:", err));
 
     const interval = setInterval(async () => {
       try {
         const updated = await api.getPersonalizationJob(jobId);
         setJob(updated);
+        if (updated.story_slug && updated.story_slug !== slug && (!story || story.slug !== updated.story_slug)) {
+          api.getStory(updated.story_slug).then(s => setStory(s)).catch(() => {});
+        }
         if (updated.status === "completed" || updated.status === "failed") {
           clearInterval(interval);
         }
@@ -750,13 +783,13 @@ export default function PersonalizePage() {
               </div>
               {job.status === "completed" && (
                 <a
-                  href={`/api/v1/books/${job.id}/download`}
+                  href={`/api/v1/personalization/${job.id}/pdf?lang=${selectedLanguage}`}
                   target="_blank"
                   rel="noreferrer"
                   className="px-5 py-2.5 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Download Preview PDF</span>
+                  <span>Download Preview PDF ({selectedLanguage.toUpperCase()})</span>
                 </a>
               )}
             </div>
@@ -803,12 +836,47 @@ export default function PersonalizePage() {
                   onPageChange={(idx) => setCurrentPageIdx(idx)}
                   childPhotoUrl={cleanPreview || originalPreview || job.photo_url}
                   childName={job.child_name || childName || "Your Child"}
-                  storyTitle={story?.title || "The Girl and the Magical Unicorn"}
+                  storyTitle={story?.title || "Storybook"}
                   onRetryPage={handleRetryPage}
                   isRetrying={Boolean(retryingAssetId)}
+                  selectedLanguage={selectedLanguage}
+                  onLanguageChange={handleLanguageChange}
+                  translatedTexts={translations}
+                  isTranslating={isTranslating}
                 />
               ) : (
                 <div className="editorial-card p-8 bg-white space-y-6">
+                  {/* Language Selector in Spread Mode */}
+                  <div className="p-3 rounded-2xl bg-[#F7F3EC] border border-[#EBE3D9] flex flex-wrap items-center justify-between gap-3">
+                    <span className="text-xs font-bold text-[#2D222A]">
+                      Language Translation:
+                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {[
+                        { id: "english", label: "English" },
+                        { id: "tamil", label: "தமிழ் (Tamil)" },
+                        { id: "malayalam", label: "മലയാളം (Malayalam)" },
+                        { id: "hindi", label: "हिंदी (Hindi)" },
+                        { id: "marathi", label: "मराठी (Marathi)" },
+                        { id: "telugu", label: "తెలుగు (Telugu)" },
+                        { id: "kannada", label: "ಕನ್ನಡ (Kannada)" },
+                      ].map((lang) => (
+                        <button
+                          key={lang.id}
+                          onClick={() => handleLanguageChange(lang.id)}
+                          disabled={isTranslating}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold transition border cursor-pointer ${
+                            selectedLanguage === lang.id
+                              ? "bg-[#C98A84] text-white border-[#C98A84]"
+                              : "bg-white text-gray-700 hover:bg-gray-100 border-gray-200"
+                          }`}
+                        >
+                          {lang.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between border-b border-[#EBE3D9] pb-4">
                     <div>
                       <h3 className="font-editorial-serif text-2xl font-bold text-[#2D222A]">
@@ -858,10 +926,18 @@ export default function PersonalizePage() {
                       <div className="md:col-span-5 space-y-6">
                         <div className="p-6 rounded-2xl bg-[#F7F3EC] border border-[#EBE3D9] space-y-3">
                           <span className="text-[11px] uppercase tracking-wider text-[#C98A84] font-semibold">
-                            Story Narrative
+                            Story Narrative ({selectedLanguage.toUpperCase()})
                           </span>
                           <p className="font-editorial-serif text-xl text-[#2D222A] leading-relaxed italic">
-                            "{currentAsset.story_text || currentAsset.prompt_used}"
+                            "{(() => {
+                              if (translations[currentAsset.id]) return translations[currentAsset.id];
+                              let text = currentAsset.story_text || currentAsset.prompt_used || "";
+                              const cleanChild = (job?.child_name || childName || "Your Child").trim();
+                              ["[Name]", "[name]", "{name}", "[child_name]", "{child_name}"].forEach((tag) => {
+                                text = text.split(tag).join(cleanChild);
+                              });
+                              return text;
+                            })()}"
                           </p>
                         </div>
 

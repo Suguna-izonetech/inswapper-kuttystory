@@ -221,6 +221,7 @@ class PersonalizationOut(BaseModel):
     is_purchased: Optional[bool] = False
     created_formatted: Optional[str] = None
     pdf_download_url: Optional[str] = None
+    print_pdf_url: Optional[str] = None
     assets: Optional[List[GeneratedAssetOut]] = []
     class Config:
         from_attributes = True
