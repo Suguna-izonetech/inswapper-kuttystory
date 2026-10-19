@@ -192,9 +192,9 @@ export default function PersonalizePage() {
         setRawPhotoFile(file);
         setOriginalPreview(dataUrl);
 
-        // Client-side photo validation
+        // Photo validation (YuNet AI face landmark analysis + client fallback)
         setIsValidatingPhoto(true);
-        validateChildPhoto(dataUrl, blob.size)
+        validateChildPhoto(dataUrl, blob.size, blob)
           .then((report) => setValidationReport(report))
           .catch((err) => console.warn("Validation error:", err))
           .finally(() => setIsValidatingPhoto(false));
@@ -213,10 +213,10 @@ export default function PersonalizePage() {
     const url = URL.createObjectURL(file);
     setOriginalPreview(url);
 
-    // Run client-side photo guidelines validation
+    // Run photo guidelines validation (YuNet AI face landmark analysis + client fallback)
     setIsValidatingPhoto(true);
     try {
-      const report = await validateChildPhoto(url, file.size);
+      const report = await validateChildPhoto(url, file.size, file);
       setValidationReport(report);
     } catch (err) {
       console.warn("Validation error:", err);
@@ -690,11 +690,11 @@ export default function PersonalizePage() {
               <div className="pt-4 border-t border-[#EBE3D9] space-y-2 text-xs text-[#4E424B]">
                 <div className="flex justify-between">
                   <span>Digital Illustrated Edition:</span>
-                  <span className="font-semibold text-[#2D222A]">${story.price_digital}</span>
+                  <span className="font-semibold text-[#2D222A]">₹{story.price_digital ? Number(story.price_digital).toLocaleString("en-IN") : "799"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Heirloom Hardcover Print:</span>
-                  <span className="font-semibold text-[#2D222A]">${story.price_print}</span>
+                  <span className="font-semibold text-[#2D222A]">₹{story.price_print ? Number(story.price_print).toLocaleString("en-IN") : "1,399"}</span>
                 </div>
               </div>
 

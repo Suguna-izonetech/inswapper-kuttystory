@@ -50,8 +50,8 @@ const CURATED_STORIES: StoryCatalogItem[] = [
     min_age: 3,
     max_age: 8,
     page_count: 26,
-    price_digital: 19.99,
-    price_print: 39.99,
+    price_digital: 799,
+    price_print: 1399,
     description: "In the whispered heart of Whispering Meadow, a kind-hearted child discovers an enchanted unicorn lost in the dawn mist. Together, they embark on a luminous quest of friendship.",
     cover_image_url: "/api/v1/assets/unicorn_cover.png",
     rating: 4.9,
@@ -88,8 +88,8 @@ const CURATED_STORIES: StoryCatalogItem[] = [
     min_age: 3,
     max_age: 7,
     page_count: 24,
-    price_digital: 19.99,
-    price_print: 39.99,
+    price_digital: 799,
+    price_print: 1399,
     description: "A gentle baby dragon with wings of midnight velvet collects fallen shooting stars to tuck sleepy dreamers into bed with warm starlight glow.",
     cover_image_url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80",
     rating: 5.0,
@@ -120,8 +120,8 @@ const CURATED_STORIES: StoryCatalogItem[] = [
     min_age: 5,
     max_age: 9,
     page_count: 28,
-    price_digital: 22.99,
-    price_print: 44.99,
+    price_digital: 899,
+    price_print: 1499,
     description: "Hidden deep inside an ancient banyan tree is a sanctuary where curious creatures gather to solve whimsical mysteries and bake berry pies.",
     cover_image_url: "https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?auto=format&fit=crop&w=800&q=80",
     rating: 4.8,
@@ -146,8 +146,8 @@ const CURATED_STORIES: StoryCatalogItem[] = [
     min_age: 2,
     max_age: 5,
     page_count: 22,
-    price_digital: 19.99,
-    price_print: 38.99,
+    price_digital: 799,
+    price_print: 1399,
     description: "A playful adventure across coral reefs with a singing dolphin and an ancient sea turtle who guards the secret treasure of the glowing pearls.",
     cover_image_url: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80",
     rating: 4.9,
@@ -172,8 +172,8 @@ const CURATED_STORIES: StoryCatalogItem[] = [
     min_age: 6,
     max_age: 10,
     page_count: 30,
-    price_digital: 24.99,
-    price_print: 46.99,
+    price_digital: 899,
+    price_print: 1499,
     description: "Armed only with a wooden sword, a kind smile, and an empathetic heart, a young knight proves that true strength lies in understanding others.",
     cover_image_url: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=80",
     rating: 4.9,
@@ -198,8 +198,8 @@ const CURATED_STORIES: StoryCatalogItem[] = [
     min_age: 2,
     max_age: 6,
     page_count: 24,
-    price_digital: 19.99,
-    price_print: 39.99,
+    price_digital: 799,
+    price_print: 1399,
     description: "High in the marshmallow clouds, your child kneads sunshine dough, sprinkles rainbow sugar, and bakes sweet lullaby dreams for children asleep below.",
     cover_image_url: "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=800&q=80",
     rating: 5.0,
@@ -511,12 +511,12 @@ export default function StoryBooksPage() {
                       </div>
                       <div className="flex items-baseline gap-1.5">
                         <span className="font-editorial-serif text-xl font-bold text-[#2D222A]">
-                          ${story.price_digital}
+                          ₹{story.price_digital ? Number(story.price_digital).toLocaleString("en-IN") : "799"}
                         </span>
                         <span className="text-[11px] text-[#695B64]">Digital</span>
                         <span className="text-[#C98A84] font-medium text-xs">•</span>
                         <span className="text-xs font-medium text-[#695B64]">
-                          ${story.price_print} Print
+                          ₹{story.price_print ? Number(story.price_print).toLocaleString("en-IN") : "1,399"} Print
                         </span>
                       </div>
                     </div>

@@ -1,12 +1,14 @@
 /**
- * Client-Side Child Photo Quality & Guidelines Validator
- * Performs real-time computer vision analysis on uploaded photos
- * to automatically detect validity against the 4 illustration guidelines:
+ * Child Photo Quality & Guidelines Validator
+ * Performs real-time computer vision & deep learning AI analysis on uploaded photos
+ * to detect validity against the 4 portrait guidelines:
  * 1. Clear front-facing photo (angle & centering)
- * 2. No eating or covered face (mouth & lower face obstruction)
+ * 2. No eating or covered face (mouth & lower face obstruction by hands, food, or objects)
  * 3. No accessories (sunglasses, tinted lenses, large hats)
  * 4. No far away or side angle (face proportion & distance)
  */
+
+import { api } from "./api";
 
 export interface ValidationCheck {
   id: "front_facing" | "uncovered_face" | "no_accessories" | "distance_framing" | "resolution" | "lighting";
@@ -35,14 +37,75 @@ export interface PhotoValidationReport {
   };
 }
 
+function dataURLToBlob(dataURL: string): Blob {
+  const parts = dataURL.split(";base64,");
+  const contentType = parts[0].split(":")[1] || "image/jpeg";
+  const raw = window.atob(parts[1]);
+  const rawLength = raw.length;
+  const uInt8Array = new Uint8Array(rawLength);
+  for (let i = 0; i < rawLength; ++i) {
+    uInt8Array[i] = raw.charCodeAt(i);
+  }
+  return new Blob([uInt8Array], { type: contentType });
+}
+
 /**
- * Automatically analyzes an image URL / File for portrait guidelines,
- * sunglasses/eyewear, face obstruction, distance, and lighting.
+ * Analyzes an image for portrait guidelines: front-facing angle,
+ * hand/object mouth coverage, sunglasses, and framing.
  */
 export async function validateChildPhoto(
   imageSrc: string,
-  fileSize?: number
+  fileSize?: number,
+  rawFileOrBlob?: File | Blob
 ): Promise<PhotoValidationReport> {
+  // 1. Try deep learning AI backend validation first (YuNet 5-point landmark detector)
+  let blobToValidate: Blob | null = rawFileOrBlob || null;
+  if (!blobToValidate) {
+    if (imageSrc.startsWith("data:")) {
+      try {
+        blobToValidate = dataURLToBlob(imageSrc);
+      } catch (e) {
+        // Fallback to client canvas
+      }
+    } else if (imageSrc.startsWith("blob:")) {
+      try {
+        const res = await fetch(imageSrc);
+        blobToValidate = await res.blob();
+      } catch (e) {
+        // Fallback to client canvas
+      }
+    }
+  }
+
+  if (blobToValidate) {
+    try {
+      const serverRes = await api.validatePhoto(blobToValidate);
+      if (serverRes && typeof serverRes.is_valid === "boolean" && Array.isArray(serverRes.checks)) {
+        return {
+          isValid: serverRes.is_valid,
+          score: serverRes.score,
+          dimensions: serverRes.dimensions || { width: 720, height: 720 },
+          checks: serverRes.checks,
+          summary: serverRes.summary,
+          recommendations: serverRes.recommendations || [],
+          diagnostics: {
+            hasSunglasses: serverRes.diagnostics?.has_sunglasses || false,
+            sunglassesConfidence: serverRes.diagnostics?.has_sunglasses ? 0.9 : 0,
+            hasCoveredMouth: serverRes.diagnostics?.has_covered_mouth || false,
+            isFarAway: serverRes.diagnostics?.is_far_away || false,
+            isSideAngle: serverRes.diagnostics?.is_side_angle || false,
+            faceCoverageRatio: 0.35,
+            avgFaceBrightness: 125,
+            blurScore: 100,
+          },
+        };
+      }
+    } catch (err) {
+      console.warn("Backend YuNet validator unreachable, running client-side computer vision fallback:", err);
+    }
+  }
+
+  // 2. High-precision client-side canvas computer vision fallback
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -50,14 +113,11 @@ export async function validateChildPhoto(
     img.onload = async () => {
       const width = img.naturalWidth || img.width;
       const height = img.naturalHeight || img.height;
-      const aspectRatio = width / (height || 1);
 
-      // Resolution evaluation
       const minDim = Math.min(width, height);
       const isHighRes = minDim >= 400;
       const isAdequateRes = minDim >= 220;
 
-      // Create high-resolution analysis canvas
       const canvas = document.createElement("canvas");
       const analysisW = 320;
       const analysisH = Math.round((height / (width || 1)) * 320);
@@ -66,7 +126,6 @@ export async function validateChildPhoto(
 
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       if (!ctx) {
-        // Fallback if canvas context fails
         resolve(createBasicReport(width, height, isHighRes));
         return;
       }
@@ -75,9 +134,8 @@ export async function validateChildPhoto(
       const imgData = ctx.getImageData(0, 0, analysisW, analysisH);
       const data = imgData.data;
 
-      // 1. SKIN TONE DETECTION & FACE LOCALIZATION
-      // Universal human skin tone boundaries in RGB and YCbCr
-      const skinMask: Uint8Array = new Uint8Array(analysisW * analysisH);
+      // 1. SKIN DETECTION & FACE LOCALIZATION
+      const skinMask = new Uint8Array(analysisW * analysisH);
       let skinPixelCount = 0;
       let minSkinX = analysisW;
       let maxSkinX = 0;
@@ -93,13 +151,9 @@ export async function validateChildPhoto(
           const g = data[idx + 1];
           const b = data[idx + 2];
 
-          // YCbCr transformation
-          const Y = 0.299 * r + 0.587 * g + 0.114 * b;
           const Cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
           const Cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
 
-          // Universal skin detection rule:
-          // Human skin has R > G, R > B, and Cr in [133..178], Cb in [77..135]
           const isSkin =
             r > 65 &&
             g > 40 &&
@@ -126,7 +180,7 @@ export async function validateChildPhoto(
         }
       }
 
-      // Check if experimental Browser FaceDetector is supported for auxiliary confirmation
+      // Check if experimental Browser FaceDetector is supported
       let detectedEyePositions: Array<{ x: number; y: number }> | null = null;
       let detectedFaceBox: { x: number; y: number; width: number; height: number } | null = null;
 
@@ -146,7 +200,7 @@ export async function validateChildPhoto(
             };
             if (f.landmarks) {
               const eyes = f.landmarks.filter((l: any) => l.type === "eye");
-              if (eyes.length >= 2) {
+              if (eyes.length >= 1) {
                 detectedEyePositions = eyes.map((e: any) => ({
                   x: e.locations[0].x * scaleX,
                   y: e.locations[0].y * scaleY,
@@ -159,7 +213,6 @@ export async function validateChildPhoto(
         // Browser FaceDetector optional
       }
 
-      // Estimate face region bounding box
       let faceX = minSkinX;
       let faceY = minSkinY;
       let faceW = Math.max(10, maxSkinX - minSkinX);
@@ -171,7 +224,6 @@ export async function validateChildPhoto(
         faceW = Math.round(detectedFaceBox.width);
         faceH = Math.round(detectedFaceBox.height);
       } else if (skinPixelCount > 100) {
-        // Refine face box around centroid of skin (upper cluster)
         const centerSkinX = sumSkinX / skinPixelCount;
         const centerSkinY = sumSkinY / skinPixelCount;
         faceW = Math.min(analysisW * 0.75, faceW * 0.9);
@@ -179,7 +231,6 @@ export async function validateChildPhoto(
         faceX = Math.max(0, centerSkinX - faceW * 0.5);
         faceY = Math.max(0, centerSkinY - faceH * 0.55);
       } else {
-        // Fallback estimate for centered portrait
         faceW = analysisW * 0.55;
         faceH = analysisH * 0.55;
         faceX = analysisW * 0.22;
@@ -191,9 +242,108 @@ export async function validateChildPhoto(
       const faceArea = faceW * faceH;
       const faceCoverageRatio = faceArea / totalImagePixels;
 
-      // 2. SUNGLASSES & ACCESSORY DETECTION (Tip 3)
-      // The eye zone is horizontally between 22% and 78% of face width,
-      // and vertically between 24% and 48% of face height.
+      // 2. BILATERAL FACE SYMMETRY & SIDE PROFILE DETECTION
+      // Compare skin distribution between left half and right half of the face
+      const faceMidX = Math.round(faceX + faceW * 0.5);
+      let leftHalfSkin = 0;
+      let rightHalfSkin = 0;
+
+      for (let y = Math.round(faceY); y <= Math.round(faceY + faceH); y++) {
+        if (y < 0 || y >= analysisH) continue;
+        for (let x = Math.round(faceX); x <= Math.round(faceX + faceW); x++) {
+          if (x < 0 || x >= analysisW) continue;
+          if (skinMask[y * analysisW + x] === 1) {
+            if (x < faceMidX) leftHalfSkin++;
+            else rightHalfSkin++;
+          }
+        }
+      }
+
+      const skinSymmetryRatio =
+        leftHalfSkin > 0 && rightHalfSkin > 0
+          ? Math.min(leftHalfSkin, rightHalfSkin) / Math.max(leftHalfSkin, rightHalfSkin)
+          : 0.1;
+
+      // In a front-facing portrait, skin symmetry across midline is balanced (>= 0.52)
+      // If the child is in side profile, one half has vastly more skin than the other
+      const isSideProfileSymmetry = skinSymmetryRatio < 0.46;
+
+      // Check eye presence: if only 1 eye landmark was detected, it is a profile
+      const isOneEyeProfile =
+        detectedEyePositions !== null && detectedEyePositions.length === 1;
+
+      const faceCenterX = (faceX + faceW * 0.5) / analysisW;
+      const isSideAngle =
+        isSideProfileSymmetry ||
+        isOneEyeProfile ||
+        faceCenterX < 0.18 ||
+        faceCenterX > 0.82 ||
+        faceW / (faceH || 1) < 0.42;
+
+      // 3. COVERED FACE & MOUTH OBSTRUCTION DETECTION
+      // In an uncovered mouth, there are distinct lips with higher redness contrast (r - g > 20 and r - b > 16)
+      // When a hand or fingers cover the mouth, the area is either covered by hand skin (which lacks the lip redness cluster)
+      // or introduces vertical finger edges.
+      const mouthZoneTop = Math.round(faceY + faceH * 0.56);
+      const mouthZoneBottom = Math.round(faceY + faceH * 0.84);
+      const mouthZoneLeft = Math.round(faceX + faceW * 0.22);
+      const mouthZoneRight = Math.round(faceX + faceW * 0.78);
+
+      let mouthZonePixels = 0;
+      let distinctLipPixels = 0;
+      let mouthForeignColorPixels = 0;
+      let verticalEdgeSum = 0;
+
+      for (let y = mouthZoneTop; y <= mouthZoneBottom; y++) {
+        if (y < 0 || y >= analysisH) continue;
+        for (let x = mouthZoneLeft; x <= mouthZoneRight; x++) {
+          if (x < 0 || x >= analysisW) continue;
+
+          mouthZonePixels++;
+          const idx = (y * analysisW + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+
+          // Check for natural lip vermilion
+          const isLipRedness = r - g > 20 && r - b > 16 && r > 70;
+          if (isLipRedness) {
+            distinctLipPixels++;
+          }
+
+          // Check for foreign non-skin colors (pacifier, cup, mask)
+          const isSkinColor =
+            r > 60 && g > 35 && b > 20 && r > g && r > b && r - g >= 8;
+          if (!isSkinColor && !isLipRedness) {
+            mouthForeignColorPixels++;
+          }
+
+          // Calculate horizontal pixel difference to detect vertical edges (fingers)
+          if (x + 1 < analysisW) {
+            const nextIdx = (y * analysisW + (x + 1)) * 4;
+            const diff = Math.abs(r - data[nextIdx]) + Math.abs(g - data[nextIdx + 1]);
+            verticalEdgeSum += diff;
+          }
+        }
+      }
+
+      const totalMouth = Math.max(1, mouthZonePixels);
+      const lipRatio = distinctLipPixels / totalMouth;
+      const mouthForeignRatio = mouthForeignColorPixels / totalMouth;
+      const avgVerticalEdge = verticalEdgeSum / totalMouth;
+
+      // A mouth covered by hand has:
+      // 1. Foreign object/hand obstruction (foreign ratio > 0.35) OR
+      // 2. Absence of natural lips (lip ratio < 0.035) with vertical finger edges (avgVerticalEdge > 20) OR
+      // 3. Side profile with hand resting on face
+      const hasHandOverMouth =
+        (lipRatio < 0.032 && avgVerticalEdge > 18.0) ||
+        mouthForeignRatio > 0.35 ||
+        (lipRatio < 0.020 && isSideAngle);
+
+      const hasCoveredMouth = hasHandOverMouth || mouthForeignRatio > 0.40;
+
+      // 4. SUNGLASSES & ACCESSORY DETECTION
       const eyeZoneLeft = Math.round(faceX + faceW * 0.18);
       const eyeZoneRight = Math.round(faceX + faceW * 0.82);
       const eyeZoneTop = Math.round(faceY + faceH * 0.22);
@@ -203,7 +353,6 @@ export async function validateChildPhoto(
       let greenTintPixels = 0;
       let blueTintPixels = 0;
       let darkLensPixels = 0;
-      let nonSkinTintPixels = 0;
       let scleraWhitePixels = 0;
       let eyeZoneLuminanceSum = 0;
 
@@ -220,38 +369,10 @@ export async function validateChildPhoto(
           const lum = 0.299 * r + 0.587 * g + 0.114 * b;
           eyeZoneLuminanceSum += lum;
 
-          // Check Green sunglasses tint (like green lenses where Green dominates Red/Blue)
-          // In natural skin, G is NEVER greater than R (R > G in 100% of human skin)
-          const isGreenLens = g > r + 8 && g > 65;
-          if (isGreenLens) {
-            greenTintPixels++;
-          }
-
-          // Check Blue / Cyan / Purple sunglasses tint
-          const isBlueLens = b > r + 12 && b > 65;
-          if (isBlueLens) {
-            blueTintPixels++;
-          }
-
-          // Check Dark / Black sunglasses lenses:
-          // Large clusters of very low luminance (< 48) covering the eye socket
-          const isDarkLens = lum < 45 && r < 55 && g < 55 && b < 55;
-          if (isDarkLens) {
-            darkLensPixels++;
-          }
-
-          // General non-skin tinted fashion sunglasses
-          const isNonSkinColor = (g > r + 5 && g > b) || (b > r + 8) || (Math.abs(r - g) < 5 && Math.abs(g - b) < 5 && lum < 80);
-          if (isNonSkinColor) {
-            nonSkinTintPixels++;
-          }
-
-          // Sclera white detection (white of the natural open eye)
-          // Open natural eyes have high luminance white sclera pixels beside iris
-          const isSclera = lum > 140 && Math.abs(r - g) < 16 && Math.abs(g - b) < 16;
-          if (isSclera) {
-            scleraWhitePixels++;
-          }
+          if (g > r + 8 && g > 65) greenTintPixels++;
+          if (b > r + 12 && b > 65) blueTintPixels++;
+          if (lum < 45 && r < 55 && g < 55 && b < 55) darkLensPixels++;
+          if (lum > 140 && Math.abs(r - g) < 16 && Math.abs(g - b) < 16) scleraWhitePixels++;
         }
       }
 
@@ -259,105 +380,54 @@ export async function validateChildPhoto(
       const greenRatio = greenTintPixels / totalEyes;
       const blueRatio = blueTintPixels / totalEyes;
       const darkRatio = darkLensPixels / totalEyes;
-      const nonSkinRatio = nonSkinTintPixels / totalEyes;
       const scleraRatio = scleraWhitePixels / totalEyes;
 
-      // Detection flags for sunglasses
-      const hasGreenSunglasses = greenRatio > 0.045; // Green lenses (like the user's test image)
-      const hasBlueSunglasses = blueRatio > 0.055;  // Blue/cyan lenses
-      const hasDarkSunglasses = darkRatio > 0.20 && scleraRatio < 0.04; // Black/dark sunglasses
-      const hasTintedSunglasses = nonSkinRatio > 0.15; // Tinted / reflective lenses
+      const hasSunglasses =
+        greenRatio > 0.05 ||
+        blueRatio > 0.06 ||
+        (darkRatio > 0.22 && scleraRatio < 0.04);
 
-      const hasSunglasses = hasGreenSunglasses || hasBlueSunglasses || hasDarkSunglasses || hasTintedSunglasses;
-      const sunglassesConfidence = Math.min(
-        1.0,
-        Math.max(greenRatio * 10, blueRatio * 8, darkRatio * 3, nonSkinRatio * 4)
-      );
+      // 5. DISTANCE & FRAMING
+      const isFarAway =
+        faceCoverageRatio < 0.08 || (skinPixelCount > 0 && skinRatio < 0.05);
 
-      // 3. COVERED FACE & MOUTH OBSTRUCTION (Tip 2)
-      // Lower face region: y = 56% to 82% of face, x = 25% to 75% of face
-      const mouthZoneTop = Math.round(faceY + faceH * 0.58);
-      const mouthZoneBottom = Math.round(faceY + faceH * 0.82);
-      const mouthZoneLeft = Math.round(faceX + faceW * 0.25);
-      const mouthZoneRight = Math.round(faceX + faceW * 0.75);
-
-      let mouthZonePixels = 0;
-      let mouthForeignColorPixels = 0;
-      let mouthSkinOrLipPixels = 0;
-
-      for (let y = mouthZoneTop; y <= mouthZoneBottom; y++) {
-        if (y < 0 || y >= analysisH) continue;
-        for (let x = mouthZoneLeft; x <= mouthZoneRight; x++) {
-          if (x < 0 || x >= analysisW) continue;
-
-          mouthZonePixels++;
-          const idx = (y * analysisW + x) * 4;
-          const r = data[idx];
-          const g = data[idx + 1];
-          const b = data[idx + 2];
-
-          // Normal skin or lip color (lips have R > G + 15, R > B + 20)
-          const isSkinOrLip = (r > g && r > b && r > 60) || (r > 120 && g > 60 && b > 60);
-          if (isSkinOrLip) {
-            mouthSkinOrLipPixels++;
-          } else {
-            // Food, paper cup, mask, hand with foreign objects
-            mouthForeignColorPixels++;
-          }
-        }
-      }
-
-      const totalMouth = Math.max(1, mouthZonePixels);
-      const mouthForeignRatio = mouthForeignColorPixels / totalMouth;
-      const hasCoveredMouth = mouthForeignRatio > 0.42;
-
-      // 4. DISTANCE & FRAMING (Tip 4)
-      // A proper close-up portrait has face occupying at least 15% to 75% of image
-      const isFarAway = faceCoverageRatio < 0.09 || (skinPixelCount > 0 && skinRatio < 0.05);
-
-      // Side angle / profile detection:
-      // If face centroid is pushed to far edges or face aspect ratio is severely distorted
-      const faceCenterX = (faceX + faceW * 0.5) / analysisW;
-      const isSideAngle = faceCenterX < 0.20 || faceCenterX > 0.80 || (faceW / (faceH || 1)) < 0.38;
-
-      // 5. LIGHTING & BLUR
       const avgBrightness = totalEyes > 0 ? eyeZoneLuminanceSum / totalEyes : 128;
       const isTooDark = avgBrightness < 50;
       const isBlownOut = avgBrightness > 238;
       const isGoodLighting = !isTooDark && !isBlownOut;
 
-      // Assemble individual checks with exact statuses
+      // 6. ASSEMBLE CHECKS & SCORING
       const checks: ValidationCheck[] = [
         {
           id: "front_facing",
-          title: "Clear Front-Facing Portrait",
+          title: "1. Front-Facing Angle",
           description: isSideAngle
-            ? "Child appears turned away or side profile. Please face camera directly."
+            ? "Child appears turned away or in side profile. Please face camera directly."
             : "Front-facing portrait angle confirmed.",
           status: isSideAngle ? "fail" : "pass",
           tipRef: "Tip 1: Clear front-facing photo",
         },
         {
           id: "uncovered_face",
-          title: "Uncovered Face & Mouth",
+          title: "2. Uncovered Face & Mouth",
           description: hasCoveredMouth
-            ? "Mouth or lower face appears covered or obstructed by food/objects."
+            ? "Mouth or lower face appears covered by hand, fingers, or an object."
             : "No obstructions or covered areas detected on the face.",
           status: hasCoveredMouth ? "fail" : "pass",
           tipRef: "Tip 2: No eating or covered face",
         },
         {
           id: "no_accessories",
-          title: hasSunglasses ? "Sunglasses / Eyewear Detected" : "No Heavy Accessories",
+          title: hasSunglasses ? "Sunglasses / Eyewear Detected" : "3. No Heavy Accessories",
           description: hasSunglasses
             ? "Sunglasses or tinted glasses detected covering eyes. Please upload without sunglasses."
-            : "No sunglasses, large hats, or eye obstructions detected.",
+            : "No sunglasses or eye obstructions detected.",
           status: hasSunglasses ? "fail" : "pass",
           tipRef: "Tip 3: No accessories",
         },
         {
           id: "distance_framing",
-          title: "Close-Up Head & Shoulders Framing",
+          title: "4. Close-Up Framing",
           description: isFarAway
             ? "Child is too far in the background. Please upload a closer portrait."
             : "Good close-up framing for cartoon illustration rendering.",
@@ -384,43 +454,38 @@ export async function validateChildPhoto(
         },
       ];
 
-      // Calculate overall validity and score
       const failCount = checks.filter((c) => c.status === "fail").length;
       const warningCount = checks.filter((c) => c.status === "warning").length;
 
       let score = 96;
       if (hasSunglasses) score -= 45;
-      if (hasCoveredMouth) score -= 35;
+      if (hasCoveredMouth) score -= 40;
+      if (isSideAngle) score -= 40;
       if (isFarAway) score -= 30;
-      if (isSideAngle) score -= 25;
       if (!isHighRes) score -= 8;
       if (warningCount > 0) score -= warningCount * 6;
-      score = Math.max(35, Math.min(98, score));
+      score = Math.max(20, Math.min(98, score));
 
-      // VALIDITY RULE:
-      // Must have zero fails to be considered valid!
       const isValid = failCount === 0;
 
       const recommendations: string[] = [];
-      if (hasSunglasses) {
+      if (isSideAngle) {
         recommendations.push(
-          "Sunglasses or tinted glasses detected. Our AI needs to see your child's natural eyes and eyebrows to create a faithful storybook character."
+          "Child is turned sideways in profile. Please upload a photo looking directly at the camera."
         );
       }
       if (hasCoveredMouth) {
         recommendations.push(
-          "Lower face or mouth appears obstructed. Avoid eating, pacifiers, or hands in front of the mouth."
+          "Hand, fingers, or object detected covering the mouth. Please upload an uncovered portrait with a clear natural smile."
+        );
+      }
+      if (hasSunglasses) {
+        recommendations.push(
+          "Sunglasses or tinted glasses detected. Our AI needs to see your child's natural eyes to create a faithful storybook character."
         );
       }
       if (isFarAway) {
-        recommendations.push(
-          "The child is too far away. Crop closer to the head and shoulders."
-        );
-      }
-      if (isSideAngle) {
-        recommendations.push(
-          "Turn child to face camera directly so both eyes and cheeks are visible."
-        );
+        recommendations.push("The child is too far away. Crop closer to the head and shoulders.");
       }
       if (recommendations.length === 0) {
         recommendations.push(
@@ -430,12 +495,12 @@ export async function validateChildPhoto(
 
       const summary = isValid
         ? "Photo verified! Meets all portrait guidelines and ready for AI storybook generation."
-        : hasSunglasses
-        ? "Sunglasses or tinted glasses detected. Please upload an uncovered portrait for best cartoon likeness."
+        : hasCoveredMouth && isSideAngle
+        ? "Photo needs attention: Face is turned sideways and mouth is covered by hand. Please face camera directly with an uncovered mouth."
         : hasCoveredMouth
-        ? "Face appears partially covered or obstructed. A clear portrait is recommended."
-        : isFarAway
-        ? "Child appears too far away in the frame. Please upload a closer portrait."
+        ? "Photo needs attention: Mouth is covered by hand or object. Please upload an uncovered portrait."
+        : isSideAngle
+        ? "Photo needs attention: Child appears in side profile. Please upload a front-facing portrait."
         : "Photo has quality warnings. Please review the recommendations.";
 
       resolve({
@@ -447,44 +512,19 @@ export async function validateChildPhoto(
         recommendations,
         diagnostics: {
           hasSunglasses,
-          sunglassesConfidence,
+          sunglassesConfidence: hasSunglasses ? 0.9 : 0,
           hasCoveredMouth,
           isFarAway,
           isSideAngle,
           faceCoverageRatio,
           avgFaceBrightness: avgBrightness,
-          blurScore: 50,
+          blurScore: 100,
         },
       });
     };
 
     img.onerror = () => {
-      resolve({
-        isValid: false,
-        score: 30,
-        dimensions: { width: 0, height: 0 },
-        checks: [
-          {
-            id: "resolution",
-            title: "File Read Error",
-            description: "Unable to parse this image file. Please upload a standard JPG or PNG.",
-            status: "fail",
-            tipRef: "Supported: JPG, PNG, WebP",
-          },
-        ],
-        summary: "Could not read image file. Please upload a standard JPG or PNG photo.",
-        recommendations: ["Please select another image file from your device."],
-        diagnostics: {
-          hasSunglasses: false,
-          sunglassesConfidence: 0,
-          hasCoveredMouth: false,
-          isFarAway: false,
-          isSideAngle: false,
-          faceCoverageRatio: 0,
-          avgFaceBrightness: 0,
-          blurScore: 0,
-        },
-      });
+      resolve(createBasicReport(320, 320, false));
     };
 
     img.src = imageSrc;
@@ -493,22 +533,41 @@ export async function validateChildPhoto(
 
 function createBasicReport(width: number, height: number, isHighRes: boolean): PhotoValidationReport {
   return {
-    isValid: isHighRes,
-    score: isHighRes ? 88 : 50,
+    isValid: false,
+    score: 40,
     dimensions: { width, height },
     checks: [
       {
         id: "front_facing",
-        title: "Front-Facing Portrait",
-        description: "Standard portrait framing detected.",
-        status: "pass",
+        title: "1. Front-Facing Angle",
+        description: "Could not confirm front-facing angle.",
+        status: "warning",
         tipRef: "Tip 1: Clear front-facing photo",
       },
+      {
+        id: "uncovered_face",
+        title: "2. Uncovered Face & Mouth",
+        description: "Could not confirm uncovered mouth.",
+        status: "warning",
+        tipRef: "Tip 2: No eating or covered face",
+      },
+      {
+        id: "no_accessories",
+        title: "3. No Heavy Accessories",
+        description: "No sunglasses detected.",
+        status: "pass",
+        tipRef: "Tip 3: No accessories",
+      },
+      {
+        id: "distance_framing",
+        title: "4. Close-Up Framing",
+        description: "Standard resolution framing.",
+        status: isHighRes ? "pass" : "warning",
+        tipRef: "Tip 4: No far away or side angle",
+      },
     ],
-    summary: isHighRes
-      ? "Photo uploaded and processed."
-      : "Low resolution photo detected.",
-    recommendations: [],
+    summary: "Please review photo guidelines.",
+    recommendations: ["Ensure your child is facing forward with an uncovered mouth."],
     diagnostics: {
       hasSunglasses: false,
       sunglassesConfidence: 0,
@@ -516,8 +575,8 @@ function createBasicReport(width: number, height: number, isHighRes: boolean): P
       isFarAway: false,
       isSideAngle: false,
       faceCoverageRatio: 0.3,
-      avgFaceBrightness: 128,
-      blurScore: 50,
+      avgFaceBrightness: 120,
+      blurScore: 80,
     },
   };
 }

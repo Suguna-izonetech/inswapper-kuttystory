@@ -66,8 +66,8 @@ const COLLECTIONS: CollectionItem[] = [
         pages: 24
       }
     ],
-    bundlePrice: 69.99,
-    regularPrice: 89.99
+    bundlePrice: 1999,
+    regularPrice: 2798
   },
   {
     id: "little-explorer",
@@ -99,8 +99,8 @@ const COLLECTIONS: CollectionItem[] = [
         pages: 28
       }
     ],
-    bundlePrice: 69.99,
-    regularPrice: 89.99
+    bundlePrice: 1999,
+    regularPrice: 2798
   },
   {
     id: "bedtime-lullaby",
@@ -132,8 +132,8 @@ const COLLECTIONS: CollectionItem[] = [
         pages: 24
       }
     ],
-    bundlePrice: 69.99,
-    regularPrice: 89.99
+    bundlePrice: 1999,
+    regularPrice: 2798
   },
   {
     id: "sibling-duet",
@@ -165,8 +165,8 @@ const COLLECTIONS: CollectionItem[] = [
         pages: 30
       }
     ],
-    bundlePrice: 79.99,
-    regularPrice: 99.99
+    bundlePrice: 2299,
+    regularPrice: 2998
   }
 ];
 
@@ -303,13 +303,13 @@ export default function CollectionsPage() {
                   </div>
                   <div className="flex items-baseline gap-2">
                     <span className="font-editorial-serif text-2xl font-bold text-[#2D222A]">
-                      ${col.bundlePrice}
+                      ₹{col.bundlePrice.toLocaleString("en-IN")}
                     </span>
                     <span className="text-xs text-[#695B64] line-through">
-                      ${col.regularPrice}
+                      ₹{col.regularPrice.toLocaleString("en-IN")}
                     </span>
                     <span className="text-[11px] font-bold text-[#4E7048] bg-[#EEF4ED] px-2 py-0.5 rounded-full">
-                      Save ${(col.regularPrice - col.bundlePrice).toFixed(0)}
+                      Save ₹{(col.regularPrice - col.bundlePrice).toLocaleString("en-IN")}
                     </span>
                   </div>
                 </div>

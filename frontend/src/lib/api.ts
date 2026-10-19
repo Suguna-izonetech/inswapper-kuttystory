@@ -194,6 +194,17 @@ export const api = {
     return res.json();
   },
 
+  async validatePhoto(fileOrBlob: Blob | File): Promise<any> {
+    const formData = new FormData();
+    formData.append("photo", fileOrBlob, "upload.jpg");
+    const res = await fetch(`${API_BASE}/personalization/validate-photo`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) throw new Error("Photo validation failed");
+    return res.json();
+  },
+
   async startPersonalization(formData: FormData): Promise<PersonalizationJob> {
     const res = await fetch(`${API_BASE}/personalization`, {
       method: "POST",

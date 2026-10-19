@@ -10,8 +10,34 @@ from app.models import PersonalizationJob, StoryTemplate, GeneratedAsset, ChildP
 from app.schemas import PersonalizationOut, GeneratedAssetOut
 from app.services.storage import storage
 from app.services.job_runner import job_runner
+from app.services.ai.photo_validator import validate_child_photo_ai
 
 router = APIRouter(prefix="/personalization", tags=["Personalization"])
+
+@router.post("/validate-photo")
+async def validate_photo_endpoint(
+    photo: Optional[UploadFile] = File(None),
+    file: Optional[UploadFile] = File(None)
+):
+    """
+    AI-powered Deep Learning face validator (YuNet) checking:
+    1. Front-facing angle (nose between eyes, yaw symmetry, interocular distance)
+    2. Uncovered face & mouth (hand/finger coverage, mouth landmark presence, lip contrast)
+    3. Sunglasses & distance framing
+    """
+    try:
+        upload = photo or file
+        if not upload:
+            raise HTTPException(status_code=400, detail="Photo file is required.")
+        content = await upload.read()
+        return validate_child_photo_ai(content)
+    except Exception as e:
+        return {
+            "is_valid": False,
+            "score": 40,
+            "error": str(e),
+            "summary": "Photo validation check encountered an error."
+        }
 
 def enrich_job_urls(job: PersonalizationJob) -> dict:
     created_fmt = job.created_at.strftime("%b %d, %I:%M %p") if job.created_at else "Recently"

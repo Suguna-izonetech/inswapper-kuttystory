@@ -153,7 +153,7 @@ export default function HomePage() {
                   <div>
                     <span className="text-xs text-[#695B64]">From </span>
                     <span className="font-editorial-serif text-xl font-bold text-[#2D222A]">
-                      ${story.price_digital}
+                      ₹{story.price_digital ? Number(story.price_digital).toLocaleString("en-IN") : "799"}
                     </span>
                   </div>
                   <Link

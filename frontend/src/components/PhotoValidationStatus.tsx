@@ -258,7 +258,7 @@ export default function PhotoValidationStatus({
                   )}
                 </div>
                 <span className={`font-medium ${isMouthOk ? "text-[#15803D]" : "text-[#B91C1C]"}`}>
-                  {isMouthOk ? "2. Uncovered Face & Mouth" : "2. Obstructed Mouth / Food"}
+                  {isMouthOk ? "2. Uncovered Face & Mouth" : "2. Mouth Covered (Hand or Object)"}
                 </span>
               </div>
 
