@@ -5,6 +5,12 @@ import PersonalizePage from "./pages/PersonalizePage";
 import POCTestPage from "./pages/POCTestPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
+import StoryBooksPage from "./pages/StoryBooksPage";
+import AboutPage from "./pages/AboutPage";
+import FootStepsPage from "./pages/FootStepsPage";
+import HowItWorksPage from "./pages/HowItWorksPage";
+import CollectionsPage from "./pages/CollectionsPage";
+import JournalPage from "./pages/JournalPage";
 
 export default function App() {
   return (
@@ -26,6 +32,15 @@ export default function App() {
         {/* Customer storefront with header & footer layout */}
         <Route path="/" element={<Layout />}>
           <Route index element={<HomePage />} />
+          <Route path="home" element={<HomePage />} />
+          <Route path="storybooks" element={<StoryBooksPage />} />
+          <Route path="stories" element={<StoryBooksPage />} />
+          <Route path="about" element={<AboutPage />} />
+          <Route path="footsteps" element={<FootStepsPage />} />
+          <Route path="foot-steps" element={<FootStepsPage />} />
+          <Route path="how-it-works" element={<HowItWorksPage />} />
+          <Route path="collections" element={<CollectionsPage />} />
+          <Route path="journal" element={<JournalPage />} />
           <Route path="personalize/:slug" element={<PersonalizePage />} />
           <Route path="poc" element={<POCTestPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

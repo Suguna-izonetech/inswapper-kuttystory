@@ -36,18 +36,18 @@ export default function HomePage() {
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4">
               <Link
-                to="/personalize/unicorn-story"
+                to="/storybooks"
                 className="px-8 py-4 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-base font-medium shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-3 text-center"
               >
-                <span>Personalize The Unicorn Story</span>
+                <span>Explore Story Books</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
-                to="/poc"
+                to="/collections"
                 className="px-6 py-4 rounded-full bg-white border border-[#EBE3D9] hover:border-[#C98A84] text-[#2D222A] text-base font-medium transition-all flex items-center justify-center gap-2 text-center"
               >
                 <Sparkles className="w-4 h-4 text-[#C98A84]" />
-                <span>View 3-Image AI POC</span>
+                <span>View Collections</span>
               </Link>
             </div>
 
@@ -69,7 +69,7 @@ export default function HomePage() {
             <div className="relative mx-auto max-w-md lg:max-w-none">
               {/* Decorative luxury frame */}
               <div className="absolute -inset-2 rounded-3xl bg-gradient-to-tr from-[#FAEEED] via-[#F2EEF7] to-[#FAF5E8] opacity-80 blur-xl"></div>
-              
+
               <div className="relative rounded-2xl bg-white p-3 shadow-xl border border-[#EBE3D9]">
                 <div className="relative aspect-square rounded-xl overflow-hidden bg-[#FAF7F2]">
                   {stories.length > 0 && stories[0].cover_image_url ? (
@@ -287,10 +287,10 @@ export default function HomePage() {
 
           <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
             <Link
-              to="/poc"
+              to="/how-it-works"
               className="px-6 py-3.5 rounded-full bg-[#FAEEED] hover:bg-[#F5DFDC] text-[#C98A84] text-xs font-semibold text-center transition-colors"
             >
-              Inspect 3-Image AI POC
+              See How It Works
             </Link>
             <Link
               to="/personalize/unicorn-story"

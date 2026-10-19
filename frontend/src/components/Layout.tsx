@@ -1,12 +1,26 @@
-import { Link, Outlet } from "react-router-dom";
-import { Sparkles, ShieldCheck, LayoutDashboard } from "lucide-react";
+import { useState } from "react";
+import { Link, NavLink, Outlet } from "react-router-dom";
+import { Sparkles, ShieldCheck, Menu, X, ArrowRight } from "lucide-react";
 
 export default function Layout() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navLinks = [
+    { label: "Home", path: "/", end: true },
+    { label: "Story Books", path: "/storybooks" },
+    { label: "About", path: "/about" },
+    { label: "Foot Steps", path: "/footsteps" },
+    { label: "How It Works", path: "/how-it-works" },
+    { label: "Collections", path: "/collections" },
+    { label: "Journal", path: "/journal" },
+  ];
+
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF7F2] text-[#2D222A]">
       {/* Editorial Header */}
-      <header className="sticky top-0 z-50 bg-[#FAF7F2]/90 backdrop-blur-md border-b border-[#EBE3D9] transition-all">
+      <header className="sticky top-0 z-50 bg-[#FAF7F2]/95 backdrop-blur-md border-b border-[#EBE3D9] transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          {/* Logo */}
           <div className="flex items-center space-x-3">
             <Link to="/" className="flex items-center space-x-3 group">
               <div className="w-10 h-10 rounded-full bg-[#FAEEED] border border-[#C98A84]/30 flex items-center justify-center text-[#C98A84] group-hover:scale-105 transition-transform">
@@ -23,35 +37,94 @@ export default function Layout() {
             </Link>
           </div>
 
-          {/* Navigation items */}
-          <nav className="hidden md:flex items-center space-x-8 text-sm font-medium text-[#4E424B]">
-            <a href="/#stories" className="hover:text-[#C98A84] transition-colors">
-              Storybooks
-            </a>
-            <a href="/#how-it-works" className="hover:text-[#C98A84] transition-colors">
-              How It Works
-            </a>
-            <Link to="/poc" className="hover:text-[#C98A84] transition-colors flex items-center gap-1.5 text-[#B87A74]">
-              <Sparkles className="w-4 h-4 text-[#C98A84]" />
-              <span>3-Image AI POC</span>
-            </Link>
-            <Link to="/admin" className="hover:text-[#C98A84] transition-colors flex items-center gap-1.5">
-              <LayoutDashboard className="w-4 h-4 text-[#8F9E8B]" />
-              <span>Admin Studio</span>
-            </Link>
+          {/* Primary Navigation Menu (Desktop) */}
+          <nav className="hidden lg:flex items-center space-x-1 xl:space-x-2">
+            {navLinks.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.end}
+                className={({ isActive }) =>
+                  `px-3.5 py-2 rounded-full text-xs xl:text-sm font-medium transition-all relative ${
+                    isActive
+                      ? "text-[#C98A84] bg-[#FAEEED]/70 font-semibold"
+                      : "text-[#4E424B] hover:text-[#C98A84] hover:bg-[#FAEEED]/30"
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <span className="flex items-center gap-1.5">
+                    {item.label}
+                    {isActive && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#C98A84] inline-block" />
+                    )}
+                  </span>
+                )}
+              </NavLink>
+            ))}
           </nav>
 
-          {/* CTA */}
-          <div className="flex items-center space-x-4">
+          {/* Action CTA & Mobile Hamburger */}
+          <div className="flex items-center space-x-3">
             <Link
               to="/personalize/unicorn-story"
-              className="px-5 py-2.5 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-sm font-medium shadow-sm hover:shadow transition-all flex items-center gap-2"
+              className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs sm:text-sm font-medium shadow-xs hover:shadow transition-all"
             >
               <span>Personalize Now</span>
               <Sparkles className="w-3.5 h-3.5" />
             </Link>
+
+            {/* Mobile menu toggle */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden w-10 h-10 rounded-full bg-white border border-[#EBE3D9] flex items-center justify-center text-[#2D222A] hover:text-[#C98A84] transition-colors"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Navigation Drawer / Overlay */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden bg-white/95 backdrop-blur-md border-b border-[#EBE3D9] px-4 pt-3 pb-6 animate-in slide-in-from-top duration-200">
+            <div className="flex flex-col space-y-1">
+              {navLinks.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.end}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `px-4 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-between ${
+                      isActive
+                        ? "bg-[#FAEEED] text-[#C98A84] font-semibold"
+                        : "text-[#2D222A] hover:bg-[#FAF7F2]"
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <span>{item.label}</span>
+                      {isActive && <Sparkles className="w-4 h-4 text-[#C98A84]" />}
+                    </>
+                  )}
+                </NavLink>
+              ))}
+
+              <div className="pt-3 border-t border-[#EBE3D9] mt-2">
+                <Link
+                  to="/personalize/unicorn-story"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full py-3 rounded-xl bg-[#C98A84] hover:bg-[#B87A74] text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-xs"
+                >
+                  <span>Personalize A Storybook</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main page content */}
@@ -81,25 +154,25 @@ export default function Layout() {
 
             <div>
               <h4 className="font-editorial-serif text-sm font-semibold uppercase tracking-wider text-[#2D222A] mb-4">
-                Story Library
+                Explore Atelier
               </h4>
               <ul className="space-y-2.5 text-xs text-[#695B64]">
-                <li><Link to="/personalize/unicorn-story" className="hover:text-[#C98A84]">The Girl & the Magical Unicorn</Link></li>
-                <li><span className="text-[#A2949E]">The Starlight Dragon (Coming Soon)</span></li>
-                <li><span className="text-[#A2949E]">The Secret Treehouse (Coming Soon)</span></li>
-                <li><Link to="/poc" className="hover:text-[#C98A84]">Character Consistency POC</Link></li>
+                <li><Link to="/storybooks" className="hover:text-[#C98A84] transition-colors">Story Books</Link></li>
+                <li><Link to="/about" className="hover:text-[#C98A84] transition-colors">About Us</Link></li>
+                <li><Link to="/footsteps" className="hover:text-[#C98A84] transition-colors">Foot Steps Milestones</Link></li>
+                <li><Link to="/how-it-works" className="hover:text-[#C98A84] transition-colors">How It Works</Link></li>
               </ul>
             </div>
 
             <div>
               <h4 className="font-editorial-serif text-sm font-semibold uppercase tracking-wider text-[#2D222A] mb-4">
-                Studio & Admin
+                Collections & Reading
               </h4>
               <ul className="space-y-2.5 text-xs text-[#695B64]">
-                <li><Link to="/admin" className="hover:text-[#C98A84]">Studio Dashboard</Link></li>
-                <li><Link to="/admin" className="hover:text-[#C98A84]">Story Template Manager</Link></li>
-                <li><Link to="/admin" className="hover:text-[#C98A84]">AI Providers & Budgets</Link></li>
-                <li><Link to="/admin" className="hover:text-[#C98A84]">Generation Monitor</Link></li>
+                <li><Link to="/collections" className="hover:text-[#C98A84] transition-colors">Thematic Collections</Link></li>
+                <li><Link to="/journal" className="hover:text-[#C98A84] transition-colors">The Atelier Journal</Link></li>
+                <li><Link to="/personalize/unicorn-story" className="hover:text-[#C98A84] transition-colors">The Magical Unicorn Edition</Link></li>
+                <li><Link to="/admin" className="text-[#A2949E] hover:text-[#C98A84] transition-colors">Studio Admin</Link></li>
               </ul>
             </div>
 
