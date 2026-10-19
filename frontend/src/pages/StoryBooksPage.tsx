@@ -14,6 +14,7 @@ import {
   SlidersHorizontal
 } from "lucide-react";
 import { api, StoryTemplate } from "@/lib/api";
+import { HardcoverBook } from "@/components/HardcoverBook";
 
 interface StoryCatalogItem {
   id: string;
@@ -53,7 +54,7 @@ const CURATED_STORIES: StoryCatalogItem[] = [
     price_digital: 799,
     price_print: 1399,
     description: "In the whispered heart of Whispering Meadow, a kind-hearted child discovers an enchanted unicorn lost in the dawn mist. Together, they embark on a luminous quest of friendship.",
-    cover_image_url: "/api/v1/assets/unicorn_cover.png",
+    cover_image_url: "/unicorn_cover.png",
     rating: 4.9,
     review_count: 148,
     tag: "Bestseller",
@@ -436,42 +437,46 @@ export default function StoryBooksPage() {
                 key={story.id}
                 className="editorial-card group flex flex-col justify-between overflow-hidden bg-white border border-[#EBE3D9] hover:border-[#C98A84]/50 transition-all duration-300"
               >
-                {/* Book Cover Container */}
+                {/* Book Cover Container — Realistic 3D Hardcover Book Showcase */}
                 <div>
-                  <div className="relative aspect-square overflow-hidden bg-[#FAF7F2]">
-                    <img
-                      src={story.cover_image_url}
-                      alt={story.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80";
-                      }}
-                    />
+                  <div className="relative aspect-square p-5 sm:p-6 bg-gradient-to-b from-[#FDFCFB] via-[#F8F5EE] to-[#EFE8DD] flex items-center justify-center overflow-hidden border-b border-[#EBE3D9]/70">
+                    <div className="w-[82%] sm:w-[86%] max-w-[320px] aspect-square flex items-center justify-center mx-auto">
+                      <HardcoverBook
+                        coverUrl={story.cover_image_url}
+                        title={story.title}
+                        aspectRatio="square"
+                        fallbackSrc="https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80"
+                        onClick={() => {
+                          setPreviewStory(story);
+                          setActiveSpreadIndex(0);
+                        }}
+                      >
+                        {/* Quick Preview Hover Overlay */}
+                        <div className="absolute inset-0 bg-[#2D222A]/35 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-4 rounded-r-[7px] rounded-l-[4px]">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewStory(story);
+                              setActiveSpreadIndex(0);
+                            }}
+                            className="px-4 py-2.5 rounded-full bg-white text-[#2D222A] hover:bg-[#FAF7F2] text-xs font-medium shadow-lg transition-transform transform translate-y-2 group-hover:translate-y-0 flex items-center gap-2 cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-[#C98A84]" />
+                            <span>Quick Look Inside</span>
+                          </button>
+                        </div>
+                      </HardcoverBook>
+                    </div>
 
                     {/* Ribbon Tag */}
-                    <div className="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md border border-[#EBE3D9] text-[11px] font-semibold text-[#2D222A] shadow-xs">
+                    <div className="absolute top-3 left-3 z-30 flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 backdrop-blur-md border border-[#EBE3D9] text-[11px] font-semibold text-[#2D222A] shadow-xs">
                       <Sparkles className="w-3 h-3 text-[#C98A84]" />
                       <span>{story.tag}</span>
                     </div>
 
                     {/* Age Range Badge */}
-                    <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-[#2D222A]/85 backdrop-blur-md text-[11px] font-medium text-white shadow-xs">
+                    <div className="absolute top-3 right-3 z-30 px-3 py-1 rounded-full bg-[#2D222A]/85 backdrop-blur-md text-[11px] font-medium text-white shadow-xs">
                       {story.age_range}
-                    </div>
-
-                    {/* Quick Preview Hover Overlay */}
-                    <div className="absolute inset-0 bg-[#2D222A]/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
-                      <button
-                        onClick={() => {
-                          setPreviewStory(story);
-                          setActiveSpreadIndex(0);
-                        }}
-                        className="px-4 py-2.5 rounded-full bg-white text-[#2D222A] hover:bg-[#FAF7F2] text-xs font-medium shadow-md transition-transform transform translate-y-2 group-hover:translate-y-0 flex items-center gap-2 cursor-pointer"
-                      >
-                        <Eye className="w-3.5 h-3.5 text-[#C98A84]" />
-                        <span>Quick Look Inside</span>
-                      </button>
                     </div>
                   </div>
 
