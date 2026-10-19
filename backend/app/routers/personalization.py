@@ -1,13 +1,14 @@
 import os
 import datetime
 import uuid
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, Response, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import PersonalizationJob, StoryTemplate, GeneratedAsset, ChildProfile, Book, StoryPage
 from app.schemas import PersonalizationOut, GeneratedAssetOut
+from app.config import settings
 from app.services.storage import storage
 from app.services.job_runner import job_runner
 from app.services.ai.photo_validator import validate_child_photo_ai
@@ -49,7 +50,12 @@ def enrich_job_urls(job: PersonalizationJob) -> dict:
 
     story_title = story_obj.title if story_obj else "Personalized Story"
     story_slug = story_obj.slug if story_obj else ""
-    free_pages = f"{job.completed_pages or 0} free"
+    story_pages_count = story_obj.page_count if (story_obj and story_obj.page_count) else 24
+    completed_p = job.completed_pages or 5
+    if completed_p >= story_pages_count:
+        free_pages = f"All {story_pages_count} pages"
+    else:
+        free_pages = f"All {story_pages_count} pages ({completed_p} free)"
 
     status_display = job.status
     if job.status in ["generating", "queued", "analyzing", "in_progress", "processing"]:
@@ -69,7 +75,7 @@ def enrich_job_urls(job: PersonalizationJob) -> dict:
         "photo_url": storage.get_public_url(job.photo_path),
         "status": status_display,
         "current_stage": job.current_stage,
-        "total_pages": job.total_pages,
+        "total_pages": story_pages_count,
         "completed_pages": job.completed_pages,
         "failed_pages": job.failed_pages,
         "retry_count": job.retry_count,
@@ -260,6 +266,66 @@ def trigger_full_generation(
         "message": "Full-book HD AI generation started in background."
     }
 
+def get_full_storybook_pages_for_print(
+    job: PersonalizationJob,
+    story: StoryTemplate,
+    target_lang: str = "english",
+    db: Session = None
+) -> List[Dict[str, Any]]:
+    story_slug = story.slug or "unicorn-story"
+    child_name = job.child_name or "Little Explorer"
+
+    # Query all story pages ordered by page_number
+    story_pages = db.query(StoryPage).filter(
+        StoryPage.story_id == story.id
+    ).order_by(StoryPage.page_number).all()
+
+    # Pre-load existing generated assets (face-fused plates)
+    existing_assets = {
+        a.page_number: a
+        for a in db.query(GeneratedAsset).filter(GeneratedAsset.job_id == job.id).all()
+        if a.storage_path and os.path.exists(a.storage_path)
+    }
+
+    pages_data = []
+    for page in story_pages:
+        page_num = page.page_number
+        page_type = page.page_type or ("cover" if page_num == 1 else "story")
+
+        # 1. Resolve image: use personalized face-swapped plate if ready, else use base high-res illustration
+        img_path = None
+        if page_num in existing_assets:
+            img_path = existing_assets[page_num].storage_path
+        elif page.original_image_path and os.path.exists(page.original_image_path):
+            img_path = page.original_image_path
+        else:
+            cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png"
+            if cand.exists():
+                img_path = str(cand)
+
+        # Skip any invalid or non-existent pages (ensures exact clean pages)
+        if not img_path or not os.path.exists(img_path):
+            continue
+
+        # 2. Personalize narrative text
+        raw_text = page.story_text or page.extracted_text or f"Scene for page {page_num}."
+        personalized_text = raw_text
+        for tag in ["[Name]", "[name]", "{name}", "[child_name]", "{child_name}"]:
+            personalized_text = personalized_text.replace(tag, child_name)
+
+        if target_lang.lower() not in ["english", "en"]:
+            from app.services.translation_service import translation_service
+            personalized_text = translation_service.translate_text(personalized_text, target_lang, child_name=child_name)
+
+        pages_data.append({
+            "page_number": page_num,
+            "page_type": page_type,
+            "image_path": img_path,
+            "story_text": personalized_text
+        })
+
+    return pages_data
+
 @router.get("/{job_id}/print-pdf")
 def download_full_print_pdf(
     job_id: str,
@@ -281,10 +347,12 @@ def download_full_print_pdf(
     story_title = story.title if story else "Personalized Story"
 
     from app.services.pdf_composer import PDFComposerService
-    from app.services.job_runner import job_runner
 
-    # Retrieve or dynamically complete ALL pages of the uploaded storybook
-    all_pages_data = job_runner.get_or_generate_full_storybook_pages(job.id, target_lang=lang)
+    # Deterministic assembly of all storybook pages:
+    # Uses AI face-fused plates for personalized pages, and high-res story template art for remaining pages
+    all_pages_data = get_full_storybook_pages_for_print(job=job, story=story, target_lang=lang, db=db)
+    if not all_pages_data:
+        raise HTTPException(status_code=400, detail="No printable pages found for this storybook.")
 
     print_filename = f"print_{job.id}_{lang}_{size}_{color}.pdf"
     pdf_path, validation = PDFComposerService.compose_storybook_pdf(
@@ -306,7 +374,7 @@ def download_full_print_pdf(
             content=pdf_bytes,
             media_type="application/pdf",
             headers={
-                "Content-Disposition": f'inline; filename="{safe_child}_{safe_title}_Full_{size}_{color.upper()}_Print.pdf"'
+                "Content-Disposition": f'attachment; filename="{safe_child}_{safe_title}_Full_Print_{size}.pdf"'
             }
         )
     raise HTTPException(status_code=500, detail="Failed to compose print PDF.")

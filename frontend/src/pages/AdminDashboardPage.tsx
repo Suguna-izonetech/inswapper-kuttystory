@@ -641,27 +641,14 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
     }
 
     // Print PDF (8x8 CMYK - ALL Pages):
-    // If all pages are already fully rendered and not currently rendering:
-    const isFullyRendered = Boolean(
-      job.completed_pages &&
-      job.total_pages &&
-      job.completed_pages >= job.total_pages &&
-      !job.status?.toLowerCase().includes("rendering")
-    );
-
-    if (isFullyRendered) {
-      const url = job.print_pdf_url || `/api/v1/personalization/${job.id}/print-pdf?size=8x8&color=cmyk`;
-      window.open(url, "_blank");
-      return;
-    }
-
-    // If remaining pages need HD AI rendering, show the live progress modal and trigger generation:
-    setGeneratingFullJob(job);
-    try {
-      await api.triggerFullGeneration(job.id);
-    } catch (e: any) {
-      console.error("Error triggering full generation:", e);
-    }
+    // Directly download the complete print-ready PDF containing all pages
+    const url = job.print_pdf_url || `/api/v1/personalization/${job.id}/print-pdf?size=8x8&color=cmyk`;
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `${(job.child_name || "Child").replace(/\s+/g, "_")}_Full_Print.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleSaveAiSettings = async () => {
@@ -1468,9 +1455,14 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
 
                             {/* PAGES */}
                             <td className="py-4 px-6">
-                              <span className="text-xs text-gray-500 font-medium">
-                                {job.pages_label || `${job.completed_pages || 0} free`}
-                              </span>
+                              <div className="flex flex-col">
+                                <span className="text-xs font-semibold text-gray-800">
+                                  All {job.total_pages && job.total_pages > 5 ? job.total_pages : 24} pages
+                                </span>
+                                <span className="text-[11px] text-gray-400 font-normal">
+                                  {job.completed_pages || 5} free preview
+                                </span>
+                              </div>
                             </td>
 
                             {/* CREATED */}
