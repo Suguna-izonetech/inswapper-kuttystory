@@ -11,10 +11,10 @@ import {
   CheckCircle2,
   Bookmark,
   Compass,
-  Smile,
-  ShieldAlert,
-  Stars
+  Smile
 } from "lucide-react";
+import BookSalesMapSection from "../components/BookSalesMapSection";
+
 
 interface MilestoneStage {
   id: string;
@@ -189,180 +189,11 @@ export default function FootStepsPage() {
           </div>
         </div>
       </section>
+      
+      {/* 4. Book Sales Map Reach Section */}
+      <BookSalesMapSection />
 
-      {/* 2. Interactive Milestone Navigator */}
-      <section id="stages" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6">
-        <div className="bg-white rounded-3xl p-6 sm:p-10 border border-[#EBE3D9] shadow-sm space-y-8">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-widest text-[#C98A84] mb-1">
-              Select Your Child's Journey
-            </div>
-            <h2 className="font-editorial-serif text-2xl sm:text-3xl font-bold text-[#2D222A]">
-              Which Step Is Your Child Taking Today?
-            </h2>
-          </div>
-
-          {/* Milestone Step Buttons */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {MILESTONE_STAGES.map((stage) => {
-              const Icon = stage.icon;
-              const isSelected = selectedMilestone === stage.id;
-              return (
-                <button
-                  key={stage.id}
-                  onClick={() => setSelectedMilestone(stage.id)}
-                  className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
-                    isSelected
-                      ? "border-[#C98A84] bg-[#FAEEED]/40 shadow-sm ring-2 ring-[#C98A84]/20"
-                      : "border-[#EBE3D9] bg-[#FAF7F2] hover:bg-white hover:border-[#C98A84]/40"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className={`w-9 h-9 rounded-xl ${stage.colorBg} flex items-center justify-center ${stage.colorText}`}>
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#2D222A] border border-[#EBE3D9]">
-                      {stage.ageRange}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-[#2D222A]">{stage.stageName}</div>
-                    <div className="text-[11px] text-[#695B64] line-clamp-1">{stage.title}</div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Active Milestone Spotlight Detail Card */}
-          <div className="rounded-2xl border border-[#EBE3D9] bg-gradient-to-br from-[#FAF7F2] via-white to-[#FAF7F2] p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            <div className="lg:col-span-7 space-y-5">
-              <div className="flex items-center gap-3">
-                <span className="px-3 py-1 rounded-full bg-[#2D222A] text-white text-xs font-semibold">
-                  Stage: {currentStage.stageName}
-                </span>
-                <span className="text-xs font-medium text-[#C98A84]">
-                  Recommended For {currentStage.ageRange}
-                </span>
-              </div>
-
-              <h3 className="font-editorial-serif text-3xl font-bold text-[#2D222A]">
-                {currentStage.title}
-              </h3>
-
-              <p className="text-sm text-[#695B64] leading-relaxed">
-                {currentStage.description}
-              </p>
-
-              <div className="space-y-2.5 pt-2">
-                <div className="text-xs uppercase tracking-wider font-bold text-[#2D222A]">
-                  Built-In Heirloom Keepsake Elements:
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {currentStage.keepsakeFeatures.map((feat, idx) => (
-                    <div key={idx} className="flex items-start gap-2 text-xs text-[#4E424B]">
-                      <CheckCircle2 className="w-4 h-4 text-[#8F9E8B] shrink-0 mt-0.5" />
-                      <span>{feat}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Recommended Story Box */}
-            <div className="lg:col-span-5 bg-white rounded-2xl p-6 border border-[#EBE3D9] shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[#C98A84]">
-                  Ideal Story Match
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FAF7F2] text-[#695B64] border border-[#EBE3D9]">
-                  {currentStage.recommendedStory.genre}
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                <h4 className="font-editorial-serif text-xl font-bold text-[#2D222A]">
-                  {currentStage.recommendedStory.title}
-                </h4>
-                <p className="text-xs text-[#695B64]">
-                  Tailored narrative designed to resonate with this exact developmental leap.
-                </p>
-              </div>
-
-              <div className="pt-3 border-t border-[#EBE3D9] flex items-center justify-between">
-                <div className="text-xs text-[#695B64]">
-                  26 Pages • Archival 210×210 mm
-                </div>
-                <Link
-                  to={`/personalize/${currentStage.recommendedStory.slug}`}
-                  className="px-4 py-2 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                >
-                  <span>Personalize</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. The 3 Special Keepsake Inclusions */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-24">
-        <div className="text-center max-w-2xl mx-auto space-y-3 mb-14">
-          <div className="text-xs uppercase tracking-widest text-[#C98A84] font-semibold">
-            The Foot Steps Inclusions
-          </div>
-          <h2 className="font-editorial-serif text-3xl sm:text-4xl font-bold text-[#2D222A]">
-            More Than a Book: A Tangible Time Capsule
-          </h2>
-          <p className="text-xs sm:text-sm text-[#695B64]">
-            Every edition ordered through our Foot Steps collection includes these three permanent commemorative features.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Keepsake 1 */}
-          <div className="bg-white rounded-2xl p-7 border border-[#EBE3D9] space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-[#FAEEED] flex items-center justify-center text-[#C98A84]">
-              <Footprints className="w-6 h-6" />
-            </div>
-            <h3 className="font-editorial-serif text-xl font-bold text-[#2D222A]">
-              1. The 1:1 Footprint Page
-            </h3>
-            <p className="text-xs text-[#695B64] leading-relaxed">
-              Printed on extra-heavyweight acid-free art stock. Includes instructions and non-toxic safe ink guidelines for stamping their tiny foot alongside an illustrated golden stepping-stone path.
-            </p>
-          </div>
-
-          {/* Keepsake 2 */}
-          <div className="bg-white rounded-2xl p-7 border border-[#EBE3D9] space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-[#F2EEF7] flex items-center justify-center text-[#B8A9C9]">
-              <Bookmark className="w-6 h-6" />
-            </div>
-            <h3 className="font-editorial-serif text-xl font-bold text-[#2D222A]">
-              2. The Letter From Loved Ones
-            </h3>
-            <p className="text-xs text-[#695B64] leading-relaxed">
-              Before the story begins, Page 1 displays your permanent letter to your child. Written today, but waiting to be read again on their 18th birthday or wedding morning.
-            </p>
-          </div>
-
-          {/* Keepsake 3 */}
-          <div className="bg-white rounded-2xl p-7 border border-[#EBE3D9] space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-[#EEF4ED] flex items-center justify-center text-[#8F9E8B]">
-              <Calendar className="w-6 h-6" />
-            </div>
-            <h3 className="font-editorial-serif text-xl font-bold text-[#2D222A]">
-              3. The Growth Milestone Seal
-            </h3>
-            <p className="text-xs text-[#695B64] leading-relaxed">
-              Tucked inside the back cover is an embossed certificate commemorating the date, height, favorite toy, and proudest achievement of the day this book was typeset.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. Parent Memories & Testimonials */}
+      {/* 5. Parent Memories & Testimonials */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-24">
         <div className="bg-[#FAF7F2] rounded-3xl p-8 sm:p-12 border border-[#EBE3D9] space-y-8">
           <div className="text-center space-y-2">
