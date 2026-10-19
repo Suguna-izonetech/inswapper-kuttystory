@@ -3,10 +3,27 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
+  Volume2,
+  VolumeX,
+  Play,
+  Pause,
+  Sparkles,
   Maximize2,
   Minimize2
 } from "lucide-react";
 import { GeneratedAsset } from "@/lib/api";
+
+import { Globe, Languages } from "lucide-react";
+
+export const SUPPORTED_LANGUAGES = [
+  { id: "english", label: "English", native: "English", flag: "🇬🇧" },
+  { id: "tamil", label: "Tamil", native: "தமிழ்", flag: "🇮🇳" },
+  { id: "malayalam", label: "Malayalam", native: "മലയാളം", flag: "🇮🇳" },
+  { id: "hindi", label: "Hindi", native: "हिंदी", flag: "🇮🇳" },
+  { id: "marathi", label: "Marathi", native: "मराठी", flag: "🇮🇳" },
+  { id: "telugu", label: "Telugu", native: "తెలుగు", flag: "🇮🇳" },
+  { id: "kannada", label: "Kannada", native: "ಕನ್ನಡ", flag: "🇮🇳" },
+];
 
 interface RealisticBookFlipViewerProps {
   assets: GeneratedAsset[];
@@ -17,6 +34,10 @@ interface RealisticBookFlipViewerProps {
   storyTitle?: string;
   onRetryPage?: (assetId: string) => void;
   isRetrying?: boolean;
+  selectedLanguage?: string;
+  onLanguageChange?: (languageId: string) => void;
+  translatedTexts?: Record<string, string>;
+  isTranslating?: boolean;
 }
 
 export default function RealisticBookFlipViewer({
@@ -25,24 +46,69 @@ export default function RealisticBookFlipViewer({
   onPageChange,
   childPhotoUrl,
   childName = "Your Child",
-  storyTitle = "The Girl and the Magical Unicorn",
+  storyTitle = "Storybook",
   onRetryPage,
-  isRetrying = false
+  isRetrying = false,
+  selectedLanguage = "english",
+  onLanguageChange,
+  translatedTexts = {},
+  isTranslating = false,
 }: RealisticBookFlipViewerProps) {
-  // Animation states
+  // Animation & Playback states
   const [isFlipping, setIsFlipping] = useState(false);
   const [flipDirection, setFlipDirection] = useState<"next" | "prev">("next");
   const [fromPageIdx, setFromPageIdx] = useState(currentPageIdx);
   const [toPageIdx, setToPageIdx] = useState(currentPageIdx);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [isAutoplay, setIsAutoplay] = useState(true);
+  const [flipSpeed, setFlipSpeed] = useState<"slow" | "normal">("slow"); // Slow motion active by default
+  const [isHovered, setIsHovered] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [flipProgress, setFlipProgress] = useState(0); // 0 to 100 for physics styling
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const flipDurationMs = 750;
+  const autoplayTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const flipDurationMs = flipSpeed === "slow" ? 1500 : 750;
 
+  // Play realistic paper rustle sound via Web Audio API
+  const playPageTurnSound = useCallback(() => {
+    if (!soundEnabled) return;
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtx();
+      const soundLength = flipSpeed === "slow" ? 0.32 : 0.18;
+      const bufferSize = Math.floor(ctx.sampleRate * soundLength);
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        // Organic paper rustle noise curve
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.06));
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
 
-  // Handle page turn with realistic 3D paper curl physics
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(750, ctx.currentTime);
+      filter.Q.setValueAtTime(1.5, ctx.currentTime);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + soundLength);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      noise.start();
+    } catch {
+      // AudioContext could be blocked by browser policy
+    }
+  }, [soundEnabled, flipSpeed]);
+
+  // Handle page turn with realistic 3D paper curl physics in slow motion
   const triggerFlip = useCallback(
     (targetIdx: number) => {
       if (isFlipping || targetIdx === currentPageIdx || targetIdx < 0 || targetIdx >= assets.length) {
@@ -55,10 +121,11 @@ export default function RealisticBookFlipViewer({
       setToPageIdx(targetIdx);
       setIsFlipping(true);
       setFlipProgress(0);
+      playPageTurnSound();
 
       // Animate progress smoothly for dynamic light/shadow rendering
       const startTime = performance.now();
-      const duration = flipDurationMs;
+      const duration = flipDurationMs; // 1500ms for slow motion
 
       const updateProgress = (now: number) => {
         const elapsed = now - startTime;
@@ -75,7 +142,7 @@ export default function RealisticBookFlipViewer({
 
       requestAnimationFrame(updateProgress);
     },
-    [isFlipping, currentPageIdx, assets.length, onPageChange, flipDurationMs]
+    [isFlipping, currentPageIdx, assets.length, onPageChange, playPageTurnSound, flipDurationMs]
   );
 
   const handleNext = useCallback(() => {
@@ -96,7 +163,22 @@ export default function RealisticBookFlipViewer({
     }
   }, [currentPageIdx, assets.length, triggerFlip]);
 
+  // Autoplay Effect (Automatically flips to the next page every 5.2s in slow motion)
+  useEffect(() => {
+    if (!isAutoplay || isHovered || isFlipping || assets.length <= 1) {
+      if (autoplayTimerRef.current) clearInterval(autoplayTimerRef.current);
+      return;
+    }
 
+    const intervalTime = flipSpeed === "slow" ? 5200 : 3800;
+    autoplayTimerRef.current = setInterval(() => {
+      handleNext();
+    }, intervalTime);
+
+    return () => {
+      if (autoplayTimerRef.current) clearInterval(autoplayTimerRef.current);
+    };
+  }, [isAutoplay, isHovered, isFlipping, assets.length, handleNext, flipSpeed]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -112,6 +194,26 @@ export default function RealisticBookFlipViewer({
   const fromAsset = assets[fromPageIdx];
   const toAsset = assets[toPageIdx];
 
+  const getAssetNarrative = useCallback(
+    (asset?: GeneratedAsset | null) => {
+      if (!asset) return "";
+      if (translatedTexts && translatedTexts[asset.id]) {
+        return translatedTexts[asset.id];
+      }
+      let text = asset.story_text || asset.prompt_used || "";
+      const cleanChild = childName && childName.trim() ? childName.trim() : "Your Child";
+      ["[Name]", "[name]", "{name}", "[child_name]", "{child_name}"].forEach((tag) => {
+        text = text.split(tag).join(cleanChild);
+      });
+      return text;
+    },
+    [translatedTexts, childName]
+  );
+
+  const activeAsset = isFlipping ? toAsset : currentAsset;
+  const activeNarrative = getAssetNarrative(activeAsset);
+  const activeLangObj = SUPPORTED_LANGUAGES.find((l) => l.id === selectedLanguage);
+
   return (
     <div
       ref={containerRef}
@@ -120,9 +222,11 @@ export default function RealisticBookFlipViewer({
           : ""
         }`}
     >
-      {/* 1. Realistic Storybook Table Canvas */}
+      {/* 1. Realistic Storybook Table Canvas (Compact & Perfectly Framed) */}
       <div
-        className="relative rounded-3xl p-4 sm:p-7 md:p-9 overflow-hidden border border-[#DDD6C0] shadow-sm select-none transition-all duration-300"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className="relative rounded-3xl p-4 sm:p-6 md:p-8 overflow-hidden border border-[#DDD6C0] shadow-sm select-none transition-all duration-300"
         style={{
           backgroundColor: "#EDE4CE",
           backgroundImage: `
@@ -135,32 +239,70 @@ export default function RealisticBookFlipViewer({
         {/* Soft Vignette Overlay */}
         <div className="absolute inset-0 bg-radial from-transparent via-[#E5DCBF]/25 to-[#D5CBAE]/50 pointer-events-none" />
 
-        {/* Top Control Bar: Page counter & Fullscreen */}
-        <div className="relative z-20 flex items-center justify-between pb-3 sm:pb-5">
-          {/* Page Badge */}
+        {/* Top Control Bar: Autoplay status, Sound & Page counter */}
+        <div className="relative z-20 flex items-center justify-between pb-4 sm:pb-6">
+          {/* Page Badge & Auto-flip Indicator */}
           <div className="flex items-center gap-2">
-            <span className="px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-sm border border-[#DDD5C0] text-xs font-bold text-[#5B4F3A] shadow-xs">
+            <span className="px-3 py-1 rounded-full bg-white/90 backdrop-blur-sm border border-[#DDD5C0] text-xs font-semibold text-[#5B4F3A] shadow-xs">
               Page {currentPageIdx + 1} of {assets.length}
             </span>
+            <button
+              onClick={() => setIsAutoplay(!isAutoplay)}
+              className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 transition cursor-pointer border ${isAutoplay
+                  ? "bg-[#0275FF]/10 text-[#0275FF] border-[#0275FF]/30"
+                  : "bg-white/80 text-[#82755E] border-[#DDD5C0]"
+                }`}
+              title={isAutoplay ? "Pause auto-flipping" : "Start auto-flipping"}
+            >
+              {isAutoplay ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-[#0275FF] animate-pulse" />
+                  <Pause className="w-3 h-3" />
+                  <span>Auto-Flip</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3 h-3" />
+                  <span>Auto-Flip Off</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => setFlipSpeed(flipSpeed === "slow" ? "normal" : "slow")}
+              className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border ${flipSpeed === "slow"
+                  ? "bg-[#C98A84]/15 text-[#C98A84] border-[#C98A84]/40 shadow-xs"
+                  : "bg-white/80 text-[#82755E] border-[#DDD5C0]"
+                }`}
+              title="Toggle Slow Motion Mode"
+            >
+              <span>{flipSpeed === "slow" ? "Slow Motion (1.5s)" : "Normal (0.75s)"}</span>
+            </button>
           </div>
 
-          {/* Fullscreen control */}
+          {/* Sound & Fullscreen controls */}
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              title={soundEnabled ? "Mute Flip Sound" : "Enable Flip Sound"}
+              className="p-1.5 sm:p-2 rounded-full bg-white/80 hover:bg-white text-[#5B4F3A] border border-[#DDD5C0] shadow-xs transition cursor-pointer"
+            >
+              {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-[#0275FF]" /> : <VolumeX className="w-3.5 h-3.5 opacity-40" />}
+            </button>
             <button
               onClick={() => setIsFullscreen(!isFullscreen)}
               title={isFullscreen ? "Exit Fullscreen" : "Fullscreen Preview"}
-              className="p-2 rounded-full bg-white/90 hover:bg-white text-[#5B4F3A] border border-[#DDD5C0] shadow-xs transition cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-full bg-white/80 hover:bg-white text-[#5B4F3A] border border-[#DDD5C0] shadow-xs transition cursor-pointer"
             >
-              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
             </button>
           </div>
         </div>
 
-        {/* 2. REALISTIC HARDCOVER STORYBOOK MOCKUP (SQUARE 1:1 RATIO TO PREVENT ANY CROPPING) */}
-        <div className="relative w-full max-w-2xl sm:max-w-3xl flex items-center justify-center my-2 sm:my-4 mx-auto">
-          {/* Outer Book Perspective Wrapper: 1:1 Aspect ratio matching 1241x1241 square storybook spreads */}
+        {/* 2. REALISTIC HARDCOVER STORYBOOK MOCKUP (PROPORTIONATELY SIZED TO MATCH REFERENCE IMAGE) */}
+        <div className="relative max-w-xl mx-auto flex items-center justify-center my-1 sm:my-3">
+          {/* Outer Book Perspective Wrapper: Landscape aspect ratio matching 'When Zoey Grows Up' */}
           <div
-            className="relative w-full max-w-[560px] sm:max-w-[660px] md:max-w-[700px] aspect-square"
+            className="relative w-full max-w-[460px] sm:max-w-[500px] aspect-[1.28/1]"
             style={{ perspective: "2000px" }}
           >
             {/* 3D Hardcover Book Body */}
@@ -262,6 +404,11 @@ export default function RealisticBookFlipViewer({
                     }}
                   />
 
+                  {/* Personalized Cover Badge */}
+                  <div className="absolute top-3 right-3 z-20 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md shadow-xs border border-[#EBE3D9] text-[#2D222A] text-[10px] font-bold flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-[#C98A84]" />
+                    <span>Personalized for {childName}</span>
+                  </div>
 
                 </div>
 
@@ -309,6 +456,7 @@ export default function RealisticBookFlipViewer({
                           `
                         }}
                       />
+
                     </div>
 
                     {/* Back Face: Realistic paper parchment reverse side with watermark */}
@@ -442,7 +590,7 @@ export default function RealisticBookFlipViewer({
           </div>
         </div>
 
-        {/* 3. PAGINATION DOTS */}
+        {/* 3. PAGINATION DOTS (MATCHING REFERENCE IMAGE 2) */}
         <div className="relative z-20 flex items-center justify-center gap-2 pt-6 sm:pt-8 pb-1">
           {assets.map((_, idx) => {
             const isActive = currentPageIdx === idx;
@@ -452,7 +600,7 @@ export default function RealisticBookFlipViewer({
                 onClick={() => triggerFlip(idx)}
                 disabled={isFlipping}
                 className={`transition-all duration-300 rounded-full cursor-pointer ${isActive
-                    ? "w-2.5 h-2.5 bg-[#C98A84] shadow-xs scale-125 ring-2 ring-[#C98A84]/30"
+                    ? "w-2.5 h-2.5 bg-[#0275FF] shadow-xs scale-125 ring-2 ring-[#0275FF]/30"
                     : "w-2 h-2 bg-[#B8AF98] hover:bg-[#8F8367] opacity-60 hover:opacity-100"
                   }`}
                 title={`Go to Page ${idx + 1}`}
@@ -463,7 +611,105 @@ export default function RealisticBookFlipViewer({
         </div>
       </div>
 
+      {/* 3.5. STORY LANGUAGE SELECTOR (Tamil, Malayalam, Hindi, Marathi, Telugu, Kannada, English) */}
+      {onLanguageChange && (
+        <div className="editorial-card p-3.5 bg-gradient-to-r from-[#FAF7F2] via-white to-[#FAF7F2] border border-[#EBE3D9] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2 text-xs font-bold text-[#2D222A]">
+            <Languages className="w-4 h-4 text-[#C98A84]" />
+            <span>Story Language:</span>
+            {isTranslating && (
+              <span className="flex items-center gap-1 text-[11px] font-medium text-[#C98A84] animate-pulse">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                <span>Translating story...</span>
+              </span>
+            )}
+          </div>
 
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {SUPPORTED_LANGUAGES.map((lang) => {
+              const isSelected = selectedLanguage === lang.id;
+              return (
+                <button
+                  key={lang.id}
+                  onClick={() => onLanguageChange(lang.id)}
+                  disabled={isTranslating}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border ${
+                    isSelected
+                      ? "bg-[#C98A84] text-white border-[#C98A84] shadow-xs"
+                      : "bg-white hover:bg-[#FAEEED] text-[#5B4F3A] border-[#EBE3D9]"
+                  }`}
+                >
+                  <span>{lang.native}</span>
+                  {lang.id !== "english" && (
+                    <span className={`text-[10px] ${isSelected ? "text-white/80" : "text-gray-400"}`}>
+                      ({lang.label})
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 4. STORY NARRATIVE & METADATA SECTION */}
+      {currentAsset && (
+        <div className="editorial-card p-5 sm:p-6 bg-white grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+          {/* Narrative Text */}
+          <div className="md:col-span-7 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-[#C98A84] font-bold">
+                Story Narrative • Page #{currentAsset.page_number}
+              </span>
+              {selectedLanguage !== "english" && (
+                <span className="px-2 py-0.5 rounded-full bg-[#FAEEED] text-[#C98A84] text-[10px] font-bold border border-[#C98A84]/20 flex items-center gap-1">
+                  <Globe className="w-2.5 h-2.5" />
+                  <span>{SUPPORTED_LANGUAGES.find((l) => l.id === selectedLanguage)?.native || selectedLanguage}</span>
+                </span>
+              )}
+            </div>
+            {isTranslating ? (
+              <div className="flex items-center gap-2 py-3 text-sm text-[#C98A84] font-medium animate-pulse">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Translating narrative into {SUPPORTED_LANGUAGES.find((l) => l.id === selectedLanguage)?.native || selectedLanguage}...</span>
+              </div>
+            ) : (
+              <p className="font-editorial-serif text-base sm:text-lg text-[#2D222A] leading-relaxed italic">
+                "{getAssetNarrative(currentAsset)}"
+              </p>
+            )}
+          </div>
+
+          {/* Details & Actions */}
+          <div className="md:col-span-5 space-y-3">
+            <div className="p-3 rounded-xl bg-[#F7F3EC] border border-[#EBE3D9] space-y-1.5 text-xs text-[#695B64]">
+              <div className="flex justify-between py-0.5 border-b border-[#EBE3D9]/60">
+                <span>AI Provider:</span>
+                <span className="font-semibold text-[#2D222A]">{currentAsset.provider}</span>
+              </div>
+              <div className="flex justify-between py-0.5 border-b border-[#EBE3D9]/60">
+                <span>Model:</span>
+                <span className="font-semibold text-[#2D222A]">{currentAsset.model}</span>
+              </div>
+              <div className="flex justify-between py-0.5">
+                <span>Latency:</span>
+                <span className="font-semibold text-[#2D222A]">{currentAsset.generation_time_sec}s</span>
+              </div>
+            </div>
+
+            {onRetryPage && (
+              <button
+                onClick={() => onRetryPage(currentAsset.id)}
+                disabled={isRetrying}
+                className="w-full py-2 rounded-full border border-[#C98A84] text-[#C98A84] hover:bg-[#FAEEED] text-xs font-semibold transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRetrying ? "animate-spin" : ""}`} />
+                <span>{isRetrying ? "Regenerating Page..." : "Regenerate This Page"}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 5. JUMP TO PAGE THUMBNAILS */}
       <div className="editorial-card p-3.5 sm:p-4 bg-white space-y-2">
@@ -477,7 +723,7 @@ export default function RealisticBookFlipViewer({
               onClick={() => triggerFlip(idx)}
               disabled={isFlipping}
               className={`relative w-16 h-16 rounded-lg overflow-hidden shrink-0 border-2 transition cursor-pointer ${currentPageIdx === idx
-                  ? "border-[#C98A84] shadow-sm scale-105 ring-2 ring-[#C98A84]/20"
+                  ? "border-[#0275FF] shadow-sm scale-105 ring-2 ring-[#0275FF]/20"
                   : "border-[#EBE3D9] opacity-70 hover:opacity-100"
                 }`}
             >

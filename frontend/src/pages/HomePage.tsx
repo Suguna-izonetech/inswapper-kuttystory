@@ -293,7 +293,7 @@ export default function HomePage() {
               See How It Works
             </Link>
             <Link
-              to="/personalize/unicorn-story"
+              to={stories.length > 0 ? `/personalize/${stories[0].slug}` : "/#stories"}
               className="px-6 py-3.5 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs font-semibold text-center transition-colors shadow-sm"
             >
               Start Personalization

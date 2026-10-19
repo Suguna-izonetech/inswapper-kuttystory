@@ -113,6 +113,7 @@ export interface PersonalizationJob {
   is_purchased?: boolean;
   created_formatted?: string;
   pdf_download_url?: string;
+  print_pdf_url?: string;
   assets: GeneratedAsset[];
 }
 
@@ -223,11 +224,35 @@ export const api = {
     return res.json();
   },
 
+  async triggerFullGeneration(jobId: string): Promise<{ status: string; message: string }> {
+    const res = await fetch(`${API_BASE}/personalization/${jobId}/generate-full`, {
+      method: "POST",
+    });
+    if (!res.ok) throw new Error("Failed to trigger full book generation");
+    return res.json();
+  },
+
   async retryAsset(assetId: string): Promise<GeneratedAsset> {
     const res = await fetch(`${API_BASE}/personalization/assets/${assetId}/retry`, {
       method: "POST",
     });
     if (!res.ok) throw new Error("Failed to regenerate page");
+    return res.json();
+  },
+
+  async getLanguages(): Promise<{ default: string; languages: Array<{ id: string; name: string; native: string; code: string }> }> {
+    const res = await fetch(`${API_BASE}/personalization/languages`);
+    if (!res.ok) throw new Error("Failed to fetch languages");
+    return res.json();
+  },
+
+  async translateJob(jobId: string, targetLanguage: string): Promise<{ job_id: string; target_language: string; translations: Record<string, string> }> {
+    const res = await fetch(`${API_BASE}/personalization/${jobId}/translate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target_language: targetLanguage }),
+    });
+    if (!res.ok) throw new Error("Failed to translate story");
     return res.json();
   },
 

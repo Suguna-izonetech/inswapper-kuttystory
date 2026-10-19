@@ -15,6 +15,9 @@ from reportlab.lib.units import mm
 from app.config import settings
 from app.services.storage import storage
 
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
 # Standard square picture book trim size configured via settings
 POINTS_PER_MM = 72.0 / 25.4
 PAGE_WIDTH_PT = settings.PRINT_TRIM_WIDTH_MM * POINTS_PER_MM
@@ -22,11 +25,30 @@ PAGE_HEIGHT_PT = settings.PRINT_TRIM_HEIGHT_MM * POINTS_PER_MM
 BLEED_PT = settings.PRINT_BLEED_MM * POINTS_PER_MM
 MARGIN_PT = settings.PRINT_SAFE_MARGIN_MM * POINTS_PER_MM
 
+DEFAULT_STORY_FONT = "Helvetica-Bold"
+DEFAULT_BODY_FONT = "Helvetica"
+
+# Register universal font for Indian languages (Tamil, Malayalam, Hindi, Marathi, Telugu, Kannada)
+for cand in ["C:/Windows/Fonts/Nirmala.ttc", "C:/Windows/Fonts/nirmala.ttc", "C:/Windows/Fonts/NirmalaB.ttf", "C:/Windows/Fonts/segoeui.ttf"]:
+    try:
+        p = Path(cand)
+        if p.exists():
+            if str(cand).endswith(".ttc"):
+                pdfmetrics.registerFont(TTFont("MultiLangFont", str(p), subfontIndex=0))
+            else:
+                pdfmetrics.registerFont(TTFont("MultiLangFont", str(p)))
+            DEFAULT_STORY_FONT = "MultiLangFont"
+            DEFAULT_BODY_FONT = "MultiLangFont"
+            break
+    except Exception:
+        continue
+
+
 class PDFComposerService:
     """
     Deterministic PDF Layout Engine using ReportLab.
     Separates artwork generation from typography, ensuring sharp vector text,
-    proper margins, bleed handling, and print preflight validation.
+    proper margins, bleed handling, CMYK color separation, and print preflight validation.
     """
 
     @staticmethod
@@ -35,139 +57,135 @@ class PDFComposerService:
         output_filename: str,
         book_type: str = "preview",
         child_name: str = "Little Adventurer",
-        story_title: str = "The Girl and the Magical Unicorn",
+        story_title: str = "Personalized Story",
+        page_size: str = "8x8",
+        color_mode: str = "cmyk"
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Compose a complete, deterministic square children's picture book.
         
-        pages_data item format:
-        {
-            "page_number": int,
-            "page_type": "cover" | "story" | "ending",
-            "image_path": str,
-            "story_text": str
-        }
+        Supported page_size options:
+        - "8x8", "8x8_inch", "8*8", "8*8 mm", "8*8mm", "8x8mm": 8.0 x 8.0 inches (203.2 x 203.2 mm) = 576 x 576 pt
+        - "210x210", "210x210_mm": 210 x 210 mm = 595.28 x 595.28 pt
+        
+        Supported color_mode options:
+        - "cmyk": Standard commercial print CMYK (DeviceCMYK color space with 4-channel image separation)
+        - "rgb": Digital screen RGB preview
         """
         output_dir = settings.PREVIEWS_DIR if book_type == "preview" else settings.FINAL_BOOKS_DIR
         output_dir.mkdir(parents=True, exist_ok=True)
         pdf_path = output_dir / output_filename
 
-        c = canvas.Canvas(str(pdf_path), pagesize=(PAGE_WIDTH_PT, PAGE_HEIGHT_PT))
-        
+        # 1. Resolve Page Geometry (8x8 inches = 203.2 x 203.2 mm = 576 x 576 pt)
+        normalized_size = str(page_size).lower().strip().replace(" ", "")
+        if any(token in normalized_size for token in ["8x8", "8*8", "8inch"]):
+            page_w_pt = 8.0 * inch
+            page_h_pt = 8.0 * inch
+            trim_label = "8 x 8 inches (203.2 x 203.2 mm)"
+        elif "210" in normalized_size:
+            page_w_pt = 210.0 * POINTS_PER_MM
+            page_h_pt = 210.0 * POINTS_PER_MM
+            trim_label = "210 x 210 mm"
+        else:
+            page_w_pt = 8.0 * inch
+            page_h_pt = 8.0 * inch
+            trim_label = "8 x 8 inches (203.2 x 203.2 mm)"
+
+        is_cmyk = (str(color_mode).lower().strip() == "cmyk")
+
+        # ReportLab Canvas
+        c = canvas.Canvas(str(pdf_path), pagesize=(page_w_pt, page_h_pt))
+
+        # Color definitions for CMYK vs RGB
+        if is_cmyk:
+            card_fill = colors.CMYKColor(0.01, 0.02, 0.04, 0.01, alpha=0.94)  # Ivory in CMYK
+            card_stroke = colors.CMYKColor(0.12, 0.22, 0.60, 0.10, alpha=0.50) # Muted gold in CMYK
+            text_color = colors.CMYKColor(0.30, 0.50, 0.20, 0.85)             # Deep plum rich black
+            page_num_color = colors.CMYKColor(0.10, 0.10, 0.10, 0.60)         # Muted charcoal
+            banner_bg = colors.CMYKColor(0.10, 0.40, 0.30, 0.05, alpha=0.85)  # Dusty rose in CMYK
+            fallback_bg = colors.CMYKColor(0.01, 0.02, 0.04, 0.01)
+        else:
+            card_fill = colors.HexColor("#FAF7F2", alpha=0.98)
+            card_stroke = colors.HexColor("#D4AF37", alpha=0.4)
+            text_color = colors.HexColor("#2D222A")
+            page_num_color = colors.HexColor("#7A7077")
+            banner_bg = colors.HexColor("#DDA7A2", alpha=0.85)
+            fallback_bg = colors.HexColor("#FAF7F2")
+
         preflight_validation = {
             "book_type": book_type,
             "page_count": len(pages_data),
-            "trim_size_mm": "210 x 210",
-            "dimensions_pt": f"{PAGE_WIDTH_PT:.2f} x {PAGE_HEIGHT_PT:.2f}",
+            "trim_size": trim_label,
+            "dimensions_pt": f"{page_w_pt:.2f} x {page_h_pt:.2f}",
+            "color_space": "DeviceCMYK (4 Channels)" if is_cmyk else "DeviceRGB (3 Channels)",
             "aspect_ratio": "1:1 Square",
             "has_missing_images": False,
             "dpi_check": [],
             "validation_passed": True
         }
 
+        # Cache folder for CMYK converted images
+        cmyk_cache_dir = settings.STORAGE_DIR / "cache_cmyk"
+        if is_cmyk:
+            cmyk_cache_dir.mkdir(parents=True, exist_ok=True)
+
         for idx, page_info in enumerate(pages_data):
             page_num = page_info.get("page_number", idx + 1)
             page_type = page_info.get("page_type", "story")
             img_path = page_info.get("image_path")
-            story_text = page_info.get("story_text", "").replace("{child_name}", child_name)
+            story_text = page_info.get("story_text", "")
+            for tag in ["[Name]", "[name]", "{name}", "[child_name]", "{child_name}"]:
+                story_text = story_text.replace(tag, child_name)
 
-            # 1. Background / Canvas Setup
             c.saveState()
 
-            # 2. Draw Illustration Artwork
+            # 2. Draw Illustration Artwork (Full Bleed)
             if img_path and os.path.exists(img_path):
+                draw_img_path = img_path
                 try:
                     with Image.open(img_path) as pil_img:
                         w, h = pil_img.size
-                        # Preflight image DPI check
-                        dpi_x = (w / (PAGE_WIDTH_PT / 72.0))
+                        dpi_x = (w / (page_w_pt / 72.0))
                         preflight_validation["dpi_check"].append({
                             "page": page_num,
                             "resolution_px": f"{w}x{h}",
                             "effective_dpi": round(dpi_x, 1)
                         })
 
-                    if page_type == "cover":
-                        # Full bleed artwork on cover
-                        c.drawImage(img_path, 0, 0, width=PAGE_WIDTH_PT, height=PAGE_HEIGHT_PT, preserveAspectRatio=True)
-                    else:
-                        # Full bleed illustration
-                        c.drawImage(img_path, 0, 0, width=PAGE_WIDTH_PT, height=PAGE_HEIGHT_PT, preserveAspectRatio=True)
+                        if is_cmyk:
+                            # Convert to true 4-channel CMYK for print
+                            cmyk_filename = f"cmyk_{Path(img_path).stem}_{w}x{h}.jpg"
+                            cached_cmyk_path = cmyk_cache_dir / cmyk_filename
+                            if not cached_cmyk_path.exists() or os.path.getmtime(img_path) > os.path.getmtime(cached_cmyk_path):
+                                cmyk_img = pil_img.convert("CMYK")
+                                cmyk_img.save(str(cached_cmyk_path), format="JPEG", quality=96)
+                            draw_img_path = str(cached_cmyk_path)
+
+                    c.drawImage(draw_img_path, 0, 0, width=page_w_pt, height=page_h_pt, preserveAspectRatio=True)
                 except Exception as e:
+                    print(f"Notice: Error drawing image on page {page_num}: {e}")
                     preflight_validation["has_missing_images"] = True
                     preflight_validation["validation_passed"] = False
-                    # Fallback colored card
-                    c.setFillColor(colors.HexColor("#FAF7F2"))
-                    c.rect(0, 0, PAGE_WIDTH_PT, PAGE_HEIGHT_PT, fill=1, stroke=0)
+                    c.setFillColor(fallback_bg)
+                    c.rect(0, 0, page_w_pt, page_h_pt, fill=1, stroke=0)
             else:
                 preflight_validation["has_missing_images"] = True
                 preflight_validation["validation_passed"] = False
-                c.setFillColor(colors.HexColor("#FAF7F2"))
-                c.rect(0, 0, PAGE_WIDTH_PT, PAGE_HEIGHT_PT, fill=1, stroke=0)
+                c.setFillColor(fallback_bg)
+                c.rect(0, 0, page_w_pt, page_h_pt, fill=1, stroke=0)
 
-            # 3. Typeset Story Text Overlay
-            # For pages 2-25, if story text is provided, render it with luxury editorial styling:
-            # A soft translucent ivory pill card at the bottom with deep plum typography.
-            if page_type == "story" and story_text and len(story_text.strip()) > 0:
-                card_margin_h = 35 * POINTS_PER_MM # 35mm side margins
-                card_width = PAGE_WIDTH_PT - (2 * card_margin_h)
-                card_bottom = 20 * POINTS_PER_MM # 20mm from bottom
-                card_height = 42 * POINTS_PER_MM # 42mm height
 
-                # Semi-translucent luxury backdrop card
-                c.saveState()
-                c.setFillColor(colors.HexColor("#FAF7F2"), alpha=0.92)
-                c.setStrokeColor(colors.HexColor("#D4AF37"), alpha=0.4) # Muted gold border
-                c.setLineWidth(1)
-                c.roundRect(card_margin_h, card_bottom, card_width, card_height, 12, fill=1, stroke=1)
-                c.restoreState()
 
-                # Text inside the card
-                c.saveState()
-                c.setFillColor(colors.HexColor("#2D222A")) # Deep plum
-                c.setFont("Helvetica-Bold", 11)
-                
-                # Word wrap into lines
-                words = story_text.split()
-                lines = []
-                cur_line = []
-                for word in words:
-                    test_line = " ".join(cur_line + [word])
-                    if c.stringWidth(test_line, "Helvetica", 11) < (card_width - 24):
-                        cur_line.append(word)
-                    else:
-                        lines.append(" ".join(cur_line))
-                        cur_line = [word]
-                if cur_line:
-                    lines.append(" ".join(cur_line))
 
-                # Draw lines centered vertically and horizontally inside the pill
-                total_text_height = len(lines) * 16
-                start_y = card_bottom + (card_height + total_text_height) / 2 - 12
-                for line_idx, line in enumerate(lines):
-                    line_w = c.stringWidth(line, "Helvetica", 11)
-                    line_x = card_margin_h + (card_width - line_w) / 2
-                    c.drawString(line_x, start_y - (line_idx * 16), line)
-                c.restoreState()
 
-            # 4. Page numbering (interior pages only)
-            if page_type == "story":
-                c.saveState()
-                c.setFont("Helvetica", 9)
-                c.setFillColor(colors.HexColor("#7A7077"))
-                page_str = str(page_num)
-                c.drawRightString(PAGE_WIDTH_PT - 20, 15, page_str)
-                c.restoreState()
-
-            # 5. Preview Watermark badge if preview mode
+            # 5. Preview Watermark badge (Only for free preview; Omitted for final print books)
             if book_type == "preview":
                 c.saveState()
-                # Subtle elegant diagonal ribbon or watermark
-                c.setFillColor(colors.HexColor("#DDA7A2"), alpha=0.85) # Dusty rose banner
-                c.rect(0, PAGE_HEIGHT_PT - 26, 170, 26, fill=1, stroke=0)
+                c.setFillColor(banner_bg)
+                c.rect(0, page_h_pt - 26, 170, 26, fill=1, stroke=0)
                 c.setFillColor(colors.white)
                 c.setFont("Helvetica-Bold", 9)
-                c.drawString(14, PAGE_HEIGHT_PT - 17, "PERSONALIZED PREVIEW")
+                c.drawString(14, page_h_pt - 17, "PERSONALIZED PREVIEW")
                 c.restoreState()
 
             c.restoreState()
@@ -175,3 +193,4 @@ class PDFComposerService:
 
         c.save()
         return str(pdf_path), preflight_validation
+

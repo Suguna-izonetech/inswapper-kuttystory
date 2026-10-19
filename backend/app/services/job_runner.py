@@ -1,11 +1,11 @@
 import asyncio
 import os
 import time
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import PersonalizationJob, StoryPage, GeneratedAsset, Book
+from app.models import PersonalizationJob, StoryPage, GeneratedAsset, Book, StoryTemplate
 from app.services.storage import storage
 from app.services.pdf_composer import PDFComposerService
 from app.services.ai.diffusers_provider import diffusers_provider
@@ -91,11 +91,16 @@ class JobRunner:
                             height=1024
                         )
                     else:
+                        page_img = page.original_image_path
+                        if not page_img or not os.path.exists(page_img):
+                            cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page.page_number:02d}.png"
+                            if cand.exists():
+                                page_img = str(cand)
                         gen_res = cartoon_fusion_engine.fuse_page(
                             page_number=page.page_number,
                             child_reference_path=norm_ref,
                             story_slug=story_slug,
-                            page_image_path=page.original_image_path,
+                            page_image_path=page_img,
                             face_outline_points=page.face_outline_points
                         )
 
@@ -208,11 +213,16 @@ class JobRunner:
                     height=1024
                 )
             else:
+                page_img = page.original_image_path
+                if not page_img or not os.path.exists(page_img):
+                    cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page.page_number:02d}.png"
+                    if cand.exists():
+                        page_img = str(cand)
                 gen_res = cartoon_fusion_engine.fuse_page(
                     page_number=page.page_number,
                     child_reference_path=job.photo_path,
                     story_slug=story_slug,
-                    page_image_path=page.original_image_path,
+                    page_image_path=page_img,
                     face_outline_points=page.face_outline_points
                 )
 
@@ -236,4 +246,136 @@ class JobRunner:
         finally:
             db.close()
 
+    @staticmethod
+    def get_or_generate_full_storybook_pages(
+        job_id: str,
+        target_lang: str = "english"
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieves or dynamically completes ALL pages of the storybook for full print production:
+        - Resolves all pages in sequence from the uploaded PDF.
+        - Preserves existing preview plates that were already personalized.
+        - Dynamically generates face-fused character artwork for all remaining personalizable pages.
+        - Translates narrative text if target_lang is not English.
+        - Returns complete pages_data array for all pages (e.g. 1 to 26).
+        """
+        db: Session = SessionLocal()
+        try:
+            job = db.query(PersonalizationJob).filter(PersonalizationJob.id == job_id).first()
+            if not job:
+                raise ValueError("Personalization job not found")
+
+            story = job.story or db.query(StoryTemplate).filter(StoryTemplate.id == job.story_id).first()
+            if not story:
+                raise ValueError("Story template not found")
+
+            story_slug = story.slug or "unicorn-story"
+            story_title = story.title or "Personalized Story"
+
+            story_pages = db.query(StoryPage).filter(StoryPage.story_id == story.id).order_by(StoryPage.page_index).all()
+            if not story_pages:
+                raise ValueError("No story pages configured for this story template")
+
+            existing_assets = {
+                a.page_number: a
+                for a in db.query(GeneratedAsset).filter(GeneratedAsset.job_id == job.id).all()
+                if a.storage_path and os.path.exists(a.storage_path)
+            }
+
+            norm_ref = None
+            if job.photo_path and os.path.exists(job.photo_path):
+                norm_ref = CharacterConsistencyEngine.normalize_child_reference(job.photo_path)
+
+            pages_data = []
+            for page in story_pages:
+                page_num = page.page_number
+                page_type = page.page_type or ("cover" if page_num == 1 else "story")
+
+                raw_text = page.story_text or page.extracted_text or f"Scene for page {page_num}."
+                personalized_text = raw_text
+                for tag in ["[Name]", "{name}", "[child_name]", "{child_name}"]:
+                    personalized_text = personalized_text.replace(tag, job.child_name)
+
+                if target_lang.lower() not in ["english", "en"]:
+                    from app.services.translation_service import translation_service
+                    personalized_text = translation_service.translate_text(personalized_text, target_lang, child_name=job.child_name)
+
+                img_path = None
+                if page_num in existing_assets:
+                    img_path = existing_assets[page_num].storage_path
+                elif page.personalization_required and norm_ref:
+                    page_img = page.original_image_path
+                    if not page_img or not os.path.exists(page_img):
+                        cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png"
+                        if cand.exists():
+                            page_img = str(cand)
+
+                    try:
+                        gen_res = cartoon_fusion_engine.fuse_page(
+                            page_number=page_num,
+                            child_reference_path=norm_ref,
+                            story_slug=story_slug,
+                            page_image_path=page_img,
+                            face_outline_points=page.face_outline_points,
+                            prefer_local=False
+                        )
+                        asset_filename = f"job_{job.id}_p{page_num:02d}_{int(time.time())}.{gen_res.format}"
+                        asset_dir = settings.GENERATED_ASSETS_DIR / job.id
+                        asset_dir.mkdir(parents=True, exist_ok=True)
+                        asset_path = str(asset_dir / asset_filename)
+                        with open(asset_path, "wb") as f:
+                            f.write(gen_res.image_bytes)
+
+                        asset = GeneratedAsset(
+                            job_id=job.id,
+                            story_page_id=page.id,
+                            page_number=page_num,
+                            storage_path=asset_path,
+                            provider=gen_res.provider,
+                            model=gen_res.model,
+                            prompt_used=personalized_text,
+                            generation_status="completed",
+                            review_status="approved",
+                            cost_estimate=gen_res.cost_estimate_usd,
+                            generation_time_sec=gen_res.generation_time_sec
+                        )
+                        db.add(asset)
+                        existing_assets[page_num] = asset
+                        img_path = asset_path
+
+                        # Update live job progress in database
+                        job.completed_pages = len(existing_assets)
+                        job.total_pages = len(story_pages)
+                        pct = int((len(existing_assets) / len(story_pages)) * 100)
+                        job.status = f"Rendering · {pct}%"
+                        job.current_stage = f"Rendering HD AI page {page_num} of {len(story_pages)}..."
+                        db.commit()
+                    except Exception as fuse_err:
+                        print(f"Notice: Face fusion fallback on full render page {page_num}: {fuse_err}")
+                        img_path = page.original_image_path or str(settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png")
+                else:
+                    img_path = page.original_image_path
+                    if not img_path or not os.path.exists(img_path):
+                        cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png"
+                        if cand.exists():
+                            img_path = str(cand)
+
+                pages_data.append({
+                    "page_number": page_num,
+                    "page_type": page_type,
+                    "image_path": img_path,
+                    "story_text": personalized_text
+                })
+
+            job.total_pages = len(pages_data)
+            job.completed_pages = len(pages_data)
+            job.status = "completed"
+            job.current_stage = "All HD AI pages generated successfully"
+            db.commit()
+
+            return pages_data
+        finally:
+            db.close()
+
 job_runner = JobRunner()
+

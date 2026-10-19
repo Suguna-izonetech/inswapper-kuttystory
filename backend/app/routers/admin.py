@@ -387,15 +387,22 @@ def auto_trace_page(page_id: str, db: Session = Depends(get_db)):
     page = db.query(StoryPage).filter(StoryPage.id == page_id).first()
     if not page:
         raise HTTPException(status_code=404, detail="Story page not found")
-    
-    pts = [
-        [41.5, 43.2], [44.8, 42.1], [48.6, 42.5], [51.9, 44.2], [54.2, 47.5],
-        [54.8, 51.3], [53.5, 55.0], [51.2, 58.6], [48.1, 61.2], [45.0, 62.1],
-        [41.6, 61.5], [38.2, 59.2], [35.5, 56.1], [34.0, 52.3], [34.2, 48.2],
-        [36.1, 45.4], [38.5, 43.8], [40.2, 43.2], [41.0, 43.0], [41.2, 43.1], [41.5, 43.2]
-    ]
-    import json
-    page.face_outline_points = json.dumps(pts)
+
+    detected_pts = ""
+    if page.original_image_path and os.path.exists(page.original_image_path):
+        detected_pts = PDFImporterService.detect_page_character_face(page.original_image_path)
+
+    if not detected_pts:
+        import json
+        pts = [
+            [42.0, 36.0], [45.5, 35.0], [49.0, 35.5], [52.0, 37.0], [54.5, 40.0],
+            [55.0, 44.0], [53.5, 48.0], [51.0, 51.5], [48.0, 54.0], [45.0, 55.0],
+            [41.5, 54.5], [38.0, 52.0], [35.5, 49.0], [34.0, 45.0], [34.5, 41.0],
+            [36.5, 38.0], [39.0, 36.5], [42.0, 36.0]
+        ]
+        detected_pts = json.dumps(pts)
+
+    page.face_outline_points = detected_pts
     db.commit()
     db.refresh(page)
     return serialize_page(page)
@@ -404,16 +411,19 @@ def auto_trace_page(page_id: str, db: Session = Depends(get_db)):
 def auto_trace_all_pages(story_id: str, db: Session = Depends(get_db)):
     pages = db.query(StoryPage).filter(StoryPage.story_id == story_id).all()
     count = 0
-    pts = [
-        [41.5, 43.2], [44.8, 42.1], [48.6, 42.5], [51.9, 44.2], [54.2, 47.5],
-        [54.8, 51.3], [53.5, 55.0], [51.2, 58.6], [48.1, 61.2], [45.0, 62.1],
-        [41.6, 61.5], [38.2, 59.2], [35.5, 56.1], [34.0, 52.3], [34.2, 48.2],
-        [36.1, 45.4], [38.5, 43.8], [40.2, 43.2], [41.0, 43.0], [41.2, 43.1], [41.5, 43.2]
-    ]
     import json
+    default_pts = json.dumps([
+        [42.0, 36.0], [45.5, 35.0], [49.0, 35.5], [52.0, 37.0], [54.5, 40.0],
+        [55.0, 44.0], [53.5, 48.0], [51.0, 51.5], [48.0, 54.0], [45.0, 55.0],
+        [41.5, 54.5], [38.0, 52.0], [35.5, 49.0], [34.0, 45.0], [34.5, 41.0],
+        [36.5, 38.0], [39.0, 36.5], [42.0, 36.0]
+    ])
     for p in pages:
         if not p.face_outline_points or p.face_outline_points in ["", "[]"]:
-            p.face_outline_points = json.dumps(pts)
+            detected_pts = ""
+            if p.original_image_path and os.path.exists(p.original_image_path):
+                detected_pts = PDFImporterService.detect_page_character_face(p.original_image_path)
+            p.face_outline_points = detected_pts or default_pts
             count += 1
     db.commit()
     return {"status": "success", "message": f"Auto-traced {count} untraced pages", "count": count}

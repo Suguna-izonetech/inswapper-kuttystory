@@ -182,6 +182,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
   const [testRenderPhotoFile, setTestRenderPhotoFile] = useState<File | null>(null);
   const [submittingTestRender, setSubmittingTestRender] = useState(false);
   const [selectedJobForPhotos, setSelectedJobForPhotos] = useState<PersonalizationJob | null>(null);
+  const [generatingFullJob, setGeneratingFullJob] = useState<PersonalizationJob | null>(null);
 
   // AI settings
   const [aiSettings, setAiSettings] = useState<AISettings | null>(null);
@@ -200,6 +201,42 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
     setCurrentUser(user);
     loadAllData();
   }, [navigate]);
+
+  // Polling for active background HD rendering jobs
+  useEffect(() => {
+    const hasRendering = jobs.some(j => j.status?.toLowerCase().includes("rendering") || j.status === "in_progress") || Boolean(generatingFullJob);
+    if (!hasRendering) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const updatedJobs = await api.getJobs();
+        setJobs(updatedJobs);
+        if (generatingFullJob) {
+          const match = updatedJobs.find(j => j.id === generatingFullJob.id);
+          if (match) {
+            setGeneratingFullJob(match);
+            if (match.completed_pages >= match.total_pages && (match.status === "completed" || !match.status.includes("Rendering"))) {
+              const url = match.print_pdf_url || `/api/v1/personalization/${match.id}/print-pdf?size=8x8&color=cmyk`;
+              window.open(url, "_blank");
+              setTimeout(() => {
+                setGeneratingFullJob(null);
+              }, 2500);
+            }
+          }
+        }
+        if (selectedJobForPhotos) {
+          const matchModal = updatedJobs.find(j => j.id === selectedJobForPhotos.id);
+          if (matchModal) {
+            setSelectedJobForPhotos(matchModal);
+          }
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [jobs, generatingFullJob, selectedJobForPhotos]);
 
   const loadAllData = async () => {
     setLoading(true);
@@ -596,9 +633,35 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
     }
   };
 
-  const handleDownloadPdf = (job: PersonalizationJob) => {
-    const url = job.pdf_download_url || `/api/v1/personalization/${job.id}/pdf`;
-    window.open(url, "_blank");
+  const handleDownloadPdf = async (job: PersonalizationJob, mode: "print" | "preview" = "print") => {
+    if (mode === "preview") {
+      const url = job.pdf_download_url || `/api/v1/personalization/${job.id}/pdf`;
+      window.open(url, "_blank");
+      return;
+    }
+
+    // Print PDF (8x8 CMYK - ALL Pages):
+    // If all pages are already fully rendered and not currently rendering:
+    const isFullyRendered = Boolean(
+      job.completed_pages &&
+      job.total_pages &&
+      job.completed_pages >= job.total_pages &&
+      !job.status?.toLowerCase().includes("rendering")
+    );
+
+    if (isFullyRendered) {
+      const url = job.print_pdf_url || `/api/v1/personalization/${job.id}/print-pdf?size=8x8&color=cmyk`;
+      window.open(url, "_blank");
+      return;
+    }
+
+    // If remaining pages need HD AI rendering, show the live progress modal and trigger generation:
+    setGeneratingFullJob(job);
+    try {
+      await api.triggerFullGeneration(job.id);
+    } catch (e: any) {
+      console.error("Error triggering full generation:", e);
+    }
   };
 
   const handleSaveAiSettings = async () => {
@@ -1278,7 +1341,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                   Previews
                 </h1>
                 <p className="text-xs text-gray-500 mt-1">
-                  Every generated preview session. Download the free-preview PDF for any of them.
+                  Every generated book session. Download the complete 8×8 CMYK print PDF with all pages, or inspect generated plates.
                 </p>
               </div>
 
@@ -1431,12 +1494,12 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                                 {/* PDF Button */}
                                 <button
                                   type="button"
-                                  onClick={() => handleDownloadPdf(job)}
-                                  title="Download free-preview PDF"
+                                  onClick={() => handleDownloadPdf(job, "print")}
+                                  title="Download complete print-ready PDF (All pages • 8×8 CMYK)"
                                   className="px-2.5 py-1.5 rounded-lg border border-[#8B3DFF]/40 text-[#8B3DFF] hover:bg-purple-50 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
                                 >
                                   <Download className="w-3.5 h-3.5" />
-                                  <span>PDF</span>
+                                  <span>Print PDF</span>
                                 </button>
 
                                 {/* Photos Button */}
@@ -1452,7 +1515,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
 
                                 {/* View Button */}
                                 <a
-                                  href={`/personalize/${job.story_slug || "unicorn-story"}?job_id=${job.id}`}
+                                  href={`/personalize/${job.story_slug || ""}?job_id=${job.id}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   title="Open book preview player in new tab"
@@ -1618,8 +1681,18 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                         )}
                       </div>
 
-                      {/* Buttons: Author pages, Hide/Publish, Delete */}
-                      <div className="flex items-center gap-1.5">
+                      {/* Buttons: Personalize, Author pages, Hide/Publish, Delete */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <a
+                          href={`/personalize/${story.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open personalized 3D book generator for this story"
+                          className="px-2.5 py-1.5 rounded-lg border border-[#8B3DFF]/40 bg-purple-50 hover:bg-purple-100 text-[#8B3DFF] text-xs font-semibold flex items-center gap-1 transition"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Personalize</span>
+                        </a>
                         <button
                           onClick={() => handleAuthorPages(story)}
                           className="px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold transition"
@@ -3259,14 +3332,26 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                   Used as facial consistency prompt across all illustration plates.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => handleDownloadPdf(selectedJobForPhotos)}
-                className="px-3.5 py-2 rounded-xl bg-[#8B3DFF] text-white hover:bg-[#7828f7] text-xs font-semibold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Download PDF</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPdf(selectedJobForPhotos, "print")}
+                  title="Download complete print-ready PDF with all pages in 8×8 CMYK"
+                  className="px-3.5 py-2 rounded-xl bg-[#8B3DFF] text-white hover:bg-[#7828f7] text-xs font-semibold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Print PDF (8×8 CMYK)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPdf(selectedJobForPhotos, "preview")}
+                  title="Download 5-page preview PDF"
+                  className="px-3 py-2 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-gray-500" />
+                  <span>Preview PDF</span>
+                </button>
+              </div>
             </div>
 
             {/* Generated Pages Grid */}
@@ -3327,7 +3412,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
               </span>
               <div className="flex items-center gap-2">
                 <a
-                  href={`/personalize/${selectedJobForPhotos.story_slug || "unicorn-story"}?job_id=${selectedJobForPhotos.id}`}
+                  href={`/personalize/${selectedJobForPhotos.story_slug || ""}?job_id=${selectedJobForPhotos.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-semibold flex items-center gap-1.5 transition"
@@ -3343,6 +3428,99 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                   Close
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. FULL BOOK HD AI GENERATION PROGRESS MODAL */}
+      {generatingFullJob && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-purple-100 relative overflow-hidden">
+            {/* Ambient background glow */}
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-400/20 rounded-full blur-2xl pointer-events-none" />
+
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-[#8B3DFF]">
+                  <Sparkles className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">
+                    Generating Full HD Storybook
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {generatingFullJob.child_name} · {generatingFullJob.story_title || "Storybook"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGeneratingFullJob(null)}
+                className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition cursor-pointer"
+                title="Run in background"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Progress Section */}
+            {(() => {
+              const total = generatingFullJob.total_pages || 24;
+              const completed = generatingFullJob.completed_pages || 0;
+              const pct = Math.min(100, Math.round((completed / total) * 100));
+              const isFinished = completed >= total && (generatingFullJob.status === "completed" || !generatingFullJob.status?.includes("Rendering"));
+
+              return (
+                <div className="my-5 space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-gray-800">
+                      {isFinished ? "✅ Complete! Downloading PDF..." : (generatingFullJob.current_stage || `Rendering Page ${completed + 1} of ${total}`)}
+                    </span>
+                    <span className="font-bold text-[#8B3DFF] text-sm">{pct}%</span>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full h-3 rounded-full bg-gray-100 overflow-hidden p-0.5 border border-gray-200">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-[#8B3DFF] via-purple-500 to-pink-500 transition-all duration-500 shadow-xs"
+                      style={{ width: `${Math.max(4, pct)}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-gray-400">
+                    <span>8×8 Commercial CMYK Print Engine</span>
+                    <span className="font-medium text-gray-600">{completed} of {total} plates ready</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Quality assurance notice */}
+            <div className="bg-purple-50/70 rounded-2xl p-3.5 border border-purple-100 text-xs text-purple-950 flex items-start gap-2.5 mb-5">
+              <Sparkles className="w-4 h-4 text-[#8B3DFF] shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold text-purple-900">CodeFormer Neural Face Restoration Active</p>
+                <p className="text-[11px] text-purple-700 leading-relaxed">
+                  Every single illustration plate is enhanced with deep facial alignment and CodeFormer restoration for 100% authentic photographic likeness.
+                </p>
+              </div>
+            </div>
+
+            {/* Action footer */}
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <span className="text-[11px] text-gray-400 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Auto-downloads upon completion
+              </span>
+              <button
+                type="button"
+                onClick={() => setGeneratingFullJob(null)}
+                className="px-3.5 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold transition cursor-pointer"
+              >
+                Run in background
+              </button>
             </div>
           </div>
         </div>

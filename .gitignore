@@ -48,32 +48,22 @@ yarn-error.log*
 *.sqlite3
 storybook.db
 
-# Storage, Uploaded Child Photos, and Generated Outputs (Private/Dynamic)
-backend/storage/child_photos/*
-backend/storage/generated_assets/*
-backend/storage/previews/*
-backend/storage/final_books/*
-backend/storage/original_pdfs/*
-backend/storage/*.png
-backend/storage/*.jpg
-storage/*
-uploads/
-test_outputs/
-test-output/
-
-# Template storybook source pages and sample PDF are kept for story generation
-!backend/storage/source_pages/
-!sample-assets/
-
-# Personal test photo uploaded in root
-suguna ai
-test-assets/
-
-# OS & IDE metadata
-.DS_Store
 Thumbs.db
 ehthumbs.db
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# Backend Storage & Uploads
+backend/storage/cache_cmyk/
+backend/storage/child_photos/
+backend/storage/final_books/
+backend/storage/generated_assets/
+backend/storage/original_pdfs/
+backend/storage/previews/
+backend/storage/source_pages/
+backend/storage/temp_upload_*
+backend/storage/*.png
+backend/storage/*.jpg
+backend/storage/*.pdf

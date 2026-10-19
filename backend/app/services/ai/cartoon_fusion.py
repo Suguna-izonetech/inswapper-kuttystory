@@ -60,12 +60,12 @@ class CartoonCharacterFusionEngine:
         """
         Lazily initialize and cache Hugging Face space clients.
         """
-        if space_name not in cls._clients:
+        if not cls._clients.get(space_name):
             try:
                 from gradio_client import Client
                 token = settings.HF_TOKEN.strip() if getattr(settings, "HF_TOKEN", None) else None
                 try:
-                    cls._clients[space_name] = Client(space_name, token=token, httpx_kwargs={"timeout": 90.0})
+                    cls._clients[space_name] = Client(space_name, token=token, httpx_kwargs={"timeout": 120.0})
                 except TypeError:
                     try:
                         cls._clients[space_name] = Client(space_name, token=token)
@@ -77,36 +77,38 @@ class CartoonCharacterFusionEngine:
         return cls._clients.get(space_name)
 
     @classmethod
-    def detect_face_yunet(cls, img_bgr: np.ndarray, score_threshold: float = 0.45) -> Optional[Dict[str, int]]:
+    def detect_face_yunet(cls, img_bgr: np.ndarray, score_threshold: float = 0.20) -> Optional[Dict[str, int]]:
         """
         Detects primary face bounding box using local YuNet deep learning ONNX detector.
+        Uses adaptive multi-threshold evaluation (0.35 -> 0.20 -> 0.12) to catch both photographic and stylized faces.
         Returns dict with cx, cy, w, h or None.
         """
         if not cls.YUNET_MODEL_PATH.exists():
             return None
         try:
             h, w = img_bgr.shape[:2]
-            det = cv2.FaceDetectorYN_create(str(cls.YUNET_MODEL_PATH), "", (w, h), score_threshold=score_threshold)
-            res = det.detect(img_bgr)
-            if res[1] is not None and len(res[1]) > 0:
-                # Find the largest/most prominent face (highest confidence & area)
-                best_box = None
-                best_score = -1
-                for f in res[1]:
-                    bx, by, bw, bh = [int(v) for v in f[:4]]
-                    score = float(f[14]) if len(f) > 14 else (bw * bh)
-                    area = bw * bh
-                    if area > (w * h * 0.005) and score > best_score:
-                        best_score = score
-                        best_box = {
-                            "x": max(0, bx),
-                            "y": max(0, by),
-                            "w": min(w - bx, bw),
-                            "h": min(h - by, bh),
-                            "cx": bx + bw // 2,
-                            "cy": by + bh // 2,
-                        }
-                return best_box
+            for threshold in [score_threshold, max(0.12, score_threshold - 0.08), 0.12]:
+                det = cv2.FaceDetectorYN_create(str(cls.YUNET_MODEL_PATH), "", (w, h), score_threshold=threshold)
+                res = det.detect(img_bgr)
+                if res[1] is not None and len(res[1]) > 0:
+                    best_box = None
+                    best_score = -1
+                    for f in res[1]:
+                        bx, by, bw, bh = [int(v) for v in f[:4]]
+                        score = float(f[14]) if len(f) > 14 else (bw * bh)
+                        area = bw * bh
+                        if area > (w * h * 0.002) and score > best_score:
+                            best_score = score
+                            best_box = {
+                                "x": max(0, bx),
+                                "y": max(0, by),
+                                "w": min(w - bx, bw),
+                                "h": min(h - by, bh),
+                                "cx": bx + bw // 2,
+                                "cy": by + bh // 2,
+                            }
+                    if best_box:
+                        return best_box
         except Exception as e:
             print(f"Notice during YuNet face detection: {e}")
         return None
@@ -122,7 +124,7 @@ class CartoonCharacterFusionEngine:
         """
         Performs high-fidelity local face fusion:
         1. Deep face detection on the child's photo to cleanly isolate the actual face (eyes, nose, mouth).
-        2. Deep face detection or anchor resolution on the target storybook illustration.
+        2. Dynamic character face detection or anchor resolution on the target storybook illustration.
         3. Poisson gradient blending (cv2.seamlessClone) for flawless, seamless illumination and skin harmony.
         """
         src_bgr = cv2.imread(child_reference_path)
@@ -134,12 +136,12 @@ class CartoonCharacterFusionEngine:
         dh, dw = dest_bgr.shape[:2]
 
         # 1. Detect child face in source photo
-        child_face = cls.detect_face_yunet(src_bgr, score_threshold=0.50)
+        child_face = cls.detect_face_yunet(src_bgr, score_threshold=0.35)
         if child_face:
             bx, by, bw, bh = child_face["x"], child_face["y"], child_face["w"], child_face["h"]
             # Add padding around face for natural forehead and chin line
-            pad_y = int(bh * 0.12)
-            pad_x = int(bw * 0.08)
+            pad_y = int(bh * 0.14)
+            pad_x = int(bw * 0.10)
             y1 = max(0, by - pad_y)
             y2 = min(sh, by + bh + pad_y)
             x1 = max(0, bx - pad_x)
@@ -160,28 +162,29 @@ class CartoonCharacterFusionEngine:
 
         if anchor and "cx" in anchor and "cy" in anchor:
             target_center = (anchor["cx"], anchor["cy"])
-            target_w = anchor.get("w", int(dw * 0.16))
-            target_h = anchor.get("h", int(dh * 0.18))
+            target_w = anchor.get("w", int(dw * 0.18))
+            target_h = anchor.get("h", int(dh * 0.22))
         else:
             # Try detecting face on the illustration
-            dest_face = cls.detect_face_yunet(dest_bgr, score_threshold=0.35)
+            dest_face = cls.detect_face_yunet(dest_bgr, score_threshold=0.20)
             if dest_face:
                 target_center = (dest_face["cx"], dest_face["cy"])
                 target_w = dest_face["w"]
                 target_h = dest_face["h"]
             else:
-                # If no character detected and no anchor provided, this page likely has no character
-                # (e.g. scenic landscape). Do not paste floating face!
-                print(f"Notice: Page {page_number} has no character face detected. Leaving illustration pristine.")
-                return base_page_img
+                # Dynamic golden-ratio character placement (upper-center focal area)
+                # Guarantees that any uploaded PDF always gets personalizable 3D face fusion!
+                target_center = (int(dw * 0.50), int(dh * 0.42))
+                target_w = int(dw * 0.20)
+                target_h = int(dh * 0.24)
 
         # 3. Scale face crop to fit character head size
-        target_w = max(40, int(target_w * 1.05))
-        target_h = max(40, int(target_h * 1.05))
+        target_w = max(50, int(target_w * 1.05))
+        target_h = max(50, int(target_h * 1.05))
         resized_face = cv2.resize(face_crop, (target_w, target_h), interpolation=cv2.INTER_LANCZOS4)
         rw, rh = resized_face.shape[1], resized_face.shape[0]
 
-        # 4. Create elliptical blending mask
+        # 4. Create elliptical blending mask with soft feathered boundaries
         mask = np.zeros((rh, rw), dtype=np.uint8)
         cv2.ellipse(mask, (rw // 2, rh // 2), (int(rw * 0.44), int(rh * 0.48)), 0, 0, 360, 255, -1)
 
@@ -210,13 +213,14 @@ class CartoonCharacterFusionEngine:
         child_reference_path: Optional[str] = None,
         story_slug: str = "unicorn-story",
         page_image_path: Optional[str] = None,
-        face_outline_points: Optional[str] = None
+        face_outline_points: Optional[str] = None,
+        prefer_local: bool = False
     ) -> GenerationResult:
         """
         Personalizes a storybook page by replacing the character's face with the child's real face:
         - Prioritizes High-Definition AI Neural Face Swap with CodeFormer Face Restoration.
         - Preserves 100% of the real person's authentic facial identity (eyes, nose, mouth, smile).
-        - Automatically detects face positions to eliminate floating heads or double faces.
+        - Automatically detects face positions dynamically across ANY uploaded story.
         - Provides intelligent Poisson seamless cloning fallback.
         """
         start_time = time.time()
@@ -241,16 +245,25 @@ class CartoonCharacterFusionEngine:
             if not page_file or not page_file.exists():
                 all_pages = sorted(list(source_dir.glob("page_*.png")) + list(source_dir.glob("page_*.jpg")))
                 if all_pages:
-                    page_file = all_pages[0]
+                    idx = min(page_number - 1, len(all_pages) - 1)
+                    page_file = all_pages[max(0, idx)]
                 else:
-                    page_file = settings.SOURCE_PAGES_DIR / "unicorn-story" / f"page_{page_number:02d}.png"
-                    if not page_file.exists():
-                        page_file = settings.SOURCE_PAGES_DIR / "unicorn-story" / "page_01.png"
+                    # Check other subdirectories matching the slug
+                    matching_dirs = [d for d in settings.SOURCE_PAGES_DIR.iterdir() if d.is_dir() and (story_slug in d.name or d.name in story_slug)]
+                    if matching_dirs:
+                        m_pages = sorted(list(matching_dirs[0].glob("page_*.png")) + list(matching_dirs[0].glob("page_*.jpg")))
+                        if m_pages:
+                            page_file = m_pages[min(page_number - 1, len(m_pages) - 1)]
+
+                    if not page_file or not page_file.exists():
+                        page_file = settings.SOURCE_PAGES_DIR / "unicorn-story" / f"page_{page_number:02d}.png"
+                        if not page_file.exists():
+                            page_file = settings.SOURCE_PAGES_DIR / "unicorn-story" / "page_01.png"
 
         base_page = Image.open(str(page_file)).convert("RGB")
         base_w, base_h = base_page.size
 
-        # Resolve anchor from face outline points or pre-calibrated database
+        # Resolve anchor from face outline points or dynamic detection
         anchor = None
         if face_outline_points and face_outline_points not in ["", "[]"]:
             try:
@@ -276,69 +289,62 @@ class CartoonCharacterFusionEngine:
         if not anchor and story_slug == "unicorn-story":
             anchor = cls.PAGE_ANCHORS.get(page_number)
 
+        # Dynamic character face detection for ANY storybook page
+        if not anchor:
+            dest_bgr_pre = cv2.cvtColor(np.array(base_page), cv2.COLOR_RGB2BGR)
+            dest_face = cls.detect_face_yunet(dest_bgr_pre, score_threshold=0.20)
+            if dest_face:
+                anchor = {
+                    "cx": dest_face["cx"],
+                    "cy": dest_face["cy"],
+                    "w": dest_face["w"],
+                    "h": dest_face["h"],
+                    "angle": 0,
+                    "tone": "natural_warm"
+                }
+            else:
+                anchor = {
+                    "cx": int(base_w * 0.50),
+                    "cy": int(base_h * 0.42),
+                    "w": int(base_w * 0.20),
+                    "h": int(base_h * 0.24),
+                    "angle": 0,
+                    "tone": "natural_warm"
+                }
+
         provider_name = "HD Neural Face Engine"
         model_name = "face-swap-pro-enhanced"
         swapped_with_ai = False
 
         if child_reference_path and os.path.exists(child_reference_path):
-            # 1. Tier 1: State-of-the-art Neural Face Swap with Face Restoration (ovi054/face-swap-pro)
-            primary_space = getattr(settings, "HF_FACE_SWAP_SPACE", "ovi054/face-swap-pro")
-            use_enhancer = getattr(settings, "HF_FACE_SWAP_ENHANCE", True)
-            
-            try:
-                from gradio_client import handle_file
-                client = cls._get_hf_client(primary_space)
-                if client:
-                    src = handle_file(child_reference_path)
-                    
-                    # Prepare lightweight upload version to avoid HF upload timeouts
-                    temp_dest = settings.STORAGE_DIR / f"temp_upload_{story_slug}_p{page_number:02d}_{os.getpid()}_{int(time.time())}.jpg"
-                    base_page.save(str(temp_dest), format="JPEG", quality=92)
-                    try:
-                        dest = handle_file(str(temp_dest))
-                        # Predict with ovi054/face-swap-pro
-                        result_path = client.predict(
-                            source_file=src,
-                            target_file=dest,
-                            doFaceEnhancer=use_enhancer,
-                            api_name="/predict"
-                        )
-                        if result_path and os.path.exists(result_path) and os.path.getsize(result_path) > 1000:
-                            with Image.open(result_path) as sw_img:
-                                base_page = sw_img.convert("RGB")
-                            provider_name = "Hugging Face HD Face Swap (Enhanced)"
-                            model_name = primary_space
-                            swapped_with_ai = True
-                    finally:
-                        if temp_dest.exists():
-                            try:
-                                temp_dest.unlink()
-                            except Exception:
-                                pass
-            except Exception as e1:
-                print(f"Notice: Primary AI face swap ({primary_space}) on {story_slug} Page {page_number}: {e1}")
-
-            # 2. Tier 2: Secondary Hugging Face Space Fallback (tonyassi/face-swap)
-            if not swapped_with_ai and primary_space != "tonyassi/face-swap":
+            if not prefer_local:
+                # 1. Tier 1: State-of-the-art Neural Face Swap with Face Restoration (ovi054/face-swap-pro)
+                primary_space = getattr(settings, "HF_FACE_SWAP_SPACE", "ovi054/face-swap-pro")
+                use_enhancer = getattr(settings, "HF_FACE_SWAP_ENHANCE", True)
+                
                 try:
                     from gradio_client import handle_file
-                    secondary_client = cls._get_hf_client("tonyassi/face-swap")
-                    if secondary_client:
+                    client = cls._get_hf_client(primary_space)
+                    if client:
                         src = handle_file(child_reference_path)
-                        temp_dest = settings.STORAGE_DIR / f"temp_sec_{story_slug}_p{page_number:02d}_{os.getpid()}_{int(time.time())}.jpg"
+                        
+                        # Prepare lightweight upload version to avoid HF upload timeouts
+                        temp_dest = settings.STORAGE_DIR / f"temp_upload_{story_slug}_p{page_number:02d}_{os.getpid()}_{int(time.time())}.jpg"
                         base_page.save(str(temp_dest), format="JPEG", quality=92)
                         try:
                             dest = handle_file(str(temp_dest))
-                            result_path = secondary_client.predict(
-                                src_img=src,
-                                dest_img=dest,
-                                api_name="/swap_faces"
+                            # Predict with ovi054/face-swap-pro
+                            result_path = client.predict(
+                                source_file=src,
+                                target_file=dest,
+                                doFaceEnhancer=use_enhancer,
+                                api_name="/predict"
                             )
                             if result_path and os.path.exists(result_path) and os.path.getsize(result_path) > 1000:
                                 with Image.open(result_path) as sw_img:
                                     base_page = sw_img.convert("RGB")
-                                provider_name = "Hugging Face Neural Swap (Standard)"
-                                model_name = "tonyassi/face-swap"
+                                provider_name = "Hugging Face HD Face Swap (Enhanced)"
+                                model_name = primary_space
                                 swapped_with_ai = True
                         finally:
                             if temp_dest.exists():
@@ -346,8 +352,39 @@ class CartoonCharacterFusionEngine:
                                     temp_dest.unlink()
                                 except Exception:
                                     pass
-                except Exception as e2:
-                    print(f"Notice: Secondary AI face swap on {story_slug} Page {page_number}: {e2}")
+                except Exception as e1:
+                    print(f"Notice: Primary AI face swap ({primary_space}) on {story_slug} Page {page_number}: {e1}")
+
+                # 2. Tier 2: Secondary Hugging Face Space Fallback (tonyassi/face-swap)
+                if not swapped_with_ai and primary_space != "tonyassi/face-swap":
+                    try:
+                        from gradio_client import handle_file
+                        secondary_client = cls._get_hf_client("tonyassi/face-swap")
+                        if secondary_client:
+                            src = handle_file(child_reference_path)
+                            temp_dest = settings.STORAGE_DIR / f"temp_sec_{story_slug}_p{page_number:02d}_{os.getpid()}_{int(time.time())}.jpg"
+                            base_page.save(str(temp_dest), format="JPEG", quality=92)
+                            try:
+                                dest = handle_file(str(temp_dest))
+                                result_path = secondary_client.predict(
+                                    src_img=src,
+                                    dest_img=dest,
+                                    api_name="/swap_faces"
+                                )
+                                if result_path and os.path.exists(result_path) and os.path.getsize(result_path) > 1000:
+                                    with Image.open(result_path) as sw_img:
+                                        base_page = sw_img.convert("RGB")
+                                    provider_name = "Hugging Face Neural Swap (Standard)"
+                                    model_name = "tonyassi/face-swap"
+                                    swapped_with_ai = True
+                            finally:
+                                if temp_dest.exists():
+                                    try:
+                                        temp_dest.unlink()
+                                    except Exception:
+                                        pass
+                    except Exception as e2:
+                        print(f"Notice: Secondary AI face swap on {story_slug} Page {page_number}: {e2}")
 
             # 3. Tier 3: High-Fidelity Local Poisson Face Fusion (Guaranteed 100% Real Face likeness)
             if not swapped_with_ai:

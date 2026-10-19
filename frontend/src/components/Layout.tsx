@@ -67,10 +67,10 @@ export default function Layout() {
           {/* Action CTA & Mobile Hamburger */}
           <div className="flex items-center space-x-3">
             <Link
-              to="/personalize/unicorn-story"
+              to="/storybooks"
               className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs sm:text-sm font-medium shadow-xs hover:shadow transition-all"
             >
-              <span>Personalize Now</span>
+              <span>Personalize a Story</span>
               <Sparkles className="w-3.5 h-3.5" />
             </Link>
 
@@ -114,7 +114,7 @@ export default function Layout() {
 
               <div className="pt-3 border-t border-[#EBE3D9] mt-2">
                 <Link
-                  to="/personalize/unicorn-story"
+                  to="/storybooks"
                   onClick={() => setMobileMenuOpen(false)}
                   className="w-full py-3 rounded-xl bg-[#C98A84] hover:bg-[#B87A74] text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-xs"
                 >
@@ -163,6 +163,7 @@ export default function Layout() {
                 <li><Link to="/about" className="hover:text-[#C98A84] transition-colors">About Us</Link></li>
                 <li><Link to="/footsteps" className="hover:text-[#C98A84] transition-colors">Foot Steps Milestones</Link></li>
                 <li><Link to="/how-it-works" className="hover:text-[#C98A84] transition-colors">How It Works</Link></li>
+                <li><Link to="/poc" className="hover:text-[#C98A84] transition-colors">Character Consistency POC</Link></li>
               </ul>
             </div>
 
