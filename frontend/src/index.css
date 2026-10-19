@@ -186,3 +186,67 @@ body {
   animation: scannerSweep 2s ease-in-out infinite alternate;
 }
 
+/* ─── 3D Realistic Hardcover Book Atelier Mockup (Cover Page Only) ─── */
+.hardcover-perspective {
+  perspective: 1200px;
+  perspective-origin: 50% 50%;
+}
+
+.hardcover-book {
+  transform: translateY(0px);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow:
+    0 12px 28px -4px rgba(45, 34, 42, 0.22),
+    0 4px 10px -2px rgba(45, 34, 42, 0.12),
+    0 1px 3px rgba(45, 34, 42, 0.08);
+}
+
+.group:hover .hardcover-book,
+.hardcover-book:hover {
+  transform: translateY(-6px) scale(1.015);
+  box-shadow:
+    0 20px 38px -6px rgba(45, 34, 42, 0.28),
+    0 8px 16px -3px rgba(45, 34, 42, 0.16),
+    0 2px 4px rgba(45, 34, 42, 0.1);
+}
+
+.hardcover-spine-edge {
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.35) 0%,
+    rgba(255, 255, 255, 0.42) 22%,
+    rgba(255, 255, 255, 0.1) 60%,
+    rgba(0, 0, 0, 0.18) 100%
+  );
+}
+
+.hardcover-hinge-groove {
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.45) 0%,
+    rgba(0, 0, 0, 0.35) 45%,
+    rgba(255, 255, 255, 0.65) 55%,
+    rgba(255, 255, 255, 0.35) 100%
+  );
+}
+
+.hardcover-board-shadow {
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.22) 0%,
+    rgba(0, 0, 0, 0.06) 50%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+.hardcover-silk-sheen {
+  background: linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0.26) 0%,
+    rgba(255, 255, 255, 0.08) 22%,
+    rgba(255, 255, 255, 0) 42%,
+    rgba(0, 0, 0, 0.02) 70%,
+    rgba(0, 0, 0, 0.14) 100%
+  );
+}
+

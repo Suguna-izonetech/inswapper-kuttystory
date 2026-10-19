@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Sparkles, ArrowRight, ShieldCheck, BookOpen, CheckCircle, Compass } from "lucide-react";
 import { api, StoryTemplate } from "@/lib/api";
+import { HardcoverBook } from "@/components/HardcoverBook";
 
 export default function HomePage() {
   const [stories, setStories] = useState<StoryTemplate[]>([]);
@@ -119,19 +120,15 @@ export default function HomePage() {
           {/* Main Story: Unicorn Story */}
           {stories.map((story) => (
             <div key={story.id} className="editorial-card overflow-hidden flex flex-col group">
-              <div className="relative aspect-square bg-[#FAF7F2] overflow-hidden">
-                {story.cover_image_url ? (
-                  <img
-                    src={story.cover_image_url}
-                    alt={story.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              <div className="relative aspect-square p-5 sm:p-6 bg-gradient-to-b from-[#FDFCFB] via-[#F8F5EE] to-[#EFE8DD] flex items-center justify-center overflow-hidden border-b border-[#EBE3D9]/70">
+                <div className="w-[82%] sm:w-[86%] max-w-[320px] aspect-square flex items-center justify-center mx-auto">
+                  <HardcoverBook
+                    coverUrl={story.cover_image_url}
+                    title={story.title}
+                    aspectRatio="square"
                   />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[#695B64]">
-                    <BookOpen className="w-12 h-12 text-[#C98A84]" />
-                  </div>
-                )}
-                <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md border border-[#EBE3D9] text-[11px] font-medium text-[#2D222A]">
+                </div>
+                <div className="absolute top-3 right-3 z-30 px-3 py-1 rounded-full bg-white/95 backdrop-blur-md border border-[#EBE3D9] text-[11px] font-medium text-[#2D222A] shadow-xs">
                   {story.age_range}
                 </div>
               </div>
