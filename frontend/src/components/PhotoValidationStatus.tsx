@@ -63,7 +63,7 @@ export default function PhotoValidationStatus({
   const displayImage = useCleanBg && cleanPreview ? cleanPreview : originalPreview;
 
   return (
-    <div className="rounded-3xl border border-[#E8E1F5] bg-white p-6 sm:p-7 shadow-sm space-y-6">
+    <div className="rounded-3xl border border-[#EBE3D9] bg-white p-6 sm:p-7 shadow-sm space-y-6">
       {/* Top Header: Upload Status & Quality Meter */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#F0EAE1]">
         <div>
@@ -106,7 +106,7 @@ export default function PhotoValidationStatus({
           <button
             type="button"
             onClick={onChangePhotoClick}
-            className="px-3.5 py-1.5 rounded-full border border-[#D8CCC0] hover:border-[#8B5CF6] text-xs font-medium text-[#2D222A] hover:text-[#8B5CF6] flex items-center gap-1.5 bg-[#FAF7F2] hover:bg-white transition cursor-pointer"
+            className="px-3.5 py-1.5 rounded-full border border-[#D8CCC0] hover:border-[#C98A84] text-xs font-medium text-[#2D222A] hover:text-[#C98A84] flex items-center gap-1.5 bg-[#FAF7F2] hover:bg-white transition cursor-pointer"
           >
             <Upload className="w-3.5 h-3.5" />
             <span>Replace</span>
@@ -116,7 +116,7 @@ export default function PhotoValidationStatus({
             <button
               type="button"
               onClick={onCameraClick}
-              className="px-3.5 py-1.5 rounded-full border border-[#D8CCC0] hover:border-[#8B5CF6] text-xs font-medium text-[#2D222A] hover:text-[#8B5CF6] flex items-center gap-1.5 bg-[#FAF7F2] hover:bg-white transition cursor-pointer"
+              className="px-3.5 py-1.5 rounded-full border border-[#D8CCC0] hover:border-[#C98A84] text-xs font-medium text-[#2D222A] hover:text-[#C98A84] flex items-center gap-1.5 bg-[#FAF7F2] hover:bg-white transition cursor-pointer"
             >
               <Camera className="w-3.5 h-3.5" />
               <span>Camera</span>
@@ -173,11 +173,20 @@ export default function PhotoValidationStatus({
               </span>
             </div>
 
-            {/* Processing spinner if solid background is being generated */}
+            {/* Processing scanner overlay if solid background is being generated */}
             {isProcessingBg && (
-              <div className="absolute inset-0 bg-white/75 backdrop-blur-xs flex flex-col items-center justify-center text-xs text-[#8B5CF6] gap-2">
-                <RefreshCw className="w-6 h-6 animate-spin text-[#8B5CF6]" />
-                <span className="font-semibold">Isolating child & applying backdrop...</span>
+              <div className="absolute inset-0 bg-black/45 backdrop-blur-xs flex flex-col items-center justify-center text-xs text-white gap-2 p-4 text-center z-20">
+                {/* Glowing laser scanner sweep line */}
+                <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#C98A84] to-transparent shadow-[0_0_12px_#C98A84] animate-scanner-line pointer-events-none" />
+                <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/30 animate-spin" style={{ animationDuration: "3s" }}>
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <span className="font-semibold text-white drop-shadow-md">
+                  Studio AI isolating child & applying backdrop...
+                </span>
+                <span className="text-[10px] text-white/80">
+                  Clean background ensures 100% illustration fidelity
+                </span>
               </div>
             )}
           </div>
@@ -308,10 +317,10 @@ export default function PhotoValidationStatus({
                   type="checkbox"
                   checked={useCleanBg}
                   onChange={(e) => onToggleCleanBg(e.target.checked)}
-                  className="w-4 h-4 rounded border-[#8B5CF6] text-[#8B5CF6] focus:ring-[#8B5CF6]"
+                  className="w-4 h-4 rounded border-[#C98A84] text-[#C98A84] focus:ring-[#C98A84]"
                 />
                 <span className="flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-[#8B5CF6]" />
+                  <Sparkles className="w-3.5 h-3.5 text-[#C98A84]" />
                   <span>AI Studio Backdrop Enhancement (Recommended)</span>
                 </span>
               </label>
@@ -323,7 +332,7 @@ export default function PhotoValidationStatus({
             {useCleanBg && (
               <div className="pt-2 pl-6 border-t border-[#EBE3D9]/60 flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] font-semibold text-[#2D222A] flex items-center gap-1">
-                  <Palette className="w-3 h-3 text-[#8B5CF6]" />
+                  <Palette className="w-3 h-3 text-[#C98A84]" />
                   <span>Backdrop Color:</span>
                 </span>
                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -334,7 +343,7 @@ export default function PhotoValidationStatus({
                       onClick={() => onBackdropChange(preset.hex)}
                       className={`px-2.5 py-1 rounded-lg text-[10px] border flex items-center gap-1.5 transition cursor-pointer ${
                         selectedBackdropHex === preset.hex
-                          ? "border-[#8B5CF6] bg-white shadow-2xs font-bold text-[#4C1D95]"
+                          ? "border-[#C98A84] bg-white shadow-2xs font-bold text-[#C98A84]"
                           : "border-[#EBE3D9] bg-[#FAF7F2] text-[#4E424B] hover:bg-white"
                       }`}
                     >

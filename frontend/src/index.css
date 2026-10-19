@@ -73,3 +73,116 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #C4B5A5;
 }
+
+/* ─── Magical Storybook Atelier Animations ─── */
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(1deg);
+  }
+}
+
+@keyframes magicPulseGlow {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(0.96);
+    filter: blur(20px);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.08);
+    filter: blur(28px);
+  }
+}
+
+@keyframes pageFlipGentle {
+  0%, 100% {
+    transform: rotateY(0deg);
+  }
+  50% {
+    transform: rotateY(-32deg);
+  }
+}
+
+@keyframes quillWandPaint {
+  0%, 100% {
+    transform: translate(0, 0) rotate(22deg);
+  }
+  30% {
+    transform: translate(12px, -8px) rotate(32deg);
+  }
+  70% {
+    transform: translate(-6px, 10px) rotate(14deg);
+  }
+}
+
+@keyframes shimmerProgress {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes scannerSweep {
+  0% {
+    top: 0%;
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0.8;
+  }
+}
+
+@keyframes sparkPop {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx, 0px), var(--ty, -50px)) scale(0.2);
+  }
+}
+
+.animate-float-gentle {
+  animation: floatGentle 4s ease-in-out infinite;
+}
+
+.animate-magic-glow {
+  animation: magicPulseGlow 3.5s ease-in-out infinite;
+}
+
+.animate-page-flip {
+  animation: pageFlipGentle 2.6s ease-in-out infinite;
+  transform-origin: left center;
+}
+
+.animate-quill {
+  animation: quillWandPaint 3s ease-in-out infinite;
+}
+
+.animate-shimmer-bar {
+  background: linear-gradient(
+    90deg,
+    #C98A84 0%,
+    #E5B2AD 25%,
+    #FAF0EE 50%,
+    #E5B2AD 75%,
+    #C98A84 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerProgress 2s linear infinite;
+}
+
+.animate-scanner-line {
+  animation: scannerSweep 2s ease-in-out infinite alternate;
+}
+

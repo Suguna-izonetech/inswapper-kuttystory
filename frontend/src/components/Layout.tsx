@@ -23,8 +23,8 @@ export default function Layout() {
           {/* Logo */}
           <div className="flex items-center space-x-3">
             <Link to="/" className="flex items-center space-x-3 group">
-              <div className="w-10 h-10 rounded-full bg-[#FAEEED] border border-[#C98A84]/30 flex items-center justify-center text-[#C98A84] group-hover:scale-105 transition-transform">
-                <Sparkles className="w-5 h-5 text-[#C98A84]" />
+              <div className="w-10 h-10 rounded-full bg-[#FAEEED] border border-[#C98A84]/30 flex items-center justify-center text-[#C98A84] group-hover:scale-105 transition-transform overflow-hidden shadow-xs">
+                <img src="/logo.jpg" alt="KuttyStory Logo" className="w-full h-full object-cover" />
               </div>
               <div>
                 <span className="font-editorial-serif text-2xl font-bold tracking-tight text-[#2D222A] block leading-none">
@@ -137,8 +137,10 @@ export default function Layout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
             <div className="space-y-4 md:col-span-1">
-              <div className="flex items-center space-x-2">
-                <Sparkles className="w-5 h-5 text-[#C98A84]" />
+              <div className="flex items-center space-x-2.5">
+                <div className="w-6 h-6 rounded-full overflow-hidden border border-[#C98A84]/30 shadow-2xs">
+                  <img src="/logo.jpg" alt="KuttyStory" className="w-full h-full object-cover" />
+                </div>
                 <span className="font-editorial-serif text-xl font-bold text-[#2D222A]">
                   KuttyStory
                 </span>

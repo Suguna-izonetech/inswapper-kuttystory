@@ -74,8 +74,8 @@ export default function PhotoTipsGuide({
       onDrop={handleDrop}
       className={`rounded-3xl border-2 transition-all p-6 sm:p-8 bg-white shadow-sm relative overflow-hidden ${
         isDragging
-          ? "border-[#8B5CF6] bg-[#F5F3FF]/60 ring-4 ring-[#8B5CF6]/20"
-          : "border-[#E8E1F5] hover:border-[#D8B4FE]"
+          ? "border-[#C98A84] bg-[#FAEEED]/60 ring-4 ring-[#C98A84]/20"
+          : "border-[#EBE3D9] hover:border-[#C98A84]/40"
       }`}
     >
       <input
@@ -86,9 +86,9 @@ export default function PhotoTipsGuide({
         className="hidden"
       />
 
-      {/* TOP HEADER: T I P S (Exactly matching Image 2) */}
+      {/* TOP HEADER: T I P S */}
       <div className="text-center mb-6">
-        <h3 className="text-sm font-bold tracking-[0.3em] uppercase text-[#1E1B4B]">
+        <h3 className="text-sm font-bold tracking-[0.3em] uppercase text-[#2D222A]">
           T I P S
         </h3>
         <p className="text-[11px] text-[#695B64] mt-1">
@@ -96,7 +96,7 @@ export default function PhotoTipsGuide({
         </p>
       </div>
 
-      {/* 4 CIRCULAR COMPARISONS (Matching Image 2) */}
+      {/* 4 CIRCULAR COMPARISONS */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 max-w-2xl mx-auto mb-8">
         {tips.map((tip) => (
           <div key={tip.id} className="flex flex-col items-center text-center group">
@@ -146,35 +146,44 @@ export default function PhotoTipsGuide({
         ))}
       </div>
 
-      {/* DASHED DIVIDER LINE (Matching Image 2) */}
-      <div className="border-t-2 border-dashed border-[#DDD6FE] my-6 max-w-xl mx-auto" />
+      {/* DASHED DIVIDER LINE */}
+      <div className="border-t-2 border-dashed border-[#EBE3D9] my-6 max-w-xl mx-auto" />
 
-      {/* UPLOAD ACTIONS (Matching Image 2) */}
+      {/* UPLOAD ACTIONS */}
       <div className="flex flex-col items-center justify-center space-y-3.5">
-        {/* Violet "Child's Photo" Button */}
+        {/* Brand Rose "Child's Photo" Button */}
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isProcessing}
-          className="w-full max-w-sm py-4 px-8 rounded-2xl bg-[#8B5CF6] hover:bg-[#7C3AED] active:scale-[0.98] text-white text-base font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
+          className="w-full max-w-sm py-4 px-8 rounded-2xl bg-[#C98A84] hover:bg-[#B87A74] active:scale-[0.98] text-white text-base font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-90"
         >
-          <span>Child's Photo</span>
-          <Upload className="w-5 h-5 stroke-[2.5]" />
+          {isProcessing ? (
+            <>
+              <Sparkles className="w-5 h-5 animate-spin text-white" />
+              <span>Analyzing Child's Portrait...</span>
+            </>
+          ) : (
+            <>
+              <span>Child's Photo</span>
+              <Upload className="w-5 h-5 stroke-[2.5]" />
+            </>
+          )}
         </button>
 
         {/* Drop caption */}
-        <p className="text-xs font-semibold text-[#1E1B4B]">
+        <p className="text-xs font-semibold text-[#2D222A]">
           drop a photo or click on the button
         </p>
 
-        {/* Format & Dimensions Pill button (Matching Image 2) */}
+        {/* Format & Dimensions Pill button */}
         <div className="flex items-center gap-2 pt-1">
           <button
             type="button"
             onClick={() => setShowInfoModal(!showInfoModal)}
-            className="px-5 py-2 rounded-full border border-[#C084FC] hover:border-[#8B5CF6] bg-white hover:bg-[#FAF5FF] text-[#6B21A8] text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs"
+            className="px-5 py-2 rounded-full border border-[#E8C8C4] hover:border-[#C98A84] bg-white hover:bg-[#FAEEED] text-[#C98A84] text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
           >
-            <Sparkles className="w-3.5 h-3.5 text-[#8B5CF6]" />
+            <Sparkles className="w-3.5 h-3.5 text-[#C98A84]" />
             <span>Photo Formats & Dimensions Info</span>
           </button>
 
@@ -183,9 +192,9 @@ export default function PhotoTipsGuide({
             <button
               type="button"
               onClick={onActivateCamera}
-              className="px-4 py-2 rounded-full border border-[#E5DEFF] hover:border-[#8B5CF6] bg-[#FAF8FF] text-[#4C1D95] text-xs font-medium flex items-center gap-1.5 transition"
+              className="px-4 py-2 rounded-full border border-[#EBE3D9] hover:border-[#C98A84] bg-[#FAF7F2] hover:bg-white text-[#2D222A] hover:text-[#C98A84] text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
             >
-              <Camera className="w-3.5 h-3.5 text-[#8B5CF6]" />
+              <Camera className="w-3.5 h-3.5 text-[#C98A84]" />
               <span>Use Camera</span>
             </button>
           )}
@@ -193,35 +202,35 @@ export default function PhotoTipsGuide({
 
         {/* Informative Popover Drawer */}
         {showInfoModal && (
-          <div className="w-full max-w-md mt-4 p-4 rounded-2xl bg-[#F5F3FF] border border-[#DDD6FE] text-left text-xs space-y-2.5 text-[#4C1D95] animate-in fade-in slide-in-from-top-2">
-            <div className="flex items-center justify-between pb-2 border-b border-[#DDD6FE]">
-              <div className="flex items-center gap-2 font-bold text-sm text-[#1E1B4B]">
-                <Info className="w-4 h-4 text-[#8B5CF6]" />
+          <div className="w-full max-w-md mt-4 p-4 rounded-2xl bg-[#FAEEED] border border-[#E8C8C4] text-left text-xs space-y-2.5 text-[#2D222A] animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E8C8C4]">
+              <div className="flex items-center gap-2 font-bold text-sm text-[#2D222A]">
+                <Info className="w-4 h-4 text-[#C98A84]" />
                 <span>Photo Specifications & Best Practices</span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowInfoModal(false)}
-                className="text-[#6B21A8] hover:text-[#1E1B4B] p-1"
+                className="text-[#695B64] hover:text-[#2D222A] p-1 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <ul className="space-y-1.5 text-[11px] text-[#4338CA]">
+            <ul className="space-y-1.5 text-[11px] text-[#4E424B]">
               <li className="flex items-start gap-2">
-                <span className="font-bold">• Accepted Formats:</span>
+                <span className="font-bold text-[#C98A84]">• Accepted Formats:</span>
                 <span>JPG, JPEG, PNG, WebP (up to 10MB)</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="font-bold">• Optimal Resolution:</span>
+                <span className="font-bold text-[#C98A84]">• Optimal Resolution:</span>
                 <span>1024 × 1024 pixels or higher (min 400 × 400 px)</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="font-bold">• Portrait Framing:</span>
+                <span className="font-bold text-[#C98A84]">• Portrait Framing:</span>
                 <span>Child looking straight at camera, eyes clearly visible</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="font-bold">• Lighting:</span>
+                <span className="font-bold text-[#C98A84]">• Lighting:</span>
                 <span>Soft, natural room light without deep shadows on eyes</span>
               </li>
             </ul>

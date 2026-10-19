@@ -22,6 +22,7 @@ import PersonalizationRoadmap from "@/components/PersonalizationRoadmap";
 import PhotoTipsGuide from "@/components/PhotoTipsGuide";
 import PhotoValidationStatus from "@/components/PhotoValidationStatus";
 import RealisticBookFlipViewer from "@/components/RealisticBookFlipViewer";
+import StorybookMagicLoader from "@/components/StorybookMagicLoader";
 
 export default function PersonalizePage() {
   const params = useParams<{ slug?: string }>();
@@ -422,7 +423,7 @@ export default function PersonalizePage() {
                     placeholder="e.g. Mia, Lucas, Aria"
                     value={childName}
                     onChange={(e) => setChildName(e.target.value)}
-                    className="w-full px-4 py-3.5 rounded-xl border border-[#D8CCC0] bg-[#FAF7F2] text-[#2D222A] text-base focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] focus:border-[#8B5CF6] transition font-sans"
+                    className="w-full px-4 py-3.5 rounded-xl border border-[#D8CCC0] bg-[#FAF7F2] text-[#2D222A] text-base focus:outline-none focus:ring-2 focus:ring-[#C98A84] focus:border-[#C98A84] transition font-sans"
                   />
                 </div>
 
@@ -438,7 +439,7 @@ export default function PersonalizePage() {
                         id="childAge"
                         value={childAge}
                         onChange={(e) => setChildAge(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-[#D8CCC0] bg-[#FAF7F2] text-[#2D222A] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] focus:border-[#8B5CF6] transition appearance-none cursor-pointer font-sans"
+                        className="w-full px-4 py-3 rounded-xl border border-[#D8CCC0] bg-[#FAF7F2] text-[#2D222A] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#C98A84] focus:border-[#C98A84] transition appearance-none cursor-pointer font-sans"
                       >
                         <option value="2">2 Years Old (Toddler)</option>
                         <option value="3">3 Years Old</option>
@@ -594,7 +595,7 @@ export default function PersonalizePage() {
                           <button
                             type="button"
                             onClick={capturePhoto}
-                            className="px-6 py-3 rounded-full bg-[#8B5CF6] hover:bg-[#7C3AED] text-white text-xs font-semibold flex items-center gap-2 shadow-lg transition transform hover:scale-105"
+                            className="px-6 py-3 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs font-semibold flex items-center gap-2 shadow-lg transition transform hover:scale-105 cursor-pointer"
                           >
                             <Camera className="w-4 h-4" />
                             <span>Capture Photo</span>
@@ -633,7 +634,7 @@ export default function PersonalizePage() {
                     type="checkbox"
                     checked={guardianConsent}
                     onChange={(e) => setGuardianConsent(e.target.checked)}
-                    className="mt-1 w-4 h-4 rounded border-[#8B5CF6] text-[#8B5CF6] focus:ring-[#8B5CF6]"
+                    className="mt-1 w-4 h-4 rounded border-[#C98A84] text-[#C98A84] focus:ring-[#C98A84]"
                   />
                   <div className="text-xs text-[#4E424B] leading-relaxed">
                     <span className="font-semibold text-[#2D222A] block">Parent / Legal Guardian Consent</span>
@@ -714,13 +715,19 @@ export default function PersonalizePage() {
           {/* Status Bar */}
           <div className="editorial-card p-6 bg-white flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-[#FAEEED] flex items-center justify-center text-[#C98A84]">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                job.status === "completed"
+                  ? "bg-[#EEF4ED] text-[#8F9E8B]"
+                  : job.status === "failed"
+                  ? "bg-[#FEF2F2] text-[#EF4444]"
+                  : "bg-[#FAEEED] text-[#C98A84] ring-4 ring-[#C98A84]/15 shadow-xs"
+              }`}>
                 {job.status === "completed" ? (
                   <CheckCircle className="w-6 h-6 text-[#8F9E8B]" />
                 ) : job.status === "failed" ? (
                   <AlertCircle className="w-6 h-6 text-[#C98A84]" />
                 ) : (
-                  <RefreshCw className="w-6 h-6 text-[#C98A84] animate-spin" />
+                  <Sparkles className="w-6 h-6 text-[#C98A84] animate-spin" style={{ animationDuration: "5s" }} />
                 )}
               </div>
               <div>
@@ -858,24 +865,7 @@ export default function PersonalizePage() {
                           </p>
                         </div>
 
-                        <div className="space-y-3 text-xs text-[#695B64]">
-                          <div className="flex justify-between py-1.5 border-b border-[#EBE3D9]">
-                            <span>AI Provider:</span>
-                            <span className="font-medium text-[#2D222A]">{currentAsset.provider}</span>
-                          </div>
-                          <div className="flex justify-between py-1.5 border-b border-[#EBE3D9]">
-                            <span>Model:</span>
-                            <span className="font-medium text-[#2D222A]">{currentAsset.model}</span>
-                          </div>
-                          <div className="flex justify-between py-1.5 border-b border-[#EBE3D9]">
-                            <span>Generation Latency:</span>
-                            <span className="font-medium text-[#2D222A]">{currentAsset.generation_time_sec}s</span>
-                          </div>
-                          <div className="flex justify-between py-1.5 border-b border-[#EBE3D9]">
-                            <span>Asset Version:</span>
-                            <span className="font-medium text-[#2D222A]">v{currentAsset.asset_version}</span>
-                          </div>
-                        </div>
+
 
                         {/* Single page regenerate button */}
                         <button
@@ -911,16 +901,13 @@ export default function PersonalizePage() {
               )}
             </div>
           ) : (
-            /* Generating skeleton */
-            <div className="editorial-card p-12 bg-white text-center space-y-4">
-              <RefreshCw className="w-12 h-12 text-[#C98A84] animate-spin mx-auto" />
-              <h3 className="font-editorial-serif text-2xl font-bold text-[#2D222A]">
-                Crafting Your Personalized Illustrations...
-              </h3>
-              <p className="text-xs text-[#695B64] max-w-md mx-auto">
-                Our AI consistency engine is conditioning the narrative scenes with {job.child_name}’s likeness. This takes approximately 10–20 seconds.
-              </p>
-            </div>
+            /* Interactive Enchanted Storybook Atelier Generation Stage */
+            <StorybookMagicLoader
+              job={job}
+              storyTitle={story?.title || "The Girl and the Magical Unicorn"}
+              childPhotoUrl={cleanPreview || originalPreview || job.photo_url}
+              childName={job.child_name || childName || "Your Child"}
+            />
           )}
         </div>
       )}

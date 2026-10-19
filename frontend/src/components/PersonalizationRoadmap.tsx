@@ -47,18 +47,18 @@ export default function PersonalizationRoadmap({
     <div className="w-full max-w-xl mx-auto py-4 px-4 sm:px-8">
       <div className="relative flex items-center justify-between">
         {/* Continuous Background Track Line */}
-        <div className="absolute top-[22px] left-[28px] right-[28px] -translate-y-1/2 h-[2px] bg-[#E2E8F0] z-0" />
+        <div className="absolute top-[22px] left-[28px] right-[28px] -translate-y-1/2 h-[2px] bg-[#EBE3D9] z-0" />
 
-        {/* Animated Purple Progress Fill Track */}
+        {/* Animated Brand Progress Fill Track */}
         <div
-          className="absolute top-[22px] left-[28px] -translate-y-1/2 h-[2.5px] bg-gradient-to-r from-[#8B5CF6] via-[#9333EA] to-[#A855F7] z-0 transition-all duration-700 ease-in-out shadow-xs"
+          className="absolute top-[22px] left-[28px] -translate-y-1/2 h-[2.5px] bg-gradient-to-r from-[#C98A84] via-[#E0A8A3] to-[#C98A84] z-0 transition-all duration-700 ease-in-out shadow-xs"
           style={{
             width: `calc(${progressPercentage}% * (100% - 56px) / 100)`,
           }}
         >
           {/* Subtle animated moving glow pulse at the tip */}
           {progressPercentage > 0 && progressPercentage < 100 && (
-            <span className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white ring-2 ring-[#8B5CF6] animate-ping" />
+            <span className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white ring-2 ring-[#C98A84] animate-ping" />
           )}
         </div>
 
@@ -78,10 +78,10 @@ export default function PersonalizationRoadmap({
               <div
                 className={`relative w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-bold text-sm sm:text-base transition-all duration-300 transform group-hover:scale-105 ${
                   isActive
-                    ? "bg-[#8B5CF6] text-white shadow-md shadow-purple-500/30 scale-105 ring-4 ring-[#8B5CF6]/20 animate-pulse"
+                    ? "bg-[#C98A84] text-white shadow-md shadow-[#C98A84]/30 scale-105 ring-4 ring-[#C98A84]/20 animate-pulse"
                     : isDone
-                    ? "bg-[#8B5CF6] text-white shadow-xs"
-                    : "bg-white border-2 border-[#E2E8F0] text-[#94A3B8] hover:border-[#CBD5E1]"
+                    ? "bg-[#C98A84] text-white shadow-xs"
+                    : "bg-white border-2 border-[#EBE3D9] text-[#A8988F] hover:border-[#C98A84]/50"
                 }`}
               >
                 {/* Completed Checkmark or Step Number */}
@@ -96,10 +96,10 @@ export default function PersonalizationRoadmap({
               <span
                 className={`mt-2 text-xs sm:text-sm font-semibold tracking-tight whitespace-nowrap transition-colors duration-200 ${
                   isActive
-                    ? "text-[#1E1B4B] font-bold"
+                    ? "text-[#2D222A] font-bold"
                     : isDone
-                    ? "text-[#6B21A8] font-semibold"
-                    : "text-[#94A3B8] font-medium group-hover:text-[#64748B]"
+                    ? "text-[#C98A84] font-semibold"
+                    : "text-[#8A7D85] font-medium group-hover:text-[#2D222A]"
                 }`}
               >
                 {step.label}
