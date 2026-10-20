@@ -943,15 +943,6 @@ export default function PersonalizePage() {
 
 
 
-                        {/* Single page regenerate button */}
-                        <button
-                          onClick={() => handleRetryPage(currentAsset.id)}
-                          disabled={retryingAssetId === currentAsset.id}
-                          className="w-full py-3 rounded-full border border-[#C98A84] text-[#C98A84] hover:bg-[#FAEEED] text-xs font-semibold transition flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          <RefreshCw className={`w-3.5 h-3.5 ${retryingAssetId === currentAsset.id ? "animate-spin" : ""}`} />
-                          <span>{retryingAssetId === currentAsset.id ? "Regenerating Page..." : "Regenerate This Page"}</span>
-                        </button>
                       </div>
                     </div>
                   )}

@@ -72,7 +72,7 @@ const HARDCOVER_COLLECTIONS: CollectionSet[] = [
     badge: "Atelier Bestseller",
     colorBorder: "border-[#C98A84]/40 hover:border-[#C98A84]",
     accentColor: "text-[#C98A84]",
-    bgGradient: "from-[#FAEEED]/60 via-[#FFFFFF] to-[#FAF7F2]",
+    bgGradient: "from-[#FAEEED]/50 via-[#FAF7F2] to-[#FAEEED]/30",
     rating: 4.98,
     reviewCount: 246,
     description: "Transport your child into a mythical universe where gentle woodland creatures and celestial guardians teach the power of courage, compassion, and wonder.",
@@ -147,7 +147,7 @@ const HARDCOVER_COLLECTIONS: CollectionSet[] = [
     badge: "Explorer's Choice",
     colorBorder: "border-[#8F9E8B]/40 hover:border-[#8F9E8B]",
     accentColor: "text-[#8F9E8B]",
-    bgGradient: "from-[#EEF4ED]/60 via-[#FFFFFF] to-[#FAF7F2]",
+    bgGradient: "from-[#EEF4ED]/50 via-[#FAF7F2] to-[#EEF4ED]/30",
     rating: 4.95,
     reviewCount: 184,
     description: "Designed for curious toddlers and young explorers eager to dive beneath turquoise waves and discover the interconnected beauty of wildlife, nature, and friendship.",
@@ -210,7 +210,7 @@ const HARDCOVER_COLLECTIONS: CollectionSet[] = [
     badge: "Sleep Routine Hero",
     colorBorder: "border-[#B8A9C9]/40 hover:border-[#B8A9C9]",
     accentColor: "text-[#B8A9C9]",
-    bgGradient: "from-[#F2EEF7]/60 via-[#FFFFFF] to-[#FAF7F2]",
+    bgGradient: "from-[#F2EEF7]/50 via-[#FAF7F2] to-[#F2EEF7]/30",
     rating: 5.0,
     reviewCount: 212,
     description: "Specially authored in rhythmic, cadence-tested prose that calms evening hyperactivity and helps young children drift peacefully off to sleep.",
@@ -273,7 +273,7 @@ const HARDCOVER_COLLECTIONS: CollectionSet[] = [
     badge: "Two Children Starred",
     colorBorder: "border-[#C5A059]/40 hover:border-[#C5A059]",
     accentColor: "text-[#C5A059]",
-    bgGradient: "from-[#FAF5E8]/60 via-[#FFFFFF] to-[#FAF7F2]",
+    bgGradient: "from-[#FAF5E8]/60 via-[#FAF7F2] to-[#FAF5E8]/30",
     rating: 4.96,
     reviewCount: 168,
     description: "Celebrate the unbreakable bond between brothers, sisters, cousins, or best friends. Both children are illustrated together as co-heroes of their shared quest.",
@@ -336,7 +336,7 @@ const HARDCOVER_COLLECTIONS: CollectionSet[] = [
     badge: "Limited Edition Collector's Box",
     colorBorder: "border-[#C5A059]/60 hover:border-[#C5A059]",
     accentColor: "text-[#C5A059]",
-    bgGradient: "from-[#FAF5E8]/80 via-[#FAEEED]/40 to-[#FAF7F2]",
+    bgGradient: "from-[#FAF5E8]/60 via-[#FAF7F2] to-[#FAF5E8]/30",
     rating: 5.0,
     reviewCount: 94,
     description: "Our crowning achievement. Three full-length personalized hardcover volumes covering fairy tales, oceanic discovery, and heroic empathy, encased in a hand-crafted linen library slipcase.",
@@ -728,7 +728,7 @@ export default function CollectionsPage() {
       {/* ──────────────────────────────────────────────────────────
           2. Master Hardcopy Collections: 3D Dual-Book Showcase Cards
           ────────────────────────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12 relative z-10">
         <div className="space-y-12">
           {filteredCollections.map((col, cIdx) => {
             const activeVol = getActiveVolumeForCollection(col);
@@ -738,14 +738,14 @@ export default function CollectionsPage() {
             return (
               <div
                 key={col.id}
-                className={`rounded-3xl border ${col.colorBorder} bg-white shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col lg:flex-row`}
+                className={`rounded-3xl border ${col.colorBorder} bg-white shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden grid grid-cols-1 lg:grid-cols-2 items-stretch`}
               >
                 {/* LEFT: 3D Hardcover Stage & Presentation Box View */}
                 <div
-                  className={`lg:w-1/2 p-6 sm:p-8 bg-gradient-to-br ${col.bgGradient} flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-[#EBE3D9]/80 relative group`}
+                  className={`w-full h-full p-6 sm:p-8 bg-gradient-to-br ${col.bgGradient} flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-[#EBE3D9]/80 relative group`}
                 >
                   {/* Top Bar on Stage: Badge, Rating & View Toggle */}
-                  <div className="flex items-center justify-between gap-2 z-20">
+                  <div className="flex items-center justify-between gap-2 z-20 min-h-[36px]">
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-white text-[#2D222A] border border-[#EBE3D9] shadow-2xs">
                         {col.category}
@@ -782,7 +782,7 @@ export default function CollectionsPage() {
                   </div>
 
                   {/* CENTER STAGE: 3D Hardcover Presentation or Archival Box */}
-                  <div className="py-8 sm:py-10 flex items-center justify-center min-h-[360px] sm:min-h-[420px] relative">
+                  <div className="py-6 sm:py-8 flex-1 flex items-center justify-center min-h-[340px] sm:min-h-[400px] relative">
                     {viewMode === "books" ? (
                       /* 3D Realistic Dual / Triple Hardcover Book Stage */
                       <div className="w-full max-w-md relative flex items-center justify-center book-stack-container">
@@ -949,11 +949,11 @@ export default function CollectionsPage() {
                 </div>
 
                 {/* RIGHT: Curated Hardcover Box Details, Included Books, & Personalize CTA */}
-                <div className="lg:w-1/2 p-6 sm:p-8 flex flex-col justify-between space-y-6">
+                <div className="w-full h-full p-6 sm:p-8 flex flex-col justify-between space-y-6 bg-white">
                   <div className="space-y-4">
                     {/* Title & Tagline */}
                     <div>
-                      <div className="flex items-center gap-1.5 text-xs text-[#C5A059] font-medium mb-1">
+                      <div className="flex items-center gap-1.5 text-xs text-[#C5A059] font-medium mb-1 min-h-[20px]">
                         <div className="flex text-[#D8A24A]">
                           {[...Array(5)].map((_, i) => (
                             <Star key={i} className="w-3.5 h-3.5 fill-current" />
@@ -1026,7 +1026,7 @@ export default function CollectionsPage() {
                             <button
                               key={story.title}
                               onClick={() => setVolumeForCollection(col.id, sIndex)}
-                              className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2.5 ${activeIdx === sIndex
+                              className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-2.5 h-full min-h-[58px] ${activeIdx === sIndex
                                 ? "bg-white border-[#C98A84] shadow-xs"
                                 : "bg-white/60 border-[#EBE3D9] hover:bg-white text-[#695B64]"
                                 }`}
