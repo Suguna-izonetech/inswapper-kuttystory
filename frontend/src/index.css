@@ -250,3 +250,67 @@ body {
   );
 }
 
+/* ─── Luxury Gold Foil & Hardcover Atelier Effects ─── */
+.gold-foil-text {
+  background: linear-gradient(135deg, #ECC880 0%, #D8A24A 35%, #FFF0C2 55%, #B37D2A 80%, #ECC880 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 200% auto;
+  animation: goldShimmer 6s linear infinite;
+}
+
+@keyframes goldShimmer {
+  0% {
+    background-position: 0% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.gold-foil-border {
+  border-image: linear-gradient(135deg, #ECC880, #D8A24A, #FFF0C2, #B37D2A) 1;
+}
+
+/* 3D Book Fan and Stack Effects */
+.book-stack-container {
+  perspective: 1400px;
+  transform-style: preserve-3d;
+}
+
+.book-stack-card-primary {
+  transform: rotateY(-14deg) rotateZ(-1.5deg) translateZ(10px);
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.book-stack-card-secondary {
+  transform: rotateY(12deg) rotateZ(2deg) translateZ(-20px) translateX(35px);
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.group:hover .book-stack-card-primary {
+  transform: rotateY(-8deg) rotateZ(-0.5deg) translateZ(30px) translateX(-15px);
+}
+
+.group:hover .book-stack-card-secondary {
+  transform: rotateY(8deg) rotateZ(1deg) translateZ(0px) translateX(45px);
+}
+
+/* Satin ribbon bookmark */
+.satin-ribbon {
+  position: absolute;
+  width: 14px;
+  height: 48px;
+  background: linear-gradient(180deg, #D8A24A 0%, #B37D2A 70%, #8C5B17 100%);
+  bottom: -22px;
+  right: 28px;
+  box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.35);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+  z-index: 25;
+}
+
+.satin-ribbon-rose {
+  background: linear-gradient(180deg, #C98A84 0%, #A65F58 70%, #7E3E38 100%);
+}
+
+
