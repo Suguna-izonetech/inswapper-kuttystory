@@ -97,9 +97,27 @@ export default function StorybookMagicLoader({
   const [sparks, setSparks] = useState<SparkParticle[]>([]);
   const [activeFactIdx, setActiveFactIdx] = useState(0);
   const [activeTeaserIdx, setActiveTeaserIdx] = useState(0);
-  const [smoothProgress, setSmoothProgress] = useState(12);
+  const [smoothProgress, setSmoothProgress] = useState(14);
   const [elapsedSecs, setElapsedSecs] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Total pages for this preview job (defaults to 5 if total_pages reflects full story)
+  const totalPages = (job.total_pages && job.total_pages <= 12) ? job.total_pages : 5;
+  const completedPages = Math.min(totalPages, job.completed_pages || 0);
+
+  const isCompleted = job.status?.toLowerCase() === "completed" || job.status?.toLowerCase() === "done" || (completedPages >= totalPages && totalPages > 0 && job.status !== "queued");
+  const isAssembling = job.status === "assembling_preview" || job.current_stage?.toLowerCase().includes("composing") || job.current_stage?.toLowerCase().includes("pdf");
+
+  // Dynamic estimated time text
+  const getEstimatedTime = () => {
+    if (isCompleted || smoothProgress >= 100) return "Ready!";
+    if (isAssembling || smoothProgress >= 92) return "Finalizing spreads...";
+    if (smoothProgress >= 80) return "Estimated: ~5–10s";
+    if (smoothProgress >= 60) return "Estimated: ~10–15s";
+    if (smoothProgress >= 40) return "Estimated: ~15–20s";
+    if (smoothProgress >= 25) return "Estimated: ~20–30s";
+    return "Estimated: ~30–40s";
+  };
 
   // Auto-rotating fun facts every 4.5 seconds
   useEffect(() => {
@@ -117,21 +135,52 @@ export default function StorybookMagicLoader({
     return () => clearInterval(timer);
   }, []);
 
-  // Compute smooth progress bar percentage based on real backend pages + smooth elapsed crawl
+  // Compute smooth, monotonic progress bar percentage based on real backend status + smooth elapsed progression
   useEffect(() => {
-    const totalPages = job.total_pages || 5;
-    const completedPages = job.completed_pages || 0;
-    
-    // Base progress from completed pages
-    const pageRatio = completedPages / totalPages;
-    const pageBase = pageRatio * 90; // Up to 90% from actual pages
+    // 1. Calculate time-based progression curve (starts at 14% and climbs through stages smoothly)
+    let timeProgress = 14;
+    if (elapsedSecs < 6) {
+      // 14% to 26% over first 6 seconds (Stage 1: Likeness Analysis)
+      timeProgress = 14 + (elapsedSecs / 6) * 12;
+    } else if (elapsedSecs < 18) {
+      // 26% to 50% over next 12 seconds (Stage 2: Story Universe Weaving)
+      timeProgress = 26 + ((elapsedSecs - 6) / 12) * 24;
+    } else if (elapsedSecs < 38) {
+      // 50% to 75% over next 20 seconds (Stage 3: Watercolor Synthesis)
+      timeProgress = 50 + ((elapsedSecs - 18) / 20) * 25;
+    } else if (elapsedSecs < 65) {
+      // 75% to 88% over next 27 seconds (Stage 4: Editorial Spreads Compiling)
+      timeProgress = 75 + ((elapsedSecs - 38) / 27) * 13;
+    } else if (elapsedSecs < 95) {
+      // 88% to 93% over next 30 seconds
+      timeProgress = 88 + ((elapsedSecs - 65) / 30) * 5;
+    } else {
+      // Gentle asymptotic crawl towards 95%
+      timeProgress = Math.min(95, 93 + (1 - Math.exp(-(elapsedSecs - 95) / 35)) * 2);
+    }
 
-    // Micro elapsed crawl so bar never feels frozen (asymptotically approaches next page)
-    const subPageFraction = Math.min(0.85, (elapsedSecs % 15) / 15) * (90 / totalPages);
-    const computed = Math.min(94, Math.max(12, Math.round(pageBase + subPageFraction)));
+    // 2. Real backend-driven progress milestones
+    let backendProgress = 0;
+    if (isCompleted) {
+      backendProgress = 100;
+    } else if (isAssembling) {
+      backendProgress = 94;
+    } else if (completedPages > 0) {
+      const pageRatio = completedPages / totalPages;
+      backendProgress = 25 + pageRatio * 68; // 1/5 => ~38%, 2/5 => ~52%, 3/5 => ~66%, 4/5 => ~79%, 5/5 => ~93%
+    } else if (job.status === "generating") {
+      backendProgress = Math.max(timeProgress, 28);
+    }
 
-    setSmoothProgress(computed);
-  }, [job.completed_pages, job.total_pages, elapsedSecs]);
+    const candidate = Math.max(timeProgress, backendProgress);
+
+    setSmoothProgress((prev) => {
+      if (isCompleted) return 100;
+      // Strictly monotonic: progress never goes backwards, capped at 95% until complete
+      const target = Math.min(95, Math.max(prev, Math.round(candidate)));
+      return target;
+    });
+  }, [completedPages, totalPages, isCompleted, isAssembling, job.status, elapsedSecs]);
 
   // Clean up completed sparks
   useEffect(() => {
@@ -197,7 +246,7 @@ export default function StorybookMagicLoader({
     },
     {
       id: 4,
-      name: "Compiling 5 Editorial Pages",
+      name: `Compiling ${totalPages} Editorial Spreads`,
       detail: `Formatting 210×210mm archival spreads for 3D flipbook`,
       pct: 95,
       icon: BookOpen,
@@ -359,7 +408,7 @@ export default function StorybookMagicLoader({
                 <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-[#C98A84]/15 to-transparent animate-page-flip pointer-events-none" />
 
                 <span className="text-[10px] uppercase tracking-wider text-[#A8988F] font-bold">
-                  Page #{job.completed_pages ? job.completed_pages + 1 : 1} Preview
+                  Page #{completedPages > 0 ? Math.min(totalPages, completedPages + 1) : 1} Preview
                 </span>
 
                 {/* Animated Watercolor Canvas Simulation */}
@@ -382,14 +431,20 @@ export default function StorybookMagicLoader({
                     "{storyTitle}"
                   </p>
                   <p className="text-[9px] text-[#695B64] mt-0.5 font-medium">
-                    Simulating watercolor lighting...
+                    {smoothProgress < 25
+                      ? "Analyzing likeness & expressions..."
+                      : smoothProgress < 50
+                      ? "Weaving magical scenery..."
+                      : smoothProgress < 75
+                      ? "Painting watercolor brushstrokes..."
+                      : "Binding archival spreads..."}
                   </p>
                 </div>
 
                 <div className="w-full flex items-center justify-between text-[9px] text-[#A8988F]">
                   <span>210×210 mm Trim</span>
                   <span className="font-bold text-[#C98A84]">
-                    {job.completed_pages || 0} / {job.total_pages || 5} Rendered
+                    {completedPages} / {totalPages} Rendered
                   </span>
                 </div>
               </div>
@@ -426,8 +481,8 @@ export default function StorybookMagicLoader({
             </div>
 
             <div className="flex items-center justify-between text-[11px] text-[#8F9E8B] pt-0.5 font-medium">
-              <span>{job.current_stage || "Conditioning narrative scenes..."}</span>
-              <span>Estimated: ~10-15s</span>
+              <span className="truncate max-w-[260px] sm:max-w-xs">{job.current_stage || "Conditioning narrative scenes..."}</span>
+              <span className="shrink-0">{getEstimatedTime()}</span>
             </div>
           </div>
         </div>

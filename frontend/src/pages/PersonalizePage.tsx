@@ -138,7 +138,8 @@ export default function PersonalizePage() {
         if (updated.story_slug && updated.story_slug !== slug && (!story || story.slug !== updated.story_slug)) {
           api.getStory(updated.story_slug).then(s => setStory(s)).catch(() => {});
         }
-        if (updated.status === "completed" || updated.status === "failed") {
+        const statusLower = updated.status?.toLowerCase();
+        if (statusLower === "completed" || statusLower === "failed" || statusLower === "done") {
           clearInterval(interval);
         }
       } catch (err) {
@@ -748,21 +749,28 @@ export default function PersonalizePage() {
           {/* Status Bar */}
           <div className="editorial-card p-6 bg-white flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                job.status === "completed"
-                  ? "bg-[#EEF4ED] text-[#8F9E8B]"
-                  : job.status === "failed"
-                  ? "bg-[#FEF2F2] text-[#EF4444]"
-                  : "bg-[#FAEEED] text-[#C98A84] ring-4 ring-[#C98A84]/15 shadow-xs"
-              }`}>
-                {job.status === "completed" ? (
-                  <CheckCircle className="w-6 h-6 text-[#8F9E8B]" />
-                ) : job.status === "failed" ? (
-                  <AlertCircle className="w-6 h-6 text-[#C98A84]" />
-                ) : (
-                  <Sparkles className="w-6 h-6 text-[#C98A84] animate-spin" style={{ animationDuration: "5s" }} />
-                )}
-              </div>
+              {(() => {
+                const statusLower = job.status?.toLowerCase();
+                const isJobCompleted = statusLower === "completed" || statusLower === "done";
+                const isJobFailed = statusLower === "failed";
+                return (
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                    isJobCompleted
+                      ? "bg-[#EEF4ED] text-[#8F9E8B]"
+                      : isJobFailed
+                      ? "bg-[#FEF2F2] text-[#EF4444]"
+                      : "bg-[#FAEEED] text-[#C98A84] ring-4 ring-[#C98A84]/15 shadow-xs"
+                  }`}>
+                    {isJobCompleted ? (
+                      <CheckCircle className="w-6 h-6 text-[#8F9E8B]" />
+                    ) : isJobFailed ? (
+                      <AlertCircle className="w-6 h-6 text-[#C98A84]" />
+                    ) : (
+                      <Sparkles className="w-6 h-6 text-[#C98A84] animate-spin" style={{ animationDuration: "5s" }} />
+                    )}
+                  </div>
+                );
+              })()}
               <div>
                 <div className="text-xs uppercase tracking-wider text-[#695B64] font-medium">
                   Personalization for {job.child_name}
@@ -778,10 +786,10 @@ export default function PersonalizePage() {
               <div className="text-right">
                 <span className="text-xs text-[#695B64] block">Progress</span>
                 <span className="font-editorial-serif text-lg font-bold text-[#2D222A]">
-                  {job.completed_pages} of {job.total_pages} Pages
+                  {job.completed_pages} of {job.total_pages || 5} Pages
                 </span>
               </div>
-              {job.status === "completed" && (
+              {(job.status?.toLowerCase() === "completed" || job.status?.toLowerCase() === "done") && (
                 <a
                   href={`/api/v1/personalization/${job.id}/pdf?lang=${selectedLanguage}`}
                   target="_blank"

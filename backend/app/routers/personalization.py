@@ -62,7 +62,7 @@ def enrich_job_urls(job: PersonalizationJob) -> dict:
         pct = int(((job.completed_pages or 0) / (job.total_pages or 1)) * 100) if job.total_pages else 0
         status_display = f"Rendering · {pct}%" if pct > 0 else "Rendering"
     elif job.status == "completed":
-        status_display = "Completed"
+        status_display = "completed"
 
     data = {
         "id": job.id,
@@ -75,7 +75,7 @@ def enrich_job_urls(job: PersonalizationJob) -> dict:
         "photo_url": storage.get_public_url(job.photo_path),
         "status": status_display,
         "current_stage": job.current_stage,
-        "total_pages": story_pages_count,
+        "total_pages": job.total_pages if job.total_pages else 5,
         "completed_pages": job.completed_pages,
         "failed_pages": job.failed_pages,
         "retry_count": job.retry_count,
