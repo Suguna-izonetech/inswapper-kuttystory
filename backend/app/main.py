@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base, SessionLocal, get_db
 from app.services.pdf_importer import PDFImporterService
-from app.routers import stories, personalization, books, admin, ai_admin, storage, auth
+from app.routers import stories, personalization, books, admin, ai_admin, storage, auth, child_stories
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -63,6 +63,7 @@ app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(ai_admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(storage.router, prefix=settings.API_V1_PREFIX)
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
+app.include_router(child_stories.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/api/health")
 def health_check():

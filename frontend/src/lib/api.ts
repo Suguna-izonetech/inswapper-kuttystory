@@ -582,7 +582,92 @@ export const api = {
     if (!res.ok) throw new Error("Not authenticated");
     return res.json();
   },
+
+  async getChildStories(category?: string, search?: string): Promise<ChildStory[]> {
+    const params = new URLSearchParams();
+    if (category && category.toLowerCase() !== "all" && category.toLowerCase() !== "all stories") {
+      params.append("category", category);
+    }
+    if (search) params.append("search", search);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    const res = await fetch(`${API_BASE}/child-stories${qs}`);
+    if (!res.ok) throw new Error("Failed to fetch child stories");
+    return res.json();
+  },
+
+  async submitChildStory(payload: SubmitChildStoryPayload): Promise<{ status: string; message: string; story: ChildStory }> {
+    const res = await fetch(`${API_BASE}/child-stories`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to submit story");
+    }
+    return res.json();
+  },
+
+  async likeChildStory(storyId: string): Promise<{ status: string; likes_count: number }> {
+    const res = await fetch(`${API_BASE}/child-stories/${storyId}/like`, {
+      method: "POST",
+    });
+    if (!res.ok) throw new Error("Failed to like story");
+    return res.json();
+  },
+
+  async getAllChildStoriesAdmin(status?: string): Promise<ChildStory[]> {
+    const qs = status && status.toLowerCase() !== "all" ? `?status=${status}` : "";
+    const res = await fetch(`${API_BASE}/child-stories/admin/all${qs}`);
+    if (!res.ok) throw new Error("Failed to fetch admin child stories");
+    return res.json();
+  },
+
+  async updateChildStoryAdmin(storyId: string, updates: Partial<ChildStory>): Promise<{ status: string; story_id: string; current_status: string }> {
+    const res = await fetch(`${API_BASE}/child-stories/admin/${storyId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error("Failed to update story");
+    return res.json();
+  },
+
+  async deleteChildStoryAdmin(storyId: string): Promise<{ status: string }> {
+    const res = await fetch(`${API_BASE}/child-stories/admin/${storyId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Failed to delete story");
+    return res.json();
+  },
 };
+
+export interface ChildStory {
+  id: string;
+  child_name: string;
+  standard: string;
+  place: string;
+  title: string;
+  story_text: string;
+  category: string;
+  cover_color: string;
+  parent_email?: string;
+  status: "approved" | "pending" | "featured" | "rejected";
+  likes_count: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SubmitChildStoryPayload {
+  child_name: string;
+  standard: string;
+  place: string;
+  title: string;
+  story_text: string;
+  category?: string;
+  cover_color?: string;
+  parent_email?: string;
+}
 
 export interface UserProfile {
   id: string;

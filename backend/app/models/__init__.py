@@ -220,3 +220,22 @@ class AuditLog(Base):
     actor = Column(String(100), default="system")
     details = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class ChildWrittenStory(Base):
+    __tablename__ = "child_written_stories"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    child_name = Column(String(100), nullable=False)
+    standard = Column(String(50), nullable=False)        # e.g. "3rd Standard", "Grade 4"
+    place = Column(String(100), nullable=False)          # e.g. "Chennai", "Coimbatore"
+    title = Column(String(200), nullable=False)
+    story_text = Column(Text, nullable=False)
+    category = Column(String(50), default="Adventure")   # "Adventure", "Fantasy & Magic", "Animal Tales", "Space & Sci-Fi", "Bedtime", "Everyday Hero"
+    cover_color = Column(String(30), default="#C98A84")  # Accent badge / theme color
+    parent_email = Column(String(150), nullable=True)
+    status = Column(String(30), default="approved")      # "approved", "pending", "featured", "rejected"
+    likes_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+

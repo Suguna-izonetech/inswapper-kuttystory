@@ -32,7 +32,12 @@ import {
   Sliders,
   HelpCircle,
   AlertCircle,
-  Download
+  Download,
+  Feather,
+  Heart,
+  MapPin,
+  GraduationCap,
+  Star
 } from "lucide-react";
 import {
   api,
@@ -44,9 +49,10 @@ import {
   StoryPage,
   AISettings,
   PersonalizationJob,
+  ChildStory,
 } from "@/lib/api";
 
-type TabType = "dashboard" | "orders" | "previews" | "stories" | "page_editor" | "settings";
+type TabType = "dashboard" | "orders" | "previews" | "stories" | "page_editor" | "settings" | "child_stories";
 
 export default function AdminDashboardPage({ initialTab }: { initialTab?: TabType }) {
   const navigate = useNavigate();
@@ -56,6 +62,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
   const getInitialTab = (): TabType => {
     if (initialTab) return initialTab;
     const path = window.location.pathname.toLowerCase();
+    if (path.includes("/child_stories") || path.includes("/child-stories")) return "child_stories";
     if (path.includes("/stories")) return "stories";
     if (path.includes("/orders")) return "orders";
     if (path.includes("/previews")) return "previews";
@@ -192,6 +199,48 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
   const [budgetCap, setBudgetCap] = useState(2.5);
   const [savingAi, setSavingAi] = useState(false);
 
+  // Children's Written Stories Data
+  const [adminChildStories, setAdminChildStories] = useState<ChildStory[]>([]);
+  const [childStoryFilter, setChildStoryFilter] = useState("all");
+  const [childStorySearch, setChildStorySearch] = useState("");
+  const [selectedAdminChildStory, setSelectedAdminChildStory] = useState<ChildStory | null>(null);
+  const [loadingChildStories, setLoadingChildStories] = useState(false);
+
+  const fetchAdminChildStories = async (statusOverride?: string) => {
+    setLoadingChildStories(true);
+    try {
+      const st = statusOverride !== undefined ? statusOverride : childStoryFilter;
+      const data = await api.getAllChildStoriesAdmin(st);
+      setAdminChildStories(data);
+    } catch (err) {
+      console.error("Error loading child stories:", err);
+    } finally {
+      setLoadingChildStories(false);
+    }
+  };
+
+  const handleUpdateChildStoryStatus = async (id: string, newStatus: "approved" | "pending" | "featured" | "rejected") => {
+    try {
+      await api.updateChildStoryAdmin(id, { status: newStatus });
+      fetchAdminChildStories();
+    } catch (err: any) {
+      alert("Failed to update status: " + err.message);
+    }
+  };
+
+  const handleDeleteChildStory = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this story submission?")) return;
+    try {
+      await api.deleteChildStoryAdmin(id);
+      fetchAdminChildStories();
+      if (selectedAdminChildStory?.id === id) {
+        setSelectedAdminChildStory(null);
+      }
+    } catch (err: any) {
+      alert("Failed to delete story: " + err.message);
+    }
+  };
+
   useEffect(() => {
     const user = authService.getUser();
     if (!user) {
@@ -241,12 +290,13 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [dash, storiesData, aiData, jobsData, ordersList] = await Promise.all([
+      const [dash, storiesData, aiData, jobsData, ordersList, childStoriesData] = await Promise.all([
         api.getDashboard().catch(() => null),
         api.getAdminStories().catch(() => []),
         api.getAISettings().catch(() => null),
         api.getJobs().catch(() => []),
         api.getOrders().catch(() => []),
+        api.getAllChildStoriesAdmin().catch(() => []),
       ]);
 
       if (dash) setDashboardData(dash);
@@ -269,6 +319,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
       }
       if (jobsData) setJobs(jobsData);
       if (ordersList) setOrders(ordersList);
+      if (childStoriesData) setAdminChildStories(childStoriesData);
     } catch (err) {
       console.error("Error loading dashboard data:", err);
     } finally {
@@ -974,6 +1025,35 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
           >
             <FileEdit className="w-4 h-4 shrink-0" />
             <span>Page Editor</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("child_stories");
+              window.history.pushState(null, "", "/admin/child_stories");
+              fetchAdminChildStories();
+            }}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === "child_stories"
+                ? "bg-[#8B3DFF] text-white shadow-sm shadow-[#8B3DFF]/20"
+                : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+            }`}
+          >
+            <div className="flex items-center gap-3.5">
+              <Feather className="w-4 h-4 shrink-0" />
+              <span>Children's Stories</span>
+            </div>
+            {adminChildStories.length > 0 && (
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                  activeTab === "child_stories"
+                    ? "bg-white/20 text-white"
+                    : "bg-purple-100 text-[#8B3DFF]"
+                }`}
+              >
+                {adminChildStories.length}
+              </span>
+            )}
           </button>
 
           <button
@@ -2613,6 +2693,228 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
               >
                 {savingAi ? "Updating Settings..." : "Save AI Provider Configuration"}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── CHILDREN'S WRITTEN STORIES TAB ── */}
+        {activeTab === "child_stories" && (
+          <div className="p-6 sm:p-8 space-y-6 max-w-6xl mx-auto">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <Feather className="w-6 h-6 text-[#8B3DFF]" />
+                  Children's Written Stories
+                </h1>
+                <p className="text-xs text-gray-500 mt-1">
+                  Manage story submissions from little authors. Feature, approve, or remove entries.
+                </p>
+              </div>
+              <button
+                onClick={() => fetchAdminChildStories(childStoryFilter)}
+                className="px-4 py-2 rounded-xl bg-[#8B3DFF] text-white text-xs font-semibold hover:bg-[#7828f7] cursor-pointer"
+              >
+                ↻ Refresh
+              </button>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="flex flex-wrap items-center gap-2">
+              {["all", "featured", "approved", "pending", "rejected"].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => { setChildStoryFilter(f); fetchAdminChildStories(f); }}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold cursor-pointer capitalize transition ${
+                    childStoryFilter === f
+                      ? "bg-[#8B3DFF] text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {f === "all" ? "All Submissions" : f === "featured" ? "⭐ Featured" : f.charAt(0).toUpperCase() + f.slice(1)}
+                </button>
+              ))}
+              <input
+                type="text"
+                placeholder="Search by name, title or place..."
+                value={childStorySearch}
+                onChange={(e) => setChildStorySearch(e.target.value)}
+                className="ml-auto px-4 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-[#8B3DFF] w-60"
+              />
+            </div>
+
+            {/* Stories Table */}
+            {loadingChildStories ? (
+              <div className="py-16 text-center text-sm text-gray-400">Loading stories...</div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xs">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100 text-left text-gray-500 font-semibold uppercase tracking-wide">
+                      <th className="px-5 py-3.5">Author</th>
+                      <th className="px-5 py-3.5">Story Title</th>
+                      <th className="px-5 py-3.5">Category</th>
+                      <th className="px-5 py-3.5">Status</th>
+                      <th className="px-5 py-3.5">❤️ Likes</th>
+                      <th className="px-5 py-3.5">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminChildStories
+                      .filter((s) => {
+                        if (!childStorySearch.trim()) return true;
+                        const q = childStorySearch.toLowerCase();
+                        return (
+                          s.child_name.toLowerCase().includes(q) ||
+                          s.title.toLowerCase().includes(q) ||
+                          s.place.toLowerCase().includes(q)
+                        );
+                      })
+                      .map((story) => (
+                        <tr
+                          key={story.id}
+                          className="border-b border-gray-50 hover:bg-gray-50 transition cursor-pointer"
+                          onClick={() => setSelectedAdminChildStory(story)}
+                        >
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-2.5">
+                              <div
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0"
+                                style={{ backgroundColor: story.cover_color || "#C98A84" }}
+                              >
+                                {story.child_name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-semibold text-gray-900">{story.child_name}</p>
+                                <p className="text-[11px] text-gray-400 flex items-center gap-1">
+                                  <GraduationCap className="w-3 h-3" /> {story.standard}
+                                  <MapPin className="w-3 h-3 ml-1" /> {story.place}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-5 py-4 max-w-[200px]">
+                            <p className="font-medium text-gray-800 truncate">{story.title}</p>
+                            <p className="text-[11px] text-gray-400 truncate italic">"{story.story_text.substring(0, 60)}..."</p>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-50 text-[#8B3DFF]">
+                              {story.category}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold capitalize ${
+                              story.status === "featured" ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                              story.status === "approved" ? "bg-emerald-50 text-emerald-700" :
+                              story.status === "pending" ? "bg-orange-50 text-orange-600" :
+                              "bg-red-50 text-red-600"
+                            }`}>
+                              {story.status === "featured" ? "⭐ Featured" : story.status}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className="flex items-center gap-1 text-rose-500 font-semibold">
+                              <Heart className="w-3.5 h-3.5 fill-rose-400" />
+                              {story.likes_count || 0}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                              {story.status !== "featured" && (
+                                <button
+                                  onClick={() => handleUpdateChildStoryStatus(story.id, "featured")}
+                                  className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-semibold border border-amber-200 cursor-pointer"
+                                  title="Feature this story"
+                                >
+                                  ⭐ Feature
+                                </button>
+                              )}
+                              {story.status !== "approved" && story.status !== "featured" && (
+                                <button
+                                  onClick={() => handleUpdateChildStoryStatus(story.id, "approved")}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-semibold cursor-pointer"
+                                >
+                                  Approve
+                                </button>
+                              )}
+                              {story.status !== "rejected" && (
+                                <button
+                                  onClick={() => handleUpdateChildStoryStatus(story.id, "rejected")}
+                                  className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-semibold cursor-pointer"
+                                >
+                                  Reject
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDeleteChildStory(story.id)}
+                                className="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-semibold cursor-pointer"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+                {adminChildStories.length === 0 && (
+                  <div className="py-16 text-center text-sm text-gray-400">No stories found.</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Story Detail Modal */}
+        {selectedAdminChildStory && (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[85vh]">
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between" style={{ background: `linear-gradient(135deg, ${selectedAdminChildStory.cover_color}15, white)` }}>
+                <div>
+                  <span className="text-xs font-bold text-[#8B3DFF] uppercase tracking-wider">Story Review</span>
+                  <h3 className="text-xl font-bold text-gray-900 mt-0.5">{selectedAdminChildStory.title}</h3>
+                </div>
+                <button onClick={() => setSelectedAdminChildStory(null)} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto space-y-5">
+                <div className="grid grid-cols-3 gap-3 text-xs">
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <p className="text-gray-400 font-medium">Author</p>
+                    <p className="font-bold text-gray-900 mt-0.5">{selectedAdminChildStory.child_name}</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <p className="text-gray-400 font-medium">Standard</p>
+                    <p className="font-bold text-gray-900 mt-0.5">{selectedAdminChildStory.standard}</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <p className="text-gray-400 font-medium">Place</p>
+                    <p className="font-bold text-gray-900 mt-0.5">{selectedAdminChildStory.place}</p>
+                  </div>
+                </div>
+                {selectedAdminChildStory.parent_email && (
+                  <div className="p-3 bg-blue-50 rounded-xl text-xs">
+                    <span className="text-gray-500 font-medium">Parent Contact: </span>
+                    <span className="font-bold text-blue-700">{selectedAdminChildStory.parent_email}</span>
+                  </div>
+                )}
+                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                  <p className="text-xs text-gray-500 mb-2 font-semibold">Full Story Text</p>
+                  <p className="text-sm text-gray-800 leading-relaxed">{selectedAdminChildStory.story_text}</p>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {selectedAdminChildStory.status !== "featured" && (
+                    <button onClick={() => { handleUpdateChildStoryStatus(selectedAdminChildStory.id, "featured"); setSelectedAdminChildStory(null); }} className="px-4 py-2 rounded-xl bg-amber-500 text-white text-xs font-bold cursor-pointer hover:bg-amber-600">⭐ Mark as Featured</button>
+                  )}
+                  {selectedAdminChildStory.status !== "approved" && (
+                    <button onClick={() => { handleUpdateChildStoryStatus(selectedAdminChildStory.id, "approved"); setSelectedAdminChildStory(null); }} className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold cursor-pointer hover:bg-emerald-700">✓ Approve</button>
+                  )}
+                  {selectedAdminChildStory.status !== "rejected" && (
+                    <button onClick={() => { handleUpdateChildStoryStatus(selectedAdminChildStory.id, "rejected"); setSelectedAdminChildStory(null); }} className="px-4 py-2 rounded-xl bg-red-500 text-white text-xs font-bold cursor-pointer hover:bg-red-600">✕ Reject</button>
+                  )}
+                  <button onClick={() => { handleDeleteChildStory(selectedAdminChildStory.id); }} className="px-4 py-2 rounded-xl bg-gray-200 text-gray-700 text-xs font-bold cursor-pointer hover:bg-gray-300">🗑 Delete</button>
+                </div>
+              </div>
             </div>
           </div>
         )}
