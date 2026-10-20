@@ -89,38 +89,38 @@ function getStateFillColor(count: number): string {
 }
 
 export default function BookSalesMapSection() {
-  // Rajasthan is selected and highlighted by default
-  const [selectedStateId, setSelectedStateId] = useState<string>("rj");
+  // No state is active by default on initial page load
+  const [selectedStateId, setSelectedStateId] = useState<string | null>(null);
   const [hoveredStateId, setHoveredStateId] = useState<string | null>(null);
   const [hoveredDonutId, setHoveredDonutId] = useState<string | null>(null);
   const [showAllModal, setShowAllModal] = useState<boolean>(false);
   const [timeFilter] = useState<string>("Last 30 days");
 
-  // When pointer leaves the map, return to previously selected state
-  const activeStateId = (hoveredStateId || selectedStateId).toLowerCase();
+  // When pointer leaves the map, return to previously selected state if one was clicked; otherwise neutral
+  const activeStateId = (hoveredStateId || selectedStateId)?.toLowerCase() || null;
 
   // Active state record
-  const activeRecord = STATE_SALES_RECORD[activeStateId] || {
-    name: "India State",
-    count: 0,
-  };
+  const activeRecord = activeStateId ? STATE_SALES_RECORD[activeStateId] : null;
 
-  const activeLocation = INDIA_MAP_DATA.locations.find(
-    (loc) => loc.id.toLowerCase() === activeStateId
-  );
+  const activeLocation = activeStateId
+    ? INDIA_MAP_DATA.locations.find(
+        (loc) => loc.id.toLowerCase() === activeStateId
+      )
+    : null;
 
   const activePercentage =
-    activeRecord.count > 0
+    activeRecord && activeRecord.count > 0
       ? ((activeRecord.count / TOTAL_BOOKS) * 100).toFixed(1)
       : "0.0";
 
   // Precomputed bounding box for the standalone state shape
-  const stateBBox = STATE_BBOXES[activeStateId] || {
-    minX: 0,
-    minY: 0,
-    width: 612,
-    height: 696,
-  };
+  const stateBBox =
+    (activeStateId && STATE_BBOXES[activeStateId]) || {
+      minX: 0,
+      minY: 0,
+      width: 612,
+      height: 696,
+    };
   const padX = Math.max(stateBBox.width * 0.08, 4);
   const padY = Math.max(stateBBox.height * 0.08, 4);
   const standaloneStrokeWidth = Math.max(stateBBox.width, stateBBox.height) * 0.018;
@@ -294,7 +294,10 @@ export default function BookSalesMapSection() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
           {/* Full India Map Column (Recognizable, normal scale, no distortion or zoom on map) */}
           <div className="lg:col-span-9 flex flex-col items-center">
-            <div className="w-full relative bg-[#FAF7F2]/90 rounded-2xl p-4 sm:p-6 border border-[#EBE3D9] flex flex-col items-center justify-center overflow-hidden">
+            <div
+              className="w-full relative bg-[#FAF7F2]/90 rounded-2xl p-4 sm:p-6 border border-[#EBE3D9] flex flex-col items-center justify-center overflow-hidden"
+              onMouseLeave={() => setHoveredStateId(null)}
+            >
               <div className="w-full max-w-[620px] max-h-[620px] aspect-[612/696] flex items-center justify-center relative">
                 <svg
                   viewBox={INDIA_MAP_DATA.viewBox}
@@ -310,8 +313,8 @@ export default function BookSalesMapSection() {
                       name: loc.name,
                       count: 0,
                     };
-                    const isSelected = selectedStateId === idLower;
-                    const isHovered = hoveredStateId === idLower;
+                    const isSelected = selectedStateId ? selectedStateId === idLower : false;
+                    const isHovered = hoveredStateId ? hoveredStateId === idLower : false;
                     const isHighlighted = isHovered || isSelected;
 
                     return (
@@ -382,106 +385,141 @@ export default function BookSalesMapSection() {
           <div className="lg:col-span-3 w-full">
             <div className="bg-[#FAF7F2] rounded-2xl p-4 sm:p-5 border border-[#EBE3D9] shadow-2xs">
               {/* Content transitions smoothly on state change */}
-              <div key={activeStateId} className="panel-fade-slide space-y-3.5">
-                {/* Header row: date range + rank */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-semibold text-[#C98A84] bg-white px-2.5 py-0.5 rounded-full border border-[#C98A84]/20 shadow-2xs">
-                    {timeFilter}
-                  </span>
-                  {activeRecord.rank && activeRecord.count > 0 ? (
-                    <span className="text-[10px] font-bold text-[#2D222A] bg-white px-2 py-0.5 rounded-full border border-[#EBE3D9]">
-                      Rank #{activeRecord.rank}
-                    </span>
-                  ) : null}
-                </div>
+              <div key={activeStateId || "neutral"} className="panel-fade-slide space-y-3.5">
+                {!activeRecord || !activeLocation ? (
+                  <div className="flex flex-col justify-between min-h-[350px] py-1">
+                    {/* Header row: date range + neutral indicator */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-semibold text-[#C98A84] bg-white px-2.5 py-0.5 rounded-full border border-[#C98A84]/20 shadow-2xs">
+                        {timeFilter}
+                      </span>
+                      <span className="text-[10px] font-medium text-[#8C7A86] bg-white px-2 py-0.5 rounded-full border border-[#EBE3D9]">
+                        28 States
+                      </span>
+                    </div>
 
-                {/* Standalone State Shape (Clean vector shape, no magnifying lens, frame or circle) */}
-                {activeLocation && (
-                  <div className="w-full flex items-center justify-center py-2">
-                    <div className="w-32 h-32 sm:w-36 sm:h-36 flex items-center justify-center relative">
-                      <svg
-                        viewBox={`${stateBBox.minX - padX} ${stateBBox.minY - padY} ${stateBBox.width + 2 * padX} ${stateBBox.height + 2 * padY}`}
-                        className="w-full h-full select-none"
-                        style={{
-                          filter: "drop-shadow(0 4px 12px rgba(163, 92, 86, 0.28))",
-                        }}
-                        role="img"
-                        aria-label={`Standalone shape of ${activeRecord.name}`}
-                      >
-                        <path
-                          d={activeLocation.path}
-                          fill={getStateFillColor(activeRecord.count)}
-                          stroke="#873E38"
-                          strokeWidth={standaloneStrokeWidth}
-                          strokeLinejoin="round"
-                          strokeLinecap="round"
-                          className="transition-all duration-300"
-                        />
-                      </svg>
+                    {/* Neutral prompt & icon */}
+                    <div className="flex flex-col items-center justify-center text-center my-auto py-8 px-2 space-y-3">
+                      <div className="w-13 h-13 rounded-2xl bg-[#FAEEED] border border-[#C98A84]/30 flex items-center justify-center text-[#C98A84] shadow-xs">
+                        <MapPin className="w-6 h-6" />
+                      </div>
+                      <div className="space-y-1.5 max-w-[210px]">
+                        <h4 className="font-editorial-serif text-lg sm:text-xl font-bold text-[#2D222A]">
+                          State Details
+                        </h4>
+                        <p className="text-xs sm:text-[13px] text-[#695B64] leading-relaxed">
+                          Hover over or select a state to view its details.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Short helper hint */}
+                    <div className="pt-3 border-t border-[#EBE3D9] flex items-center justify-center gap-1.5 text-[11px] text-[#8C7A86]">
+                      <MousePointerClick className="w-3.5 h-3.5 text-[#C98A84] shrink-0" />
+                      <span>Hover over or tap any state</span>
                     </div>
                   </div>
+                ) : (
+                  <>
+                    {/* Header row: date range + rank */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-semibold text-[#C98A84] bg-white px-2.5 py-0.5 rounded-full border border-[#C98A84]/20 shadow-2xs">
+                        {timeFilter}
+                      </span>
+                      {activeRecord.rank && activeRecord.count > 0 ? (
+                        <span className="text-[10px] font-bold text-[#2D222A] bg-white px-2 py-0.5 rounded-full border border-[#EBE3D9]">
+                          Rank #{activeRecord.rank}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {/* Standalone State Shape (Clean vector shape, no magnifying lens, frame or circle) */}
+                    <div className="w-full flex items-center justify-center py-2">
+                      <div className="w-32 h-32 sm:w-36 sm:h-36 flex items-center justify-center relative">
+                        <svg
+                          viewBox={`${stateBBox.minX - padX} ${stateBBox.minY - padY} ${stateBBox.width + 2 * padX} ${stateBBox.height + 2 * padY}`}
+                          className="w-full h-full select-none"
+                          style={{
+                            filter: "drop-shadow(0 4px 12px rgba(163, 92, 86, 0.28))",
+                          }}
+                          role="img"
+                          aria-label={`Standalone shape of ${activeRecord.name}`}
+                        >
+                          <path
+                            d={activeLocation.path}
+                            fill={getStateFillColor(activeRecord.count)}
+                            stroke="#873E38"
+                            strokeWidth={standaloneStrokeWidth}
+                            strokeLinejoin="round"
+                            strokeLinecap="round"
+                            className="transition-all duration-300"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+
+                    {/* Selected State Name */}
+                    <div className="text-center sm:text-left">
+                      <div className="text-[10px] font-medium tracking-wider uppercase text-[#8C7A86]">
+                        Selected State
+                      </div>
+                      <h4 className="font-editorial-serif text-xl sm:text-2xl font-bold text-[#2D222A] leading-tight">
+                        {activeRecord.name}
+                      </h4>
+                    </div>
+
+                    {/* Books Sold Metric */}
+                    <div className="bg-white rounded-xl p-3 border border-[#EBE3D9] shadow-2xs">
+                      <div className="text-[10px] font-semibold text-[#8C7A86] uppercase tracking-wide">
+                        Books Sold
+                      </div>
+                      <div className="flex items-baseline gap-1.5 mt-0.5">
+                        <span className="font-editorial-serif text-2xl sm:text-3xl font-bold text-[#2D222A] leading-none">
+                          {activeRecord.count}
+                        </span>
+                        <span className="text-xs text-[#695B64] font-medium">
+                          {activeRecord.count === 0 ? "books sold" : "books"}
+                        </span>
+                      </div>
+                      {activeRecord.count === 0 ? (
+                        <p className="text-[10px] text-[#8C7A86] pt-1 italic">
+                          0 qualifying orders in selected period.
+                        </p>
+                      ) : null}
+                    </div>
+
+                    {/* Share of Total Sales */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-[#695B64] text-[11px] font-medium">Share of Total</span>
+                        <span className="font-bold text-[#2D222A] text-xs">{activePercentage}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-[#EBE3D9] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#C98A84] rounded-full transition-all duration-300"
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              Math.max(
+                                activeRecord.count > 0 ? (activeRecord.count / 312) * 100 : 0,
+                                activeRecord.count > 0 ? 2 : 0
+                              )
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                      <div className="text-[10px] text-[#8C7A86] text-right">
+                        {activeRecord.count} of 1,284 total
+                      </div>
+                    </div>
+
+                    {/* Short hint */}
+                    <div className="pt-2 border-t border-[#EBE3D9] flex items-center gap-1.5 text-[11px] text-[#695B64] leading-snug">
+                      <MousePointerClick className="w-3.5 h-3.5 text-[#C98A84] shrink-0" />
+                      <span>Tap or click another state to compare totals.</span>
+                    </div>
+                  </>
                 )}
-
-                {/* Selected State Name */}
-                <div className="text-center sm:text-left">
-                  <div className="text-[10px] font-medium tracking-wider uppercase text-[#8C7A86]">
-                    Selected State
-                  </div>
-                  <h4 className="font-editorial-serif text-xl sm:text-2xl font-bold text-[#2D222A] leading-tight">
-                    {activeRecord.name}
-                  </h4>
-                </div>
-
-                {/* Books Sold Metric */}
-                <div className="bg-white rounded-xl p-3 border border-[#EBE3D9] shadow-2xs">
-                  <div className="text-[10px] font-semibold text-[#8C7A86] uppercase tracking-wide">
-                    Books Sold
-                  </div>
-                  <div className="flex items-baseline gap-1.5 mt-0.5">
-                    <span className="font-editorial-serif text-2xl sm:text-3xl font-bold text-[#2D222A] leading-none">
-                      {activeRecord.count}
-                    </span>
-                    <span className="text-xs text-[#695B64] font-medium">
-                      {activeRecord.count === 0 ? "books sold" : "books"}
-                    </span>
-                  </div>
-                  {activeRecord.count === 0 ? (
-                    <p className="text-[10px] text-[#8C7A86] pt-1 italic">
-                      0 qualifying orders in selected period.
-                    </p>
-                  ) : null}
-                </div>
-
-                {/* Share of Total Sales */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-[#695B64] text-[11px] font-medium">Share of Total</span>
-                    <span className="font-bold text-[#2D222A] text-xs">{activePercentage}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-[#EBE3D9] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#C98A84] rounded-full transition-all duration-300"
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          Math.max(
-                            activeRecord.count > 0 ? (activeRecord.count / 312) * 100 : 0,
-                            activeRecord.count > 0 ? 2 : 0
-                          )
-                        )}%`,
-                      }}
-                    />
-                  </div>
-                  <div className="text-[10px] text-[#8C7A86] text-right">
-                    {activeRecord.count} of 1,284 total
-                  </div>
-                </div>
-
-                {/* Short hint */}
-                <div className="pt-2 border-t border-[#EBE3D9] flex items-center gap-1.5 text-[11px] text-[#695B64] leading-snug">
-                  <MousePointerClick className="w-3.5 h-3.5 text-[#C98A84] shrink-0" />
-                  <span>Tap or click another state to compare totals.</span>
-                </div>
               </div>
             </div>
           </div>
@@ -525,7 +563,7 @@ export default function BookSalesMapSection() {
                 {/* Donut Segments */}
                 {segmentsWithOffsets.map((seg) => {
                   const isHovered = hoveredDonutId === seg.id;
-                  const isSelectedOnMap = activeStateId === seg.id.toLowerCase();
+                  const isSelectedOnMap = activeStateId ? activeStateId === seg.id.toLowerCase() : false;
                   return (
                     <circle
                       key={seg.id}
@@ -577,7 +615,7 @@ export default function BookSalesMapSection() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {DONUT_SEGMENTS.map((seg) => {
                 const isHovered = hoveredDonutId === seg.id;
-                const isSelectedOnMap = activeStateId === seg.id.toLowerCase();
+                const isSelectedOnMap = activeStateId ? activeStateId === seg.id.toLowerCase() : false;
                 return (
                   <button
                     key={seg.id}
