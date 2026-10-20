@@ -350,9 +350,14 @@ def download_full_print_pdf(
 
     from app.services.pdf_composer import PDFComposerService
 
-    # Deterministic assembly of all storybook pages:
-    # Uses AI face-fused plates for personalized pages, and high-res story template art for remaining pages
-    all_pages_data = get_full_storybook_pages_for_print(job=job, story=story, target_lang=lang, db=db)
+    # Complete or fetch ALL pages with 3D realistic face-fused character plates:
+    from app.services.job_runner import job_runner
+    try:
+        all_pages_data = job_runner.get_or_generate_full_storybook_pages(job_id=job.id, target_lang=lang)
+    except Exception as e:
+        print(f"Notice: Falling back to pre-rendered plates for print PDF: {e}")
+        all_pages_data = get_full_storybook_pages_for_print(job=job, story=story, target_lang=lang, db=db)
+
     if not all_pages_data:
         raise HTTPException(status_code=400, detail="No printable pages found for this storybook.")
 

@@ -691,7 +691,26 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
       return;
     }
 
-    // Print PDF (8x8 RGB - ALL Pages):
+    // Print PDF (8x8 RGB - ALL 24 Pages):
+    const total = job.total_pages || 24;
+    const completed = job.completed_pages || 0;
+
+    // If all pages haven't been rendered yet or currently rendering, launch live generator modal
+    if (completed < total || job.status?.toLowerCase().includes("rendering")) {
+      try {
+        await api.triggerFullGeneration(job.id);
+      } catch (err) {
+        console.warn("Notice triggering full generation:", err);
+      }
+      setGeneratingFullJob({
+        ...job,
+        status: "Rendering · " + Math.round((completed / total) * 100) + "%",
+        completed_pages: completed,
+        total_pages: total
+      });
+      return;
+    }
+
     // Directly download the complete print-ready PDF containing all pages with vivid colors
     const url = job.print_pdf_url || `/api/v1/personalization/${job.id}/print-pdf?size=8x8&color=rgb`;
     const link = document.createElement("a");
