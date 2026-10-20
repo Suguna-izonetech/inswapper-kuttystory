@@ -34,8 +34,13 @@ export const HardcoverBook: React.FC<HardcoverBookProps> = ({
   onClick,
   interactive = true,
 }) => {
-  const [imgSrc, setImgSrc] = useState(coverUrl);
+  const [imgSrc, setImgSrc] = useState(coverUrl || fallbackSrc);
   const [hasError, setHasError] = useState(false);
+
+  React.useEffect(() => {
+    setImgSrc(coverUrl || fallbackSrc);
+    setHasError(false);
+  }, [coverUrl, fallbackSrc]);
 
   const handleError = () => {
     if (!hasError && fallbackSrc) {

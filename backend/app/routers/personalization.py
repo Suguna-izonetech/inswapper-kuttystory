@@ -86,7 +86,7 @@ def enrich_job_urls(job: PersonalizationJob) -> dict:
         "is_purchased": bool(getattr(job, "books", None) or getattr(job, "user_id", None) == "purchased"),
         "created_formatted": created_fmt,
         "pdf_download_url": f"/api/v1/personalization/{job.id}/pdf",
-        "print_pdf_url": f"/api/v1/personalization/{job.id}/print-pdf?size=8x8&color=cmyk",
+        "print_pdf_url": f"/api/v1/personalization/{job.id}/print-pdf?size=8x8&color=rgb",
         "assets": []
     }
     for asset in sorted(job.assets, key=lambda a: a.page_number):
@@ -281,11 +281,12 @@ def get_full_storybook_pages_for_print(
     ).order_by(StoryPage.page_number).all()
 
     # Pre-load existing generated assets (face-fused plates)
-    existing_assets = {
-        a.page_number: a
-        for a in db.query(GeneratedAsset).filter(GeneratedAsset.job_id == job.id).all()
-        if a.storage_path and os.path.exists(a.storage_path)
-    }
+    existing_assets = {}
+    for a in db.query(GeneratedAsset).filter(GeneratedAsset.job_id == job.id).all():
+        resolved_p = storage.resolve_path(a.storage_path)
+        if resolved_p and os.path.exists(resolved_p):
+            a.storage_path = resolved_p
+            existing_assets[a.page_number] = a
 
     pages_data = []
     for page in story_pages:
@@ -294,10 +295,11 @@ def get_full_storybook_pages_for_print(
 
         # 1. Resolve image: use personalized face-swapped plate if ready, else use base high-res illustration
         img_path = None
+        orig_p = storage.resolve_path(page.original_image_path)
         if page_num in existing_assets:
             img_path = existing_assets[page_num].storage_path
-        elif page.original_image_path and os.path.exists(page.original_image_path):
-            img_path = page.original_image_path
+        elif orig_p and os.path.exists(orig_p):
+            img_path = orig_p
         else:
             cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png"
             if cand.exists():
@@ -331,12 +333,12 @@ def download_full_print_pdf(
     job_id: str,
     lang: str = Query("english"),
     size: str = Query("8x8"),
-    color: str = Query("cmyk"),
+    color: str = Query("rgb"),
     db: Session = Depends(get_db)
 ):
     """
-    Generate and download the complete, print-ready CMYK PDF containing ALL pages of the actual uploaded storybook.
-    Formatted to 8x8 inches (203.2 x 203.2 mm) in DeviceCMYK color space without preview watermarks.
+    Generate and download the complete, print-ready RGB PDF containing ALL pages of the actual uploaded storybook.
+    Formatted to 8x8 inches (203.2 x 203.2 mm) in DeviceRGB color space with vibrant colors without preview watermarks.
     """
     job = db.query(PersonalizationJob).filter(PersonalizationJob.id == job_id).first()
     if not job:
@@ -385,10 +387,10 @@ def download_preview_pdf(
     lang: str = Query("english"),
     mode: str = Query("preview"),
     size: str = Query("8x8"),
-    color: str = Query("cmyk"),
+    color: str = Query("rgb"),
     db: Session = Depends(get_db)
 ):
-    # If mode is full/print/admin, generate the full 8x8 CMYK PDF with all pages!
+    # If mode is full/print/admin, generate the full 8x8 RGB PDF with all pages!
     if mode.lower() in ["full", "print", "admin"]:
         return download_full_print_pdf(job_id=job_id, lang=lang, size=size, color=color, db=db)
 
@@ -404,8 +406,9 @@ def download_preview_pdf(
     # If english and pre-composed preview PDF exists, return it
     if lang.lower() in ["english", "en"]:
         preview_book = db.query(Book).filter(Book.job_id == job.id, Book.book_type == "preview").order_by(Book.created_at.desc()).first()
-        if preview_book and preview_book.pdf_storage_path and os.path.exists(preview_book.pdf_storage_path):
-            with open(preview_book.pdf_storage_path, "rb") as f:
+        res_pdf = storage.resolve_path(preview_book.pdf_storage_path) if preview_book else None
+        if res_pdf and os.path.exists(res_pdf):
+            with open(res_pdf, "rb") as f:
                 pdf_bytes = f.read()
             return Response(
                 content=pdf_bytes,
@@ -420,7 +423,8 @@ def download_preview_pdf(
     assets = db.query(GeneratedAsset).filter(GeneratedAsset.job_id == job.id).order_by(GeneratedAsset.page_number).all()
     pages_data = []
     for a in assets:
-        if a.storage_path and os.path.exists(a.storage_path):
+        res_asset = storage.resolve_path(a.storage_path)
+        if res_asset and os.path.exists(res_asset):
             story_page = db.query(StoryPage).filter(StoryPage.id == a.story_page_id).first() if a.story_page_id else None
             text = (story_page.story_text or story_page.extracted_text) if story_page else f"Scene for {child_name}."
             for tag in ["[Name]", "[name]", "{name}", "[child_name]", "{child_name}"]:

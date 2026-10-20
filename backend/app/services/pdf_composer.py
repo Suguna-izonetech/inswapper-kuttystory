@@ -59,7 +59,7 @@ class PDFComposerService:
         child_name: str = "Little Adventurer",
         story_title: str = "Personalized Story",
         page_size: str = "8x8",
-        color_mode: str = "cmyk"
+        color_mode: str = "rgb"
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Compose a complete, deterministic square children's picture book.
@@ -69,8 +69,8 @@ class PDFComposerService:
         - "210x210", "210x210_mm": 210 x 210 mm = 595.28 x 595.28 pt
         
         Supported color_mode options:
-        - "cmyk": Standard commercial print CMYK (DeviceCMYK color space with 4-channel image separation)
-        - "rgb": Digital screen RGB preview
+        - "rgb": Vibrant high-fidelity RGB (DeviceRGB color space, matching screen preview and modern photo printing)
+        - "cmyk": Commercial print CMYK (DeviceCMYK color space with 4-channel image separation)
         """
         output_dir = settings.PREVIEWS_DIR if book_type == "preview" else settings.FINAL_BOOKS_DIR
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -105,11 +105,11 @@ class PDFComposerService:
             banner_bg = colors.CMYKColor(0.10, 0.40, 0.30, 0.05, alpha=0.85)  # Dusty rose in CMYK
             fallback_bg = colors.CMYKColor(0.01, 0.02, 0.04, 0.01)
         else:
-            card_fill = colors.HexColor("#FAF7F2", alpha=0.98)
-            card_stroke = colors.HexColor("#D4AF37", alpha=0.4)
+            card_fill = colors.Color(0.98, 0.97, 0.95, alpha=0.98)
+            card_stroke = colors.Color(0.83, 0.69, 0.22, alpha=0.40)
             text_color = colors.HexColor("#2D222A")
             page_num_color = colors.HexColor("#7A7077")
-            banner_bg = colors.HexColor("#DDA7A2", alpha=0.85)
+            banner_bg = colors.Color(0.87, 0.65, 0.64, alpha=0.85)
             fallback_bg = colors.HexColor("#FAF7F2")
 
         preflight_validation = {

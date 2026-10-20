@@ -216,7 +216,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
           if (match) {
             setGeneratingFullJob(match);
             if (match.completed_pages >= match.total_pages && (match.status === "completed" || !match.status.includes("Rendering"))) {
-              const url = match.print_pdf_url || `/api/v1/personalization/${match.id}/print-pdf?size=8x8&color=cmyk`;
+              const url = match.print_pdf_url || `/api/v1/personalization/${match.id}/print-pdf?size=8x8&color=rgb`;
               window.open(url, "_blank");
               setTimeout(() => {
                 setGeneratingFullJob(null);
@@ -640,9 +640,9 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
       return;
     }
 
-    // Print PDF (8x8 CMYK - ALL Pages):
-    // Directly download the complete print-ready PDF containing all pages
-    const url = job.print_pdf_url || `/api/v1/personalization/${job.id}/print-pdf?size=8x8&color=cmyk`;
+    // Print PDF (8x8 RGB - ALL Pages):
+    // Directly download the complete print-ready PDF containing all pages with vivid colors
+    const url = job.print_pdf_url || `/api/v1/personalization/${job.id}/print-pdf?size=8x8&color=rgb`;
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", `${(job.child_name || "Child").replace(/\s+/g, "_")}_Full_Print.pdf`);
@@ -1328,7 +1328,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                   Previews
                 </h1>
                 <p className="text-xs text-gray-500 mt-1">
-                  Every generated book session. Download the complete 8×8 CMYK print PDF with all pages, or inspect generated plates.
+                  Every generated book session. Download the complete 8×8 RGB print PDF with all pages, or inspect generated plates.
                 </p>
               </div>
 
@@ -1487,7 +1487,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                                 <button
                                   type="button"
                                   onClick={() => handleDownloadPdf(job, "print")}
-                                  title="Download complete print-ready PDF (All pages • 8×8 CMYK)"
+                                  title="Download complete print-ready PDF (All pages • 8×8 RGB)"
                                   className="px-2.5 py-1.5 rounded-lg border border-[#8B3DFF]/40 text-[#8B3DFF] hover:bg-purple-50 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
                                 >
                                   <Download className="w-3.5 h-3.5" />
@@ -3328,11 +3328,11 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                 <button
                   type="button"
                   onClick={() => handleDownloadPdf(selectedJobForPhotos, "print")}
-                  title="Download complete print-ready PDF with all pages in 8×8 CMYK"
+                  title="Download complete print-ready PDF with all pages in 8×8 RGB"
                   className="px-3.5 py-2 rounded-xl bg-[#8B3DFF] text-white hover:bg-[#7828f7] text-xs font-semibold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Print PDF (8×8 CMYK)</span>
+                  <span>Print PDF (8×8 RGB)</span>
                 </button>
                 <button
                   type="button"
@@ -3482,7 +3482,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                   </div>
 
                   <div className="flex items-center justify-between text-[11px] text-gray-400">
-                    <span>8×8 Commercial CMYK Print Engine</span>
+                    <span>8×8 Vibrant RGB Print Engine</span>
                     <span className="font-medium text-gray-600">{completed} of {total} plates ready</span>
                   </div>
                 </div>

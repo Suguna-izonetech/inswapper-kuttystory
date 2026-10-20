@@ -79,7 +79,44 @@ class StorageManager:
                 return f"{settings.API_V1_PREFIX}/storage/{category}/{filename}"
         except Exception:
             pass
+        
+        # Fallback: check if 'storage' is in the path parts in case project was moved
+        try:
+            parts = path_obj.parts
+            lower_parts = [p.lower() for p in parts]
+            if "storage" in lower_parts:
+                idx = lower_parts.index("storage")
+                subparts = parts[idx + 1:]
+                if len(subparts) >= 2:
+                    category = subparts[0]
+                    filename = "/".join(subparts[1:])
+                    return f"{settings.API_V1_PREFIX}/storage/{category}/{filename}"
+        except Exception:
+            pass
         return None
+
+    @staticmethod
+    def resolve_path(path_str: Optional[str]) -> Optional[str]:
+        """
+        Dynamically resolves an absolute file path. If the project directory moved,
+        it maps the relative path under settings.STORAGE_DIR.
+        """
+        if not path_str:
+            return None
+        if os.path.exists(path_str):
+            return path_str
+        try:
+            parts = Path(path_str).parts
+            lower_parts = [p.lower() for p in parts]
+            if "storage" in lower_parts:
+                idx = lower_parts.index("storage")
+                subpath = Path(*parts[idx + 1:])
+                cand = settings.STORAGE_DIR / subpath
+                if cand.exists():
+                    return str(cand)
+        except Exception:
+            pass
+        return path_str
 
     @staticmethod
     def get_file_path(category: str, filename: str) -> Path:
