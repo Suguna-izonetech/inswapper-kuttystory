@@ -6,7 +6,9 @@ import {
   Maximize2,
   Minimize2,
   Globe,
-  Languages
+  Languages,
+  Lock,
+  Sparkles
 } from "lucide-react";
 import { GeneratedAsset } from "@/lib/api";
 
@@ -33,6 +35,8 @@ interface RealisticBookFlipViewerProps {
   onLanguageChange?: (languageId: string) => void;
   translatedTexts?: Record<string, string>;
   isTranslating?: boolean;
+  isPaid?: boolean;
+  onUnlockStorybook?: () => void;
 }
 
 export default function RealisticBookFlipViewer({
@@ -48,6 +52,8 @@ export default function RealisticBookFlipViewer({
   onLanguageChange,
   translatedTexts = {},
   isTranslating = false,
+  isPaid = false,
+  onUnlockStorybook,
 }: RealisticBookFlipViewerProps) {
   // Animation & Playback states
   const [isFlipping, setIsFlipping] = useState(false);
@@ -572,6 +578,27 @@ export default function RealisticBookFlipViewer({
               <p className="font-editorial-serif text-base sm:text-lg text-[#2D222A] leading-relaxed italic">
                 "{getAssetNarrative(currentAsset)}"
               </p>
+            )}
+
+            {/* Teaser Lock at end of preview pages */}
+            {!isPaid && currentPageIdx === assets.length - 1 && onUnlockStorybook && (
+              <div className="mt-3 p-3.5 rounded-2xl bg-gradient-to-r from-[#FAF5FF] to-[#FAEEED] border border-[#E9D5FF] flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in duration-150">
+                <div className="flex items-center gap-2.5 text-xs text-[#2D222A]">
+                  <div className="w-7 h-7 rounded-full bg-[#8B3DFF]/15 text-[#8B3DFF] flex items-center justify-center shrink-0">
+                    <Lock className="w-3.5 h-3.5" />
+                  </div>
+                  <span>
+                    You've reached the end of the 5-page preview. Unlock all 26+ pages of <strong>{childName}</strong>'s adventure!
+                  </span>
+                </div>
+                <button
+                  onClick={onUnlockStorybook}
+                  className="w-full sm:w-auto px-4 py-1.5 rounded-full bg-[#8B3DFF] hover:bg-[#7828f7] text-white text-xs font-bold shrink-0 shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Unlock Full Storybook</span>
+                </button>
+              </div>
             )}
           </div>
         </div>

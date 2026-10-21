@@ -1,11 +1,15 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 from typing import List
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 STORAGE_BASE = BACKEND_DIR / "storage"
+
+# Ensure environment variables from .env are loaded into os.environ
+load_dotenv(BACKEND_DIR / ".env", override=True)
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Personalized AI Children's Storybook"
@@ -54,6 +58,10 @@ class Settings(BaseSettings):
     PREVIEW_PAGE_LIMIT: int = 5  # Configurable number of pages to generate during initial preview
     MAX_GENERATION_RETRIES: int = 3
     PAID_FALLBACK_ENABLED: bool = False
+
+    # Razorpay Payment Gateway
+    RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID", "")
+    RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET", "")
     
     # Print specifications
     PRINT_TRIM_WIDTH_MM: float = 210.0
