@@ -1,6 +1,7 @@
 import os
 import uuid
 import json
+import tempfile
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 from PIL import Image
@@ -72,9 +73,9 @@ class PDFComposerService:
         - "rgb": Vibrant high-fidelity RGB (DeviceRGB color space, matching screen preview and modern photo printing)
         - "cmyk": Commercial print CMYK (DeviceCMYK color space with 4-channel image separation)
         """
-        output_dir = settings.PREVIEWS_DIR if book_type == "preview" else settings.FINAL_BOOKS_DIR
-        output_dir.mkdir(parents=True, exist_ok=True)
-        pdf_path = output_dir / output_filename
+        temp_output_dir = Path(tempfile.gettempdir()) / "kuttystory_cache" / ("previews" if book_type == "preview" else "final_books")
+        temp_output_dir.mkdir(parents=True, exist_ok=True)
+        pdf_path = temp_output_dir / output_filename
 
         # 1. Resolve Page Geometry (8x8 inches = 203.2 x 203.2 mm = 576 x 576 pt)
         normalized_size = str(page_size).lower().strip().replace(" ", "")
@@ -124,8 +125,8 @@ class PDFComposerService:
             "validation_passed": True
         }
 
-        # Cache folder for CMYK converted images
-        cmyk_cache_dir = settings.STORAGE_DIR / "cache_cmyk"
+        # Cache folder for CMYK converted images in temp directory
+        cmyk_cache_dir = Path(tempfile.gettempdir()) / "kuttystory_cache" / "cache_cmyk"
         if is_cmyk:
             cmyk_cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -195,6 +196,11 @@ class PDFComposerService:
         c.save()
         category = "previews" if book_type == "preview" else "final_books"
         object_key = storage.save_file(pdf_path, category=category, object_name=output_filename)
+        try:
+            if pdf_path.exists():
+                pdf_path.unlink()
+        except Exception:
+            pass
         return object_key, preflight_validation
 
 

@@ -239,7 +239,16 @@ class PDFImporterService:
                 nparr = np.frombuffer(img_source, np.uint8)
                 img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             else:
-                img_bgr = cv2.imread(str(img_source))
+                src_str = str(img_source)
+                if os.path.exists(src_str):
+                    img_bgr = cv2.imread(src_str)
+                else:
+                    try:
+                        raw_b = storage.get_bytes(src_str)
+                        nparr = np.frombuffer(raw_b, np.uint8)
+                        img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                    except Exception:
+                        img_bgr = None
             if img_bgr is None:
                 return ""
             h, w = img_bgr.shape[:2]

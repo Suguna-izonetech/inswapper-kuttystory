@@ -91,11 +91,7 @@ class JobRunner:
                             height=1024
                         )
                     else:
-                        page_img = page.original_image_path
-                        if not page_img or not os.path.exists(page_img):
-                            cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page.page_number:02d}.png"
-                            if cand.exists():
-                                page_img = str(cand)
+                        page_img = page.original_image_path or f"source_pages/{story_slug}/page_{page.page_number:02d}.png"
                         gen_res = cartoon_fusion_engine.fuse_page(
                             page_number=page.page_number,
                             child_reference_path=norm_ref,

@@ -10,7 +10,7 @@ from sqlalchemy import or_
 from app.database import get_db
 from app.models import Feedback
 from app.schemas import FeedbackOut, FeedbackStatusUpdate, FeedbackUpdate
-from app.services.storage import StorageManager
+from app.services.storage import storage
 
 router = APIRouter(tags=["Feedback"])
 
@@ -67,13 +67,12 @@ async def submit_feedback(
         media_type = "video" if suffix in (".mp4", ".webm", ".mov") else "image"
 
         try:
-            stored_path = await StorageManager.save_upload_file(
+            stored_path = await storage.save_upload_file(
                 upload_file=file,
                 category="feedback_media",
                 allowed_extensions=ALLOWED_MEDIA_EXTENSIONS
             )
-            file_name = Path(stored_path).name
-            saved_media_url = f"/api/v1/storage/feedback_media/{file_name}"
+            saved_media_url = storage.get_public_url(stored_path)
         except HTTPException:
             raise
         except Exception as e:

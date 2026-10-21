@@ -82,7 +82,7 @@ class StorageManager:
             print(f"[MinIO] Notice during client initialization ({endpoint}): {e}")
 
     def _ensure_bucket(self):
-        """Ensure the MinIO bucket exists; create it if missing."""
+        """Ensure the MinIO bucket exists; create it and configure public read policy if missing."""
         if self._bucket_initialized:
             return
         if self._client is None:
@@ -93,6 +93,25 @@ class StorageManager:
                 print(f"[MinIO] Bucket '{self.bucket}' created successfully.")
             else:
                 print(f"[MinIO] Bucket '{self.bucket}' verified.")
+
+            # Ensure bucket has public-read policy so images can be fetched directly from MinIO
+            try:
+                import json
+                policy = {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {"AWS": ["*"]},
+                            "Action": ["s3:GetObject"],
+                            "Resource": [f"arn:aws:s3:::{self.bucket}/*"]
+                        }
+                    ]
+                }
+                self._client.set_bucket_policy(self.bucket, json.dumps(policy))
+            except Exception as pe:
+                print(f"[MinIO] Notice configuring bucket policy: {pe}")
+
             self._bucket_initialized = True
         except Exception as e:
             print(f"[MinIO] Notice while checking bucket '{self.bucket}': {e}")
@@ -234,28 +253,25 @@ class StorageManager:
         object_key = self._normalize_object_key(category, filename)
         self._ensure_bucket()
 
-        # Check MinIO existence
         try:
             stat = self.client.stat_object(self.bucket, object_key)
             obj = self.client.get_object(self.bucket, object_key)
             return obj, stat.content_type or self._get_content_type(object_key), stat.size
-        except Exception:
-            pass
-
-        # Backwards compatibility check: if file exists on disk in legacy storage folder,
-        # upload it to MinIO automatically on the fly and stream it!
-        cand_path = self._find_legacy_file(category, filename)
-        if cand_path and cand_path.exists():
-            self.save_file(cand_path, category=category, object_name=filename)
-            stat = self.client.stat_object(self.bucket, object_key)
-            obj = self.client.get_object(self.bucket, object_key)
-            return obj, stat.content_type or self._get_content_type(object_key), stat.size
-
-        raise HTTPException(status_code=404, detail=f"File '{object_key}' not found in MinIO storage")
+        except Exception as e:
+            # If not in MinIO, check if we need to sync from sample-assets or local storage
+            cand_path = self._find_legacy_file(category, filename)
+            if cand_path and cand_path.exists():
+                self.save_file(cand_path, category=category, object_name=filename)
+                stat = self.client.stat_object(self.bucket, object_key)
+                obj = self.client.get_object(self.bucket, object_key)
+                return obj, stat.content_type or self._get_content_type(object_key), stat.size
+            raise HTTPException(status_code=404, detail=f"File '{object_key}' not found in MinIO storage: {e}")
 
     def get_bytes(self, object_key_or_path: str) -> bytes:
-        """Fetch raw bytes of an object from MinIO."""
+        """Fetch raw bytes of an object directly from MinIO."""
         category, filename = self._parse_category_and_filename(object_key_or_path)
+        if not category or not filename:
+            raise HTTPException(status_code=404, detail=f"Invalid storage path or key: {object_key_or_path}")
         stream, _, _ = self.get_object_stream(category, filename)
         try:
             return stream.read()
@@ -266,7 +282,7 @@ class StorageManager:
     def get_file_path(self, category: str, filename: str) -> Path:
         """
         For operations where libraries require a local filesystem Path (e.g. ReportLab or OpenCV),
-        fetches the object from MinIO and caches it in a temporary directory.
+        fetches the object from MinIO and caches it in a temporary cache directory.
         Returns the local Path.
         """
         object_key = self._normalize_object_key(category, filename)
@@ -274,16 +290,17 @@ class StorageManager:
         cache_dest.parent.mkdir(parents=True, exist_ok=True)
 
         if not cache_dest.exists() or cache_dest.stat().st_size == 0:
+            self._ensure_bucket()
             try:
-                self._ensure_bucket()
                 self.client.fget_object(self.bucket, object_key, str(cache_dest))
-            except Exception:
-                # Check legacy disk fallback
+            except Exception as e:
+                # One-time sync from local if object was missing in MinIO
                 legacy = self._find_legacy_file(category, filename)
                 if legacy and legacy.exists():
                     self.save_file(legacy, category=category, object_name=filename)
-                    return legacy
-                raise HTTPException(status_code=404, detail=f"File '{object_key}' not found in storage")
+                    self.client.fget_object(self.bucket, object_key, str(cache_dest))
+                else:
+                    raise HTTPException(status_code=404, detail=f"File '{object_key}' not found in MinIO storage: {e}")
 
         return cache_dest
 
@@ -314,8 +331,7 @@ class StorageManager:
     def get_public_url(self, abs_path_or_key: Optional[str]) -> Optional[str]:
         """
         Generate public web-accessible URL for an asset.
-        Directs through backend streaming endpoint `/api/v1/storage/{category}/{filename}`
-        or through `MINIO_PUBLIC_URL` if configured.
+        Directs through MINIO_PUBLIC_URL if configured, or through backend streaming endpoint.
         """
         if not abs_path_or_key:
             return None
@@ -323,6 +339,7 @@ class StorageManager:
             abs_path_or_key.startswith("http://")
             or abs_path_or_key.startswith("https://")
             or abs_path_or_key.startswith("data:")
+            or abs_path_or_key.startswith("blob:")
         ):
             return abs_path_or_key
 
@@ -338,14 +355,21 @@ class StorageManager:
 
     def resolve_path(self, path_str: Optional[str]) -> Optional[str]:
         """
-        Resolves a path or MinIO key to a local file path (downloading to temp cache if needed)
-        so that libraries requiring local files can access it.
+        Resolves a MinIO object key or legacy path to a local temporary cached file path.
+        MinIO is strictly the source of truth for all storage.
         """
         if not path_str:
             return None
-        if os.path.exists(path_str):
-            return path_str
 
+        # If already a cached file, return it
+        try:
+            p_obj = Path(path_str)
+            if str(self._temp_cache_dir) in str(p_obj) and p_obj.exists() and p_obj.stat().st_size > 0:
+                return str(p_obj)
+        except Exception:
+            pass
+
+        # Try resolving from MinIO by category/filename
         category, filename = self._parse_category_and_filename(path_str)
         if category and filename:
             try:
@@ -353,6 +377,11 @@ class StorageManager:
                 return str(local_path)
             except Exception:
                 pass
+
+        # If outside of legacy storage (e.g. system font or temporary file), return as is if exists
+        if os.path.exists(path_str) and "storage" not in str(path_str).lower():
+            return path_str
+
         return path_str
 
     def _parse_category_and_filename(self, path_or_key: str) -> Tuple[Optional[str], Optional[str]]:
@@ -373,13 +402,12 @@ class StorageManager:
         return None, None
 
     def _find_legacy_file(self, category: str, filename: str) -> Optional[Path]:
-        """Check if file exists in legacy storage directory on disk."""
+        """Check if file exists in legacy storage directory on disk or sample-assets."""
         legacy_dir = settings.STORAGE_DIR / category
         cand = (legacy_dir / filename).resolve()
         if cand.exists():
             return cand
 
-        # Also check sample-assets
         sample_assets = settings.STORAGE_DIR.parent.parent / "sample-assets"
         sample_cand = sample_assets / filename
         if sample_cand.exists():
@@ -421,6 +449,73 @@ class StorageManager:
 
         if synced > 0:
             print(f"[MinIO] Successfully synced {synced} legacy files into MinIO bucket '{self.bucket}'.")
+
+    def migrate_database_to_minio_keys(self, db):
+        """
+        Normalize all database image/file paths to clean MinIO object keys (e.g. 'source_pages/...').
+        Eliminates all local file paths from the database.
+        """
+        try:
+            from app.models import StoryTemplate, StoryPage, GeneratedAsset, ChildProfile, PersonalizationJob, Book
+
+            def normalize_to_key(val: Optional[str]) -> Optional[str]:
+                if not val:
+                    return val
+                cat, fn = self._parse_category_and_filename(val)
+                if cat and fn:
+                    return f"{cat}/{fn}"
+                return val
+
+            updated = 0
+            # 1. StoryTemplate
+            for story in db.query(StoryTemplate).all():
+                new_cover = normalize_to_key(story.cover_image_path)
+                new_pdf = normalize_to_key(story.source_pdf_path)
+                if new_cover != story.cover_image_path or new_pdf != story.source_pdf_path:
+                    story.cover_image_path = new_cover
+                    story.source_pdf_path = new_pdf
+                    updated += 1
+
+            # 2. StoryPage
+            for page in db.query(StoryPage).all():
+                new_img = normalize_to_key(page.original_image_path)
+                if new_img != page.original_image_path:
+                    page.original_image_path = new_img
+                    updated += 1
+
+            # 3. GeneratedAsset
+            for asset in db.query(GeneratedAsset).all():
+                new_storage = normalize_to_key(asset.storage_path)
+                if new_storage != asset.storage_path:
+                    asset.storage_path = new_storage
+                    updated += 1
+
+            # 4. ChildProfile
+            for cp in db.query(ChildProfile).all():
+                new_photo = normalize_to_key(cp.photo_storage_path)
+                if new_photo != cp.photo_storage_path:
+                    cp.photo_storage_path = new_photo
+                    updated += 1
+
+            # 5. PersonalizationJob
+            for job in db.query(PersonalizationJob).all():
+                new_photo = normalize_to_key(job.photo_path)
+                if new_photo != job.photo_path:
+                    job.photo_path = new_photo
+                    updated += 1
+
+            # 6. Book
+            for book in db.query(Book).all():
+                new_pdf = normalize_to_key(book.pdf_storage_path)
+                if new_pdf != book.pdf_storage_path:
+                    book.pdf_storage_path = new_pdf
+                    updated += 1
+
+            if updated > 0:
+                db.commit()
+                print(f"[MinIO] Normalized {updated} database records to pure MinIO object keys.")
+        except Exception as e:
+            print(f"[MinIO] Notice during database key migration: {e}")
 
 
 storage = StorageManager()

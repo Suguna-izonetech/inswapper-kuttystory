@@ -2,6 +2,7 @@ import os
 import time
 import io
 import json
+import tempfile
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List
 from PIL import Image, ImageEnhance, ImageFilter, ImageDraw, ImageOps
@@ -11,6 +12,7 @@ import numpy as np
 
 from app.config import settings
 from app.services.ai.base import GenerationResult
+from app.services.storage import storage
 
 class CartoonCharacterFusionEngine:
     """
@@ -227,40 +229,40 @@ class CartoonCharacterFusionEngine:
 
         # Locate base page image
         page_file = None
-        if page_image_path and os.path.exists(page_image_path):
-            page_file = Path(page_image_path)
-        else:
-            source_dir = settings.SOURCE_PAGES_DIR / story_slug
-            candidates = [
-                source_dir / f"page_{page_number:02d}.png",
-                source_dir / f"page_{page_number}.png",
-                source_dir / f"page_{page_number:02d}.jpg",
-                source_dir / f"page_{page_number}.jpg",
-            ]
-            for c in candidates:
-                if c.exists():
-                    page_file = c
-                    break
+        # 1. Load authentic page illustration bytes from MinIO or disk cache
+        page_bytes = None
+        if page_image_path and os.path.exists(str(page_image_path)):
+            with open(str(page_image_path), "rb") as f:
+                page_bytes = f.read()
+        elif page_image_path:
+            try:
+                page_bytes = storage.get_bytes(str(page_image_path))
+            except Exception:
+                resolved = storage.resolve_path(str(page_image_path))
+                if resolved and os.path.exists(resolved):
+                    with open(resolved, "rb") as f:
+                        page_bytes = f.read()
 
-            if not page_file or not page_file.exists():
-                all_pages = sorted(list(source_dir.glob("page_*.png")) + list(source_dir.glob("page_*.jpg")))
-                if all_pages:
-                    idx = min(page_number - 1, len(all_pages) - 1)
-                    page_file = all_pages[max(0, idx)]
-                else:
-                    # Check other subdirectories matching the slug
-                    matching_dirs = [d for d in settings.SOURCE_PAGES_DIR.iterdir() if d.is_dir() and (story_slug in d.name or d.name in story_slug)]
-                    if matching_dirs:
-                        m_pages = sorted(list(matching_dirs[0].glob("page_*.png")) + list(matching_dirs[0].glob("page_*.jpg")))
-                        if m_pages:
-                            page_file = m_pages[min(page_number - 1, len(m_pages) - 1)]
+        if not page_bytes:
+            # Query MinIO storage directly for candidate page object keys
+            for cand_key in [
+                f"source_pages/{story_slug}/page_{page_number:02d}.png",
+                f"source_pages/{story_slug}/page_{page_number}.png",
+                f"source_pages/{story_slug}/page_{page_number:02d}.jpg",
+                f"source_pages/unicorn-story/page_{page_number:02d}.png",
+                f"source_pages/unicorn-story/page_01.png",
+            ]:
+                try:
+                    page_bytes = storage.get_bytes(cand_key)
+                    if page_bytes:
+                        break
+                except Exception:
+                    continue
 
-                    if not page_file or not page_file.exists():
-                        page_file = settings.SOURCE_PAGES_DIR / "unicorn-story" / f"page_{page_number:02d}.png"
-                        if not page_file.exists():
-                            page_file = settings.SOURCE_PAGES_DIR / "unicorn-story" / "page_01.png"
+        if not page_bytes:
+            raise FileNotFoundError(f"Could not load storybook page image for '{story_slug}' page {page_number} from MinIO storage.")
 
-        base_page = Image.open(str(page_file)).convert("RGB")
+        base_page = Image.open(io.BytesIO(page_bytes)).convert("RGB")
         base_w, base_h = base_page.size
 
         # Resolve anchor from face outline points or dynamic detection
@@ -316,7 +318,12 @@ class CartoonCharacterFusionEngine:
         model_name = "face-swap-pro-enhanced"
         swapped_with_ai = False
 
-        if child_reference_path and os.path.exists(child_reference_path):
+        # Resolve child reference path if stored in MinIO
+        resolved_child_ref = child_reference_path
+        if child_reference_path and not os.path.exists(child_reference_path):
+            resolved_child_ref = storage.resolve_path(child_reference_path)
+
+        if resolved_child_ref and os.path.exists(resolved_child_ref):
             if not prefer_local:
                 # 1. Tier 1: State-of-the-art Neural Face Swap with Face Restoration (ovi054/face-swap-pro)
                 primary_space = getattr(settings, "HF_FACE_SWAP_SPACE", "ovi054/face-swap-pro")
@@ -326,10 +333,12 @@ class CartoonCharacterFusionEngine:
                     from gradio_client import handle_file
                     client = cls._get_hf_client(primary_space)
                     if client:
-                        src = handle_file(child_reference_path)
+                        src = handle_file(resolved_child_ref)
                         
-                        # Prepare lightweight upload version to avoid HF upload timeouts
-                        temp_dest = settings.STORAGE_DIR / f"temp_upload_{story_slug}_p{page_number:02d}_{os.getpid()}_{int(time.time())}.jpg"
+                        # Prepare lightweight upload version in temp directory
+                        temp_dir = Path(tempfile.gettempdir()) / "kuttystory_cache" / "hf_upload"
+                        temp_dir.mkdir(parents=True, exist_ok=True)
+                        temp_dest = temp_dir / f"temp_{story_slug}_p{page_number:02d}_{os.getpid()}_{int(time.time())}.jpg"
                         base_page.save(str(temp_dest), format="JPEG", quality=92)
                         try:
                             dest = handle_file(str(temp_dest))
@@ -361,8 +370,10 @@ class CartoonCharacterFusionEngine:
                         from gradio_client import handle_file
                         secondary_client = cls._get_hf_client("tonyassi/face-swap")
                         if secondary_client:
-                            src = handle_file(child_reference_path)
-                            temp_dest = settings.STORAGE_DIR / f"temp_sec_{story_slug}_p{page_number:02d}_{os.getpid()}_{int(time.time())}.jpg"
+                            src = handle_file(resolved_child_ref)
+                            temp_dir = Path(tempfile.gettempdir()) / "kuttystory_cache" / "hf_upload"
+                            temp_dir.mkdir(parents=True, exist_ok=True)
+                            temp_dest = temp_dir / f"temp_sec_{story_slug}_p{page_number:02d}_{os.getpid()}_{int(time.time())}.jpg"
                             base_page.save(str(temp_dest), format="JPEG", quality=92)
                             try:
                                 dest = handle_file(str(temp_dest))

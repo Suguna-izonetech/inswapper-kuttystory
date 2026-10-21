@@ -295,21 +295,14 @@ def get_full_storybook_pages_for_print(
         page_num = page.page_number
         page_type = page.page_type or ("cover" if page_num == 1 else "story")
 
-        # 1. Resolve image: use personalized face-swapped plate if ready, else use base high-res illustration
+        # 1. Resolve image: use personalized face-swapped plate if ready, else use base illustration from MinIO
         img_path = None
-        orig_p = storage.resolve_path(page.original_image_path)
         if page_num in existing_assets:
             img_path = existing_assets[page_num].storage_path
-        elif orig_p and os.path.exists(orig_p):
-            img_path = orig_p
+        elif page.original_image_path:
+            img_path = page.original_image_path
         else:
-            cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png"
-            if cand.exists():
-                img_path = str(cand)
-
-        # Skip any invalid or non-existent pages (ensures exact clean pages)
-        if not img_path or not os.path.exists(img_path):
-            continue
+            img_path = f"source_pages/{story_slug}/page_{page_num:02d}.png"
 
         # 2. Personalize narrative text
         raw_text = page.story_text or page.extracted_text or f"Scene for page {page_num}."
@@ -423,20 +416,21 @@ def download_preview_pdf(
     child_name = job.child_name or "Little Explorer"
     story_title = story.title if story else "Personalized Story"
 
-    # If english and pre-composed preview PDF exists, return it
+    # If english and pre-composed preview PDF exists in MinIO, return it
     if lang.lower() in ["english", "en"]:
         preview_book = db.query(Book).filter(Book.job_id == job.id, Book.book_type == "preview").order_by(Book.created_at.desc()).first()
-        res_pdf = storage.resolve_path(preview_book.pdf_storage_path) if preview_book else None
-        if res_pdf and os.path.exists(res_pdf):
-            with open(res_pdf, "rb") as f:
-                pdf_bytes = f.read()
-            return Response(
-                content=pdf_bytes,
-                media_type="application/pdf",
-                headers={
-                    "Content-Disposition": f'inline; filename="{child_name}_{story_title}_preview.pdf"'
-                }
-            )
+        if preview_book and preview_book.pdf_storage_path:
+            try:
+                pdf_bytes = storage.get_bytes(preview_book.pdf_storage_path)
+                return Response(
+                    content=pdf_bytes,
+                    media_type="application/pdf",
+                    headers={
+                        "Content-Disposition": f'inline; filename="{child_name}_{story_title}_preview.pdf"'
+                    }
+                )
+            except Exception as e:
+                print(f"[MinIO] Notice fetching preview PDF: {e}")
 
     # Check if generated assets exist and compose via PDFComposerService
     from app.services.pdf_composer import PDFComposerService
@@ -556,12 +550,7 @@ async def test_render_book(
     if not story:
         raise HTTPException(status_code=404, detail="Story not found")
 
-    sample_child_photo = settings.STORAGE_DIR / "child_photos" / "default_child_sample.jpg"
-    if not sample_child_photo.exists():
-        # Copy or create sample child photo if needed
-        pass
-
-    photo_path = str(sample_child_photo)
+    photo_path = "child_photos/default_child_sample.jpg"
     if photo and photo.filename:
         photo_path = await storage.save_upload_file(photo, category="child_photos")
 

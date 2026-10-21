@@ -1,9 +1,12 @@
+import io
 import os
+import tempfile
 from pathlib import Path
 from typing import Optional
 from PIL import Image, ImageOps, ImageDraw, ImageFilter
 
 from app.config import settings
+from app.services.storage import storage
 
 class CharacterConsistencyEngine:
     """
@@ -18,12 +21,30 @@ class CharacterConsistencyEngine:
         - Crop to square face/bust focus
         - Resize to 512x512
         - Normalize RGB colors
+        Fetches image directly from MinIO if not locally cached,
+        and saves output in temp processing cache without touching local storage folder.
         """
-        if not os.path.exists(image_path):
-            raise FileNotFoundError(f"Reference image not found: {image_path}")
+        img_bytes = None
+        if os.path.exists(image_path):
+            with open(image_path, "rb") as f:
+                img_bytes = f.read()
+        else:
+            try:
+                img_bytes = storage.get_bytes(image_path)
+            except Exception:
+                resolved = storage.resolve_path(image_path)
+                if resolved and os.path.exists(resolved):
+                    with open(resolved, "rb") as f:
+                        img_bytes = f.read()
+                else:
+                    raise FileNotFoundError(f"Reference image not found in MinIO storage or local cache: {image_path}")
 
-        dest = output_path or str(settings.CHILD_PHOTOS_DIR / f"norm_{Path(image_path).name}")
-        with Image.open(image_path) as img:
+        temp_cache_dir = Path(tempfile.gettempdir()) / "kuttystory_cache" / "normalized"
+        temp_cache_dir.mkdir(parents=True, exist_ok=True)
+        filename = Path(image_path).name
+        dest = output_path or str(temp_cache_dir / f"norm_{filename}")
+
+        with Image.open(io.BytesIO(img_bytes)) as img:
             img = ImageOps.exif_transpose(img)
             img = img.convert("RGB")
             

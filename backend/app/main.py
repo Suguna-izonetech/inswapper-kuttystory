@@ -25,11 +25,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Notice during startup schema migration check: {e}")
     
-    # 2. MinIO storage sync: Ensure bucket and sync any existing assets
+    # 2. MinIO storage sync & DB path normalization
     try:
-        storage.sync_local_to_minio()
+        from app.services.storage import storage as storage_mgr
+        storage_mgr.sync_local_to_minio()
+        db_mig = SessionLocal()
+        try:
+            storage_mgr.migrate_database_to_minio_keys(db_mig)
+        finally:
+            db_mig.close()
     except Exception as e:
-        print(f"Notice during MinIO storage sync: {e}")
+        print(f"Notice during MinIO storage initialization: {e}")
 
     # 3. Idempotent import of the Unicorn Story PDF from sample-assets
     sample_pdf = settings.STORAGE_DIR.parent.parent / "sample-assets" / "unicorn Story.pdf"
@@ -104,6 +110,7 @@ app.include_router(books.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(ai_admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(storage.router, prefix=settings.API_V1_PREFIX)
+app.include_router(storage.router, prefix="")  # Expose /storage/{category}/{filename} for direct compatibility
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(child_stories.router, prefix=settings.API_V1_PREFIX)
 app.include_router(feedbacks.router, prefix=settings.API_V1_PREFIX)
@@ -115,7 +122,9 @@ def health_check():
         "status": "healthy",
         "service": settings.PROJECT_NAME,
         "database": "connected",
-        "storage": str(settings.STORAGE_DIR)
+        "storage": "minio",
+        "minio_endpoint": settings.MINIO_ENDPOINT,
+        "minio_bucket": settings.MINIO_BUCKET
     }
 
 @app.get("/admin_dashboard")

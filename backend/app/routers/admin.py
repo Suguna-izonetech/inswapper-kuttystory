@@ -398,7 +398,7 @@ def auto_trace_page(page_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Story page not found")
 
     detected_pts = ""
-    if page.original_image_path and os.path.exists(page.original_image_path):
+    if page.original_image_path:
         detected_pts = PDFImporterService.detect_page_character_face(page.original_image_path)
 
     if not detected_pts:
@@ -430,7 +430,7 @@ def auto_trace_all_pages(story_id: str, db: Session = Depends(get_db)):
     for p in pages:
         if not p.face_outline_points or p.face_outline_points in ["", "[]"]:
             detected_pts = ""
-            if p.original_image_path and os.path.exists(p.original_image_path):
+            if p.original_image_path:
                 detected_pts = PDFImporterService.detect_page_character_face(p.original_image_path)
             p.face_outline_points = detected_pts or default_pts
             count += 1
