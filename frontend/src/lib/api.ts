@@ -640,7 +640,92 @@ export const api = {
     if (!res.ok) throw new Error("Failed to delete story");
     return res.json();
   },
+
+  // Customer Feedback Methods
+  async submitFeedback(payload: SubmitFeedbackPayload): Promise<FeedbackItem> {
+    const formData = new FormData();
+    formData.append("name", payload.name);
+    formData.append("place", payload.place);
+    formData.append("rating", payload.rating.toString());
+    if (payload.review_text !== undefined && payload.review_text !== null) {
+      formData.append("review_text", payload.review_text);
+    }
+    if (payload.file) {
+      formData.append("file", payload.file);
+    }
+
+    const res = await fetch(`${API_BASE}/feedbacks`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to submit feedback");
+    }
+    return res.json();
+  },
+
+  async getApprovedFeedbacks(): Promise<FeedbackItem[]> {
+    const res = await fetch(`${API_BASE}/feedbacks/approved`);
+    if (!res.ok) throw new Error("Failed to fetch approved feedbacks");
+    return res.json();
+  },
+
+  async getAdminFeedbacks(status?: string, search?: string): Promise<FeedbackItem[]> {
+    const params = new URLSearchParams();
+    if (status && status !== "all") params.append("status", status);
+    if (search && search.trim()) params.append("search", search.trim());
+    const token = authService.getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/admin/feedbacks?${params.toString()}`, { headers });
+    if (!res.ok) throw new Error("Failed to fetch admin feedbacks");
+    return res.json();
+  },
+
+  async updateFeedbackStatus(feedbackId: string, status: "pending" | "approved" | "rejected"): Promise<FeedbackItem> {
+    const token = authService.getToken();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/admin/feedbacks/${feedbackId}/status`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error("Failed to update feedback status");
+    return res.json();
+  },
+
+  async editFeedback(feedbackId: string, updates: Partial<FeedbackItem>): Promise<FeedbackItem> {
+    const token = authService.getToken();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/admin/feedbacks/${feedbackId}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error("Failed to edit feedback");
+    return res.json();
+  },
+
+  async deleteFeedback(feedbackId: string): Promise<{ status: string; message: string }> {
+    const token = authService.getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/admin/feedbacks/${feedbackId}`, {
+      method: "DELETE",
+      headers,
+    });
+    if (!res.ok) throw new Error("Failed to delete feedback");
+    return res.json();
+  },
 };
+
 
 export interface ChildStory {
   id: string;
@@ -668,6 +753,28 @@ export interface SubmitChildStoryPayload {
   cover_color?: string;
   parent_email?: string;
 }
+
+export interface FeedbackItem {
+  id: string;
+  name: string;
+  place: string;
+  rating: number;
+  review_text?: string;
+  media_url?: string;
+  media_type?: "image" | "video";
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubmitFeedbackPayload {
+  name: string;
+  place: string;
+  rating: number;
+  review_text?: string;
+  file?: File | null;
+}
+
 
 export interface UserProfile {
   id: string;

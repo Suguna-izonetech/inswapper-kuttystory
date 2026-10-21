@@ -239,3 +239,19 @@ class ChildWrittenStory(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
+
+class Feedback(Base):
+    __tablename__ = "feedbacks"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    name = Column(String(100), nullable=False)
+    place = Column(String(100), nullable=False)
+    rating = Column(Integer, nullable=False, default=5)  # 1 to 5 stars
+    review_text = Column(Text, nullable=True, default="")
+    media_url = Column(String(500), nullable=True)  # File path or URL
+    media_type = Column(String(20), nullable=True)  # "image" or "video"
+    status = Column(String(30), default="pending")  # "pending", "approved", "rejected"
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+

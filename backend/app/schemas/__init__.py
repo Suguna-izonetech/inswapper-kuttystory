@@ -327,3 +327,38 @@ class DashboardStatsOut(BaseModel):
     live_stories: int
     recent_orders: List[OrderOut]
     status_counts: Dict[str, int]
+
+
+
+# Customer Feedback Schemas
+class FeedbackCreate(BaseModel):
+    name: str
+    place: str
+    rating: int = 5
+    review_text: Optional[str] = None
+
+class FeedbackUpdate(BaseModel):
+    name: Optional[str] = None
+    place: Optional[str] = None
+    rating: Optional[int] = None
+    review_text: Optional[str] = None
+    status: Optional[str] = None
+
+class FeedbackStatusUpdate(BaseModel):
+    status: str  # "approved", "rejected", "pending"
+
+class FeedbackOut(BaseModel):
+    id: str
+    name: str
+    place: str
+    rating: int
+    review_text: Optional[str] = None
+    media_url: Optional[str] = None
+    media_type: Optional[str] = None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+

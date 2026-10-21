@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { Sparkles, ShieldCheck, Menu, X, ArrowRight } from "lucide-react";
+import FooterFeedbackForm from "./FooterFeedbackForm";
+
 
 export default function Layout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -188,7 +190,13 @@ export default function Layout() {
                 ReportLab 8×8 mm Print Ready Engine • ISO 19005 Compliance
               </div>
             </div>
+
+            {/* Column 4: Share Feedback Form */}
+            <div>
+              <FooterFeedbackForm />
+            </div>
           </div>
+
 
           <div className="mt-12 pt-6 border-t border-[#EBE3D9] flex flex-col sm:flex-row items-center justify-between text-xs text-[#695B64]">
             <div>© 2026 KuttyStory Atelier. All rights reserved.</div>

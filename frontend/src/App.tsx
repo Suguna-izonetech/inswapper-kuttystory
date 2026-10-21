@@ -27,6 +27,8 @@ export default function App() {
         <Route path="/admin/orders" element={<AdminDashboardPage initialTab="orders" />} />
         <Route path="/admin/previews" element={<AdminDashboardPage initialTab="previews" />} />
         <Route path="/admin/page_editor" element={<AdminDashboardPage initialTab="page_editor" />} />
+        <Route path="/admin/feedback" element={<AdminDashboardPage initialTab="feedback" />} />
+        <Route path="/admin/feedbacks" element={<AdminDashboardPage initialTab="feedback" />} />
         <Route path="/admin/settings" element={<AdminDashboardPage initialTab="settings" />} />
 
         {/* Customer storefront with header & footer layout */}

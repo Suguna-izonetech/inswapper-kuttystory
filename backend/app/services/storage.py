@@ -22,8 +22,10 @@ class StorageManager:
             "generated_assets": settings.GENERATED_ASSETS_DIR,
             "previews": settings.PREVIEWS_DIR,
             "final_books": settings.FINAL_BOOKS_DIR,
+            "feedback_media": settings.STORAGE_DIR / "feedback_media",
         }
         if category not in categories:
+
             raise ValueError(f"Invalid storage category: {category}")
         target_dir = categories[category]
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -39,11 +41,12 @@ class StorageManager:
         file_id = f"{uuid.uuid4().hex}{ext}"
         destination = target_dir / file_id
         
+        upload_file.file.seek(0)
         with open(destination, "wb") as buffer:
             shutil.copyfileobj(upload_file.file, buffer)
             
         # If it's an image, validate integrity with PIL
-        if ext in (".png", ".jpg", ".jpeg"):
+        if ext in (".png", ".jpg", ".jpeg", ".webp"):
             try:
                 with Image.open(destination) as img:
                     img.verify()

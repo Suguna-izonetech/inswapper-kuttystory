@@ -37,7 +37,10 @@ import {
   Heart,
   MapPin,
   GraduationCap,
-  Star
+  Star,
+  MessageSquareHeart,
+  Video,
+  Pencil
 } from "lucide-react";
 import {
   api,
@@ -50,9 +53,10 @@ import {
   AISettings,
   PersonalizationJob,
   ChildStory,
+  FeedbackItem,
 } from "@/lib/api";
 
-type TabType = "dashboard" | "orders" | "previews" | "stories" | "page_editor" | "settings" | "child_stories";
+type TabType = "dashboard" | "orders" | "previews" | "stories" | "page_editor" | "settings" | "child_stories" | "feedback";
 
 export default function AdminDashboardPage({ initialTab }: { initialTab?: TabType }) {
   const navigate = useNavigate();
@@ -62,6 +66,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
   const getInitialTab = (): TabType => {
     if (initialTab) return initialTab;
     const path = window.location.pathname.toLowerCase();
+    if (path.includes("/feedback")) return "feedback";
     if (path.includes("/child_stories") || path.includes("/child-stories")) return "child_stories";
     if (path.includes("/stories")) return "stories";
     if (path.includes("/orders")) return "orders";
@@ -241,6 +246,137 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
     }
   };
 
+  // Customer Feedback Management Data
+  const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
+  const [feedbackFilter, setFeedbackFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [feedbackSearch, setFeedbackSearch] = useState("");
+  const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
+  const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
+  const [editingFeedback, setEditingFeedback] = useState<FeedbackItem | null>(null);
+  const [viewingMedia, setViewingMedia] = useState<{ url: string; type?: string; author: string } | null>(null);
+  const [editFeedbackForm, setEditFeedbackForm] = useState({ name: "", place: "", rating: 5, review_text: "" });
+  const [savingFeedbackEdit, setSavingFeedbackEdit] = useState(false);
+
+  const fetchAdminFeedbacks = async (statusOverride?: "all" | "pending" | "approved" | "rejected") => {
+    setLoadingFeedbacks(true);
+    try {
+      const st = statusOverride !== undefined ? statusOverride : feedbackFilter;
+      const data = await api.getAdminFeedbacks(st === "all" ? undefined : st);
+      setFeedbacks(data);
+    } catch (err: any) {
+      console.error("Error loading feedbacks:", err);
+    } finally {
+      setLoadingFeedbacks(false);
+    }
+  };
+
+  const syncFeedbackUpdate = () => {
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        const channel = new BroadcastChannel("kutty_feedback_sync");
+        channel.postMessage({ type: "FEEDBACK_UPDATED", timestamp: Date.now() });
+        channel.close();
+      }
+      localStorage.setItem("kuttystory_feedback_updated", Date.now().toString());
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleTogglePublish = async (fb: FeedbackItem) => {
+    const isCurrentlyApproved = fb.status === "approved";
+    const targetStatus = isCurrentlyApproved ? "pending" : "approved";
+    try {
+      await api.updateFeedbackStatus(fb.id, targetStatus);
+      await fetchAdminFeedbacks();
+      syncFeedbackUpdate();
+      const message =
+        targetStatus === "approved"
+          ? `Published: Review by ${fb.name} is now live in the Foot Steps "Heartfelt Memories" section.`
+          : `Unpublished: Review by ${fb.name} has been unpublished from the Foot Steps page.`;
+      setFeedbackNotice(message);
+      setTimeout(() => setFeedbackNotice(null), 4000);
+    } catch (err: any) {
+      alert("Failed to update publication status: " + (err.message || err));
+    }
+  };
+
+  const handleUpdateFeedbackStatus = async (id: string, newStatus: "approved" | "pending" | "rejected", authorName?: string) => {
+    try {
+      await api.updateFeedbackStatus(id, newStatus);
+      await fetchAdminFeedbacks();
+      syncFeedbackUpdate();
+      const actionLabel =
+        newStatus === "approved"
+          ? "approved & published to Foot Steps"
+          : newStatus === "rejected"
+          ? "marked as Rejected"
+          : "set to Pending";
+      setFeedbackNotice(`Review${authorName ? ` by ${authorName}` : ""} has been ${actionLabel}.`);
+      setTimeout(() => setFeedbackNotice(null), 4000);
+    } catch (err: any) {
+      alert("Failed to update feedback status: " + (err.message || err));
+    }
+  };
+
+  const handleDeleteFeedback = async (id: string, authorName?: string) => {
+    if (
+      !confirm(
+        `Are you sure you want to permanently delete the feedback submission${
+          authorName ? ` by ${authorName}` : ""
+        }? This destructive action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await api.deleteFeedback(id);
+      await fetchAdminFeedbacks();
+      syncFeedbackUpdate();
+      setFeedbackNotice(`Review by ${authorName || "customer"} permanently deleted.`);
+      setTimeout(() => setFeedbackNotice(null), 4000);
+    } catch (err: any) {
+      alert("Failed to delete feedback: " + (err.message || err));
+    }
+  };
+
+  const startEditFeedback = (fb: FeedbackItem) => {
+    setEditingFeedback(fb);
+    setEditFeedbackForm({
+      name: fb.name,
+      place: fb.place,
+      rating: fb.rating,
+      review_text: fb.review_text || "",
+    });
+  };
+
+  const handleSaveFeedbackEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingFeedback) return;
+    if (!editFeedbackForm.name.trim() || !editFeedbackForm.place.trim()) {
+      alert("Please fill in author name and place.");
+      return;
+    }
+    setSavingFeedbackEdit(true);
+    try {
+      await api.editFeedback(editingFeedback.id, {
+        name: editFeedbackForm.name.trim(),
+        place: editFeedbackForm.place.trim(),
+        rating: editFeedbackForm.rating,
+        review_text: editFeedbackForm.review_text.trim(),
+      });
+      setEditingFeedback(null);
+      await fetchAdminFeedbacks();
+      syncFeedbackUpdate();
+      setFeedbackNotice(`Updated review details for ${editFeedbackForm.name.trim()}.`);
+      setTimeout(() => setFeedbackNotice(null), 4000);
+    } catch (err: any) {
+      alert("Failed to update feedback: " + (err.message || err));
+    } finally {
+      setSavingFeedbackEdit(false);
+    }
+  };
+
   useEffect(() => {
     const user = authService.getUser();
     if (!user) {
@@ -290,13 +426,14 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [dash, storiesData, aiData, jobsData, ordersList, childStoriesData] = await Promise.all([
+      const [dash, storiesData, aiData, jobsData, ordersList, childStoriesData, feedbacksData] = await Promise.all([
         api.getDashboard().catch(() => null),
         api.getAdminStories().catch(() => []),
         api.getAISettings().catch(() => null),
         api.getJobs().catch(() => []),
         api.getOrders().catch(() => []),
         api.getAllChildStoriesAdmin().catch(() => []),
+        api.getAdminFeedbacks().catch(() => []),
       ]);
 
       if (dash) setDashboardData(dash);
@@ -320,6 +457,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
       if (jobsData) setJobs(jobsData);
       if (ordersList) setOrders(ordersList);
       if (childStoriesData) setAdminChildStories(childStoriesData);
+      if (feedbacksData) setFeedbacks(feedbacksData);
     } catch (err) {
       console.error("Error loading dashboard data:", err);
     } finally {
@@ -1064,6 +1202,33 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                   }`}
               >
                 {adminChildStories.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("feedback");
+              window.history.pushState(null, "", "/admin/feedback");
+              fetchAdminFeedbacks();
+            }}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeTab === "feedback"
+                ? "bg-[#8B3DFF] text-white shadow-sm shadow-[#8B3DFF]/20"
+                : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+              }`}
+          >
+            <div className="flex items-center gap-3.5">
+              <MessageSquareHeart className="w-4 h-4 shrink-0" />
+              <span>Feedback</span>
+            </div>
+            {feedbacks.filter((f) => f.status === "pending").length > 0 && (
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${activeTab === "feedback"
+                    ? "bg-white/20 text-white"
+                    : "bg-amber-100 text-amber-800"
+                  }`}
+              >
+                {feedbacks.filter((f) => f.status === "pending").length}
               </span>
             )}
           </button>
@@ -2919,7 +3084,506 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
             </div>
           </div>
         )}
+
+        {/* ── CUSTOMER FEEDBACK TAB ── */}
+        {activeTab === "feedback" && (
+          <div className="p-6 sm:p-8 space-y-6 max-w-6xl mx-auto">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <MessageSquareHeart className="w-6 h-6 text-[#8B3DFF]" />
+                  Customer Feedback
+                </h1>
+                <p className="text-xs text-gray-500 mt-1">
+                  Manage reviews submitted through the website footer. Inspect, publish to the Foot Steps “Heartfelt Memories” section, edit, or delete submissions.
+                </p>
+              </div>
+              <button
+                onClick={() => fetchAdminFeedbacks(feedbackFilter)}
+                className="px-4 py-2 rounded-xl bg-[#8B3DFF] text-white text-xs font-semibold hover:bg-[#7828f7] cursor-pointer flex items-center gap-1.5 transition self-start sm:self-auto"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingFeedbacks ? "animate-spin" : ""}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            {/* Notification Banner */}
+            {feedbackNotice && (
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{feedbackNotice}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFeedbackNotice(null)}
+                  className="text-emerald-700 hover:text-emerald-900 p-1 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Filter Bar & Search */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { key: "all", label: "All Reviews" },
+                  { key: "approved", label: "Published" },
+                  { key: "pending", label: "Pending" },
+                  ...(feedbacks.some((x) => x.status === "rejected")
+                    ? [{ key: "rejected", label: "Rejected" }]
+                    : []),
+                ].map((f) => {
+                  const count =
+                    f.key === "all"
+                      ? feedbacks.length
+                      : feedbacks.filter((x) => x.status === f.key).length;
+                  const isActive = feedbackFilter === f.key;
+                  return (
+                    <button
+                      key={f.key}
+                      onClick={() => {
+                        setFeedbackFilter(f.key as any);
+                        fetchAdminFeedbacks(f.key as any);
+                      }}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition flex items-center gap-1.5 ${
+                        isActive
+                          ? "bg-[#8B3DFF] text-white shadow-xs"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      <span>{f.label}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                          isActive ? "bg-white/20 text-white" : "bg-gray-200 text-gray-700"
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="relative w-full md:w-64">
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search name, place, text..."
+                  value={feedbackSearch}
+                  onChange={(e) => setFeedbackSearch(e.target.value)}
+                  className="w-full pl-8 pr-4 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-[#8B3DFF] bg-white"
+                />
+              </div>
+            </div>
+
+            {/* Submissions List */}
+            {loadingFeedbacks ? (
+              <div className="py-20 text-center text-xs text-gray-400 bg-white rounded-2xl border border-gray-100">
+                <RefreshCw className="w-5 h-5 animate-spin mx-auto text-[#8B3DFF] mb-2" />
+                Loading feedback submissions...
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xs">
+                {(() => {
+                  const filtered = feedbacks.filter((fb) => {
+                    if (feedbackFilter !== "all" && fb.status !== feedbackFilter) {
+                      return false;
+                    }
+                    if (!feedbackSearch.trim()) return true;
+                    const q = feedbackSearch.toLowerCase();
+                    return (
+                      fb.name.toLowerCase().includes(q) ||
+                      fb.place.toLowerCase().includes(q) ||
+                      (fb.review_text?.toLowerCase().includes(q) ?? false)
+                    );
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="py-16 text-center text-gray-400 space-y-2">
+                        <MessageSquareHeart className="w-10 h-10 mx-auto text-gray-200" />
+                        <p className="text-sm font-semibold text-gray-600">No feedback submissions found</p>
+                        <p className="text-xs text-gray-400">
+                          {feedbackSearch
+                            ? "Try adjusting your search query."
+                            : feedbackFilter === "pending"
+                            ? "There are no pending submissions awaiting review."
+                            : "Submissions from the footer form will appear here."}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="divide-y divide-gray-100">
+                      {filtered.map((fb) => {
+                        const isVideo = fb.media_type === "video" || fb.media_url?.endsWith(".mp4") || fb.media_url?.endsWith(".webm") || fb.media_url?.endsWith(".mov");
+                        const dateFormatted = fb.created_at
+                          ? new Date(fb.created_at).toLocaleDateString("en-IN", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : "";
+
+                        return (
+                          <div
+                            key={fb.id}
+                            className="p-5 sm:p-6 hover:bg-gray-50/50 transition flex flex-col lg:flex-row lg:items-start justify-between gap-5"
+                          >
+                            {/* Author & Review Content */}
+                            <div className="flex-1 space-y-3">
+                              <div className="flex flex-wrap items-center gap-2.5">
+                                {/* Rating Stars */}
+                                <div className="flex items-center gap-0.5">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <Star
+                                      key={star}
+                                      className={`w-4 h-4 ${
+                                        star <= fb.rating
+                                          ? "text-amber-400 fill-amber-400"
+                                          : "text-gray-200 fill-gray-100"
+                                      }`}
+                                    />
+                                  ))}
+                                </div>
+
+                                <span className="text-xs font-bold text-gray-900">{fb.name}</span>
+                                <span className="text-[11px] text-gray-500 flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded-full">
+                                  <MapPin className="w-3 h-3 text-gray-400" />
+                                  {fb.place}
+                                </span>
+
+                                {dateFormatted && (
+                                  <span className="text-[11px] text-gray-400">
+                                    • {dateFormatted}
+                                  </span>
+                                )}
+
+                                {/* Status Badge */}
+                                <span
+                                  className={`ml-auto lg:ml-0 text-[10px] font-bold px-2.5 py-0.5 rounded-full capitalize ${
+                                    fb.status === "approved"
+                                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                      : fb.status === "pending"
+                                      ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                      : "bg-red-50 text-red-600 border border-red-200"
+                                  }`}
+                                >
+                                  {fb.status === "approved"
+                                    ? "✓ Published on Foot Steps"
+                                    : fb.status === "pending"
+                                    ? "⏳ Pending Review"
+                                    : "✕ Rejected"}
+                                </span>
+                              </div>
+
+                              {/* Review Text */}
+                              {fb.review_text && fb.review_text.trim() ? (
+                                <p className="text-xs sm:text-sm text-gray-700 leading-relaxed italic bg-purple-50/20 p-3 rounded-xl border border-purple-50/60">
+                                  “{fb.review_text.trim()}”
+                                </p>
+                              ) : (
+                                <p className="text-[11px] text-gray-400 italic">
+                                  {fb.media_url ? "No written review text provided (media submission only)" : "Rating only (no written review text)"}
+                                </p>
+                              )}
+
+                              {/* Uploaded Media Preview */}
+                              {fb.media_url ? (
+                                <div className="flex items-center gap-3 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setViewingMedia({
+                                        url: fb.media_url!,
+                                        type: isVideo ? "video" : "image",
+                                        author: fb.name,
+                                      })
+                                    }
+                                    className="group flex items-center gap-2 p-1.5 pr-3 rounded-xl bg-gray-100 hover:bg-purple-50 border border-gray-200 hover:border-purple-200 transition text-left cursor-pointer"
+                                  >
+                                    {isVideo ? (
+                                      <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-[#8B3DFF] shrink-0">
+                                        <Video className="w-5 h-5" />
+                                      </div>
+                                    ) : (
+                                      <img
+                                        src={fb.media_url}
+                                        alt="Media preview"
+                                        className="w-10 h-10 rounded-lg object-cover border border-gray-200 shrink-0"
+                                      />
+                                    )}
+                                    <div className="min-w-0">
+                                      <p className="text-[11px] font-bold text-gray-800 group-hover:text-[#8B3DFF]">
+                                        {isVideo ? "Customer Video Attachment" : "Customer Photo Attachment"}
+                                      </p>
+                                      <p className="text-[10px] text-gray-400">Click to inspect / play</p>
+                                    </div>
+                                  </button>
+                                </div>
+                              ) : (
+                                <p className="text-[10px] text-gray-400 italic">No media attachment uploaded</p>
+                              )}
+                            </div>
+
+                            {/* Action Area: Publish Toggle & Compact Actions */}
+                            <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end gap-3 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-gray-100">
+                              {/* 1. PUBLISH / UNPUBLISH TOGGLE SWITCH */}
+                              <div className="flex flex-col items-start lg:items-end gap-1">
+                                <div className="flex items-center gap-2.5">
+                                  <label
+                                    htmlFor={`publish-toggle-${fb.id}`}
+                                    className="text-xs font-bold text-gray-700 cursor-pointer select-none"
+                                  >
+                                    Published
+                                  </label>
+                                  <button
+                                    id={`publish-toggle-${fb.id}`}
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={fb.status === "approved"}
+                                    aria-label={`Publication status for ${fb.name}'s review`}
+                                    aria-describedby={`publish-status-text-${fb.id}`}
+                                    tabIndex={0}
+                                    onClick={() => handleTogglePublish(fb)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        handleTogglePublish(fb);
+                                      }
+                                    }}
+                                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#8B3DFF] focus:ring-offset-2 ${
+                                      fb.status === "approved" ? "bg-emerald-600" : "bg-gray-300"
+                                    }`}
+                                  >
+                                    <span className="sr-only">
+                                      {fb.status === "approved" ? "Published (ON)" : "Unpublished (OFF)"}
+                                    </span>
+                                    <span
+                                      aria-hidden="true"
+                                      className={`pointer-events-none inline-flex items-center justify-center h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                        fb.status === "approved" ? "translate-x-5" : "translate-x-0"
+                                      }`}
+                                    >
+                                      {fb.status === "approved" ? (
+                                        <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                                      ) : (
+                                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                                      )}
+                                    </span>
+                                  </button>
+                                </div>
+
+                                {/* Text publication state (does not rely on color alone) */}
+                                <div id={`publish-status-text-${fb.id}`} className="flex items-center gap-1.5 text-[10px]">
+                                  <span
+                                    className={`font-bold px-1.5 py-0.5 rounded tracking-wide ${
+                                      fb.status === "approved"
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : fb.status === "rejected"
+                                        ? "bg-rose-100 text-rose-800"
+                                        : "bg-gray-100 text-gray-600"
+                                    }`}
+                                  >
+                                    {fb.status === "approved"
+                                      ? "ON • Live on site"
+                                      : fb.status === "rejected"
+                                      ? "OFF • Rejected"
+                                      : "OFF • Pending"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* 2. COMPACT ACTION ICONS (Edit, Delete) */}
+                              <div className="flex items-center gap-1.5 pt-1">
+
+                                {/* Edit Button: Icon Only */}
+                                <button
+                                  type="button"
+                                  onClick={() => startEditFeedback(fb)}
+                                  title={`Edit review details for ${fb.name}`}
+                                  aria-label={`Edit review details for ${fb.name}`}
+                                  className="p-2 rounded-xl text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-200 cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-[#8B3DFF]"
+                                >
+                                  <Pencil className="w-3.5 h-3.5 shrink-0 text-gray-600" />
+                                </button>
+
+                                {/* Delete Button: Icon Only */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteFeedback(fb.id, fb.name)}
+                                  title={`Permanently delete feedback submission by ${fb.name}`}
+                                  aria-label={`Permanently delete feedback submission by ${fb.name}`}
+                                  className="p-2 rounded-xl text-red-600 hover:text-red-700 bg-white hover:bg-red-50 border border-gray-200 hover:border-red-200 cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-red-400"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        )}
       </main>
+
+      {/* Modal: Edit Feedback */}
+      {editingFeedback && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-gray-100 space-y-5 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+              <div>
+                <span className="text-xs font-semibold text-[#8B3DFF] uppercase tracking-wider">Feedback Review</span>
+                <h3 className="text-lg font-bold text-gray-900">Edit Submission Details</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingFeedback(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveFeedbackEdit} className="space-y-4 text-xs">
+              <div>
+                <label className="font-semibold text-gray-800 block mb-1">Author Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={editFeedbackForm.name}
+                  onChange={(e) => setEditFeedbackForm({ ...editFeedbackForm, name: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-[#8B3DFF]"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-gray-800 block mb-1">Place / City *</label>
+                <input
+                  type="text"
+                  required
+                  value={editFeedbackForm.place}
+                  onChange={(e) => setEditFeedbackForm({ ...editFeedbackForm, place: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-[#8B3DFF]"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-gray-800 block mb-1">Rating *</label>
+                <div className="flex items-center gap-1.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setEditFeedbackForm({ ...editFeedbackForm, rating: star })}
+                      className="p-1 cursor-pointer focus:outline-none"
+                    >
+                      <Star
+                        className={`w-6 h-6 transition ${
+                          star <= editFeedbackForm.rating
+                            ? "text-amber-400 fill-amber-400"
+                            : "text-gray-200 fill-gray-100"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  <span className="text-xs font-bold text-gray-700 ml-2">
+                    {editFeedbackForm.rating} of 5 Stars
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-gray-800 block mb-1">Review Text (Optional)</label>
+                <textarea
+                  rows={4}
+                  value={editFeedbackForm.review_text}
+                  onChange={(e) => setEditFeedbackForm({ ...editFeedbackForm, review_text: e.target.value })}
+                  placeholder="Review comments or leave blank"
+                  className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-[#8B3DFF] resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingFeedback(null)}
+                  className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingFeedbackEdit}
+                  className="px-5 py-2 rounded-xl bg-[#8B3DFF] hover:bg-[#7828f7] text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+                >
+                  {savingFeedbackEdit ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: View Uploaded Media */}
+      {viewingMedia && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-2xl w-full shadow-2xl border border-gray-100 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div>
+                <span className="text-[11px] font-semibold text-[#8B3DFF] uppercase tracking-wider">Attached Media</span>
+                <h3 className="text-base font-bold text-gray-900">Uploaded by {viewingMedia.author}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingMedia(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="rounded-2xl overflow-hidden bg-gray-900 flex items-center justify-center max-h-[65vh]">
+              {viewingMedia.type === "video" ? (
+                <video
+                  controls
+                  autoPlay
+                  className="max-h-[65vh] w-full"
+                  src={viewingMedia.url}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              ) : (
+                <img
+                  src={viewingMedia.url}
+                  alt={`Attachment by ${viewingMedia.author}`}
+                  className="max-h-[65vh] object-contain mx-auto"
+                />
+              )}
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-gray-500 pt-2">
+              <span className="text-[11px]">Media is only visible to the public after this review is approved.</span>
+              <button
+                type="button"
+                onClick={() => setViewingMedia(null)}
+                className="px-4 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 3. Modal: Order Details Drawer/Dialog */}
       {selectedOrder && (
