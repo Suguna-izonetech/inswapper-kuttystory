@@ -22,7 +22,10 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Dynamically set sqlalchemy.url from app settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
+raw_db_url = settings.DATABASE_URL
+if raw_db_url.startswith("postgresql+asyncpg://"):
+    raw_db_url = raw_db_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+config.set_main_option("sqlalchemy.url", raw_db_url.replace("%", "%%"))
 
 # Target metadata for autogenerate
 target_metadata = Base.metadata
@@ -30,7 +33,7 @@ target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
-    url = config.get_main_option("sqlalchemy.url") or settings.DATABASE_URL
+    url = config.get_main_option("sqlalchemy.url") or raw_db_url
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -46,7 +49,11 @@ def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     configuration = config.get_section(config.config_ini_section, {})
     if not configuration.get("sqlalchemy.url") or "driver://" in str(configuration.get("sqlalchemy.url")):
-        configuration["sqlalchemy.url"] = settings.DATABASE_URL
+        configuration["sqlalchemy.url"] = raw_db_url
+    else:
+        current_opt = str(configuration.get("sqlalchemy.url", ""))
+        if "postgresql+asyncpg://" in current_opt:
+            configuration["sqlalchemy.url"] = current_opt.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
 
     connectable = engine_from_config(
         configuration,

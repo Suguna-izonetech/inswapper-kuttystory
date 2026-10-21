@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # Database (PostgreSQL)
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", 
-        "postgresql+pg8000://postgres:Narmadha19%40izone@localhost:5432/kuttystory_db"
+        "postgresql+asyncpg://postgres:Narmadha19%40izone@localhost:5432/kuttystory_db"
     )
     
     # Auth & Security

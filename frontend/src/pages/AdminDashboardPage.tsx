@@ -37,10 +37,11 @@ import {
   Heart,
   MapPin,
   GraduationCap,
-  Star,
   MessageSquareHeart,
   Video,
-  Pencil
+  Pencil,
+  CreditCard,
+  Star
 } from "lucide-react";
 import {
   api,
@@ -57,7 +58,7 @@ import {
   FeedbackItem,
 } from "@/lib/api";
 
-type TabType = "dashboard" | "orders" | "previews" | "stories" | "page_editor" | "settings" | "child_stories" | "feedback";
+type TabType = "dashboard" | "orders" | "previews" | "stories" | "page_editor" | "settings" | "child_stories" | "feedback" | "payments";
 
 export default function AdminDashboardPage({ initialTab }: { initialTab?: TabType }) {
   const navigate = useNavigate();
