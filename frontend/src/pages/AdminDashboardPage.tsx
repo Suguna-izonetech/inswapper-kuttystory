@@ -410,7 +410,8 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
           if (match) {
             setGeneratingFullJob(match);
             if (match.completed_pages >= match.total_pages && (match.status === "completed" || !match.status.includes("Rendering"))) {
-              const url = match.print_pdf_url || `/api/v1/personalization/${match.id}/print-pdf?size=8x8&color=rgb`;
+              const rawUrl = match.print_pdf_url || `/api/v1/personalization/${match.id}/print-pdf?size=8x8&color=rgb`;
+              const url = api.resolveUrl(rawUrl);
               window.open(url, "_blank");
               setTimeout(() => {
                 setGeneratingFullJob(null);
@@ -847,7 +848,8 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
 
   const handleDownloadPdf = async (job: PersonalizationJob, mode: "print" | "preview" = "print") => {
     if (mode === "preview") {
-      const url = job.pdf_download_url || `/api/v1/personalization/${job.id}/pdf`;
+      const rawUrl = job.pdf_download_url || `/api/v1/personalization/${job.id}/pdf`;
+      const url = api.resolveUrl(rawUrl);
       window.open(url, "_blank");
       return;
     }
@@ -873,7 +875,8 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
     }
 
     // Directly download the complete print-ready PDF containing all pages with vivid colors
-    const url = job.print_pdf_url || `/api/v1/personalization/${job.id}/print-pdf?size=8x8&color=rgb`;
+    const rawUrl = job.print_pdf_url || `/api/v1/personalization/${job.id}/print-pdf?size=8x8&color=rgb`;
+    const url = api.resolveUrl(rawUrl);
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", `${(job.child_name || "Child").replace(/\s+/g, "_")}_Full_Print.pdf`);
@@ -4040,7 +4043,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                 {selectedOrder.job_id && (
                   <div className="pt-2 border-t border-gray-200/60 flex items-center gap-2">
                     <a
-                      href={`/api/v1/personalization/${selectedOrder.job_id}/print-pdf?size=8x8&color=admin_preview`}
+                      href={api.resolveUrl(`/api/v1/personalization/${selectedOrder.job_id}/print-pdf?size=8x8&color=admin_preview`)}
                       target="_blank"
                       rel="noreferrer"
                       className="px-3 py-1.5 rounded-xl bg-[#8B3DFF] text-white font-semibold text-[11px] flex items-center gap-1 hover:bg-[#7828f7] transition"

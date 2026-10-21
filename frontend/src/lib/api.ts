@@ -1,4 +1,32 @@
-const API_BASE = "/api/v1";
+const rawBackendOrigin = (import.meta.env.VITE_BACKEND_ORIGIN || "").trim().replace(/\/+$/, "");
+const rawApiUrl = (import.meta.env.VITE_API_URL || "/api/v1").trim();
+const normalizedApiPath = rawApiUrl.startsWith("/") ? rawApiUrl : `/${rawApiUrl}`;
+
+export const BACKEND_ORIGIN = rawBackendOrigin;
+export const API_URL = rawApiUrl;
+export const API_BASE = rawBackendOrigin ? `${rawBackendOrigin}${normalizedApiPath}` : normalizedApiPath;
+
+/**
+ * Resolves a backend URL or relative asset path with the configured VITE_BACKEND_ORIGIN.
+ * If the path starts with http://, https://, blob:, or data:, it returns as is.
+ * Otherwise, it prepends BACKEND_ORIGIN if available.
+ */
+export function resolveBackendUrl(path?: string | null): string {
+  if (!path) return "";
+  if (
+    path.startsWith("http://") ||
+    path.startsWith("https://") ||
+    path.startsWith("blob:") ||
+    path.startsWith("data:")
+  ) {
+    return path;
+  }
+  if (BACKEND_ORIGIN) {
+    const cleanPath = path.startsWith("/") ? path : `/${path}`;
+    return `${BACKEND_ORIGIN}${cleanPath}`;
+  }
+  return path;
+}
 
 export interface StoryPage {
   id: string;
@@ -183,6 +211,9 @@ export interface AdminDashboardData {
 }
 
 export const api = {
+  apiBase: API_BASE,
+  resolveUrl: resolveBackendUrl,
+
   async getStories(): Promise<StoryTemplate[]> {
     const res = await fetch(`${API_BASE}/stories`);
     if (!res.ok) throw new Error("Failed to fetch stories");

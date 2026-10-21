@@ -14,6 +14,7 @@ import {
   FileCheck,
   ExternalLink
 } from "lucide-react";
+import { resolveBackendUrl } from "@/lib/api";
 
 export interface PdfDownloadModalProps {
   isOpen: boolean;
@@ -127,7 +128,8 @@ export default function PdfDownloadModal({
     }, 450);
 
     try {
-      const response = await fetch(downloadUrl, {
+      const effectiveUrl = resolveBackendUrl(downloadUrl);
+      const response = await fetch(effectiveUrl, {
         signal: controller.signal
       });
 
