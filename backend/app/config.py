@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     PRINT_BLEED_MM: float = 3.0
     PRINT_SAFE_MARGIN_MM: float = 10.0
     
-    # CORS
+    # CORS Allowed Origins
     CORS_ORIGINS: Union[str, List[str]] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -80,23 +80,25 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8000",
         "https://apikuttystory.risingsuntech.in",
         "https://kuttystory.risingsuntech.in",
-        "*"
     ]
 
     @field_validator("CORS_ORIGINS")
     def parse_cors_origins(cls, v):
+        origins = []
         if isinstance(v, list):
-            return v
-        if isinstance(v, str):
+            origins = v
+        elif isinstance(v, str):
             v = v.strip()
             if v.startswith("[") and v.endswith("]"):
                 try:
                     import json
-                    return json.loads(v)
+                    origins = json.loads(v)
                 except Exception:
                     pass
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+            if not origins:
+                origins = [origin.strip() for origin in v.split(",") if origin.strip()]
+        return [o for o in origins if o != "*"]
+
 
 
     class Config:

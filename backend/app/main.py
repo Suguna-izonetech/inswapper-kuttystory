@@ -57,14 +57,42 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS
+# CORS configuration from .env / settings
+cors_origins = [o for o in settings.CORS_ORIGINS if o != "*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=cors_origins,
+    allow_origin_regex=r"^https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+@app.middleware("http")
+async def cors_headers_fallback_middleware(request, call_next):
+    origin = request.headers.get("origin")
+    if request.method == "OPTIONS":
+        from fastapi.responses import PlainTextResponse
+        headers = {
+            "Access-Control-Allow-Origin": origin or "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+            "Access-Control-Allow-Headers": request.headers.get("access-control-request-headers", "*"),
+            "Access-Control-Max-Age": "600",
+        }
+        return PlainTextResponse("OK", status_code=200, headers=headers)
+
+    response = await call_next(request)
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Expose-Headers"] = "*"
+    return response
+
 
 # Register routers
 app.include_router(stories.router, prefix=settings.API_V1_PREFIX)
