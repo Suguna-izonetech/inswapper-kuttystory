@@ -67,12 +67,6 @@ sequenceDiagram
 - **AI Provider Switcher**: Toggle between Hugging Face Diffusers (hosted serverless), local GPU diffusers, or deterministic mock generation with budget limits.
 - **Generation Monitoring**: Real-time job status tracking, completed page counters, and retry controls for failed pages.
 
-### 3. Required 3-Image Character Consistency POC (`/poc`)
-Before generating an entire 26-page book, administrators can test and evaluate character consistency across three representative scenes:
-- **Scene 1 (Page 07)**: Close-up Portrait (child smiling with hand on unicorn's cheek).
-- **Scene 2 (Page 10)**: Full-Body Action (child running through wildflower meadow with unicorn).
-- **Scene 3 (Page 13)**: Animal Interaction / Distinct Pose (child gently cradling a baby fledgling bird).
-
 ---
 
 ## 🚀 How to Run the Application
@@ -105,7 +99,7 @@ npm run dev
 cd backend
 python test_backend.py
 ```
-*Verifies PDF import, ReportLab deterministic PDF composer, hardware diagnostics, and 3-image POC execution.*
+*Verifies PDF import, ReportLab deterministic PDF composer, and hardware diagnostics.*
 
 ---
 
@@ -115,7 +109,6 @@ python test_backend.py
 | :--- | :--- |
 | **`http://localhost:5173`** | Customer Homepage (Story showcase, atelier process, trust charter) |
 | **`http://localhost:5173/personalize/unicorn-story`** | Guided Personalization Wizard & Interactive Book Viewer |
-| **`http://localhost:5173/poc`** | 3-Image Character Consistency Proof-of-Concept testing page |
 | **`http://localhost:5173/admin`** | Admin Studio (Overview KPIs, Page Editor, AI Settings, Job Monitor) |
 | **`http://localhost:8000/docs`** | FastAPI Swagger Interactive Documentation |
 
@@ -154,7 +147,7 @@ Baby story/
 │           └── ai/
 │               ├── gemini_provider.py      # Google Gemini for scene planning
 │               ├── diffusers_provider.py   # Hugging Face Diffusers with hardware checks
-│               ├── consistency_engine.py   # Face normalization & 3-image POC runner
+│               ├── consistency_engine.py   # Face normalization engine
 │               └── mock_provider.py        # Deterministic simulation for offline tests
 └── frontend/
     ├── src/
@@ -163,7 +156,6 @@ Baby story/
     │   │   ├── layout.tsx                  # Luxury editorial header & footer
     │   │   ├── globals.css                 # Soft editorial luxury design tokens
     │   │   ├── personalize/[slug]/page.tsx # Guided Wizard & Book Viewer
-    │   │   ├── poc/page.tsx                # 3-Image Consistency POC testing page
     │   │   └── admin/page.tsx              # Admin Studio & Story Page Editor
     │   └── lib/
     │       └── api.ts                      # Typed TypeScript API client

@@ -265,32 +265,6 @@ class AISettingsUpdate(BaseModel):
     per_book_budget: Optional[float] = None
     is_paid_enabled: Optional[bool] = None
 
-class POCTestRequest(BaseModel):
-    child_name: str = "Mia"
-    provider: Optional[str] = None
-    model: Optional[str] = None
-    test_page_numbers: List[int] = [7, 10, 13]  # 1. Close-up portrait, 2. Action/full-body, 3. Different scene/pose
-
-class POCTestPageResult(BaseModel):
-    page_number: int
-    scene_type: str
-    source_description: str
-    prompt: str
-    image_url: str
-    provider: str
-    model: str
-    generation_time_sec: float
-    cost_estimate: float
-    review_status: str
-
-class POCTestResult(BaseModel):
-    test_id: str
-    child_name: str
-    child_reference_url: str
-    pages: List[POCTestPageResult]
-    summary: str
-    status: str
-
 # Order & Admin Dashboard Schemas
 class OrderBase(BaseModel):
     order_number: Optional[str] = None

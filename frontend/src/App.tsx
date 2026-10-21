@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout";
 import HomePage from "./pages/HomePage";
 import PersonalizePage from "./pages/PersonalizePage";
-import POCTestPage from "./pages/POCTestPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import StoryBooksPage from "./pages/StoryBooksPage";
@@ -42,7 +41,6 @@ export default function App() {
           <Route path="collections" element={<CollectionsPage />} />
           <Route path="journal" element={<JournalPage />} />
           <Route path="personalize/:slug" element={<PersonalizePage />} />
-          <Route path="poc" element={<POCTestPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

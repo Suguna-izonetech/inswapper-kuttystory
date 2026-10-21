@@ -2653,7 +2653,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                 >
                   <option value="huggingface">Hugging Face Diffusers (Serverless Inference)</option>
                   <option value="fal_ai">FAL AI Fast Diffusion</option>
-                  <option value="mock_poc">Deterministic Mock Provider (POC Test)</option>
+                  <option value="mock_poc">Deterministic Mock Provider</option>
                 </select>
               </div>
 

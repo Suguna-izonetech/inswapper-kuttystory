@@ -129,31 +129,6 @@ export interface AISettings {
   hardware_acceleration: string;
 }
 
-export interface POCTestResult {
-  test_id: string;
-  child_name: string;
-  child_reference_url: string;
-  provider_used: string;
-  model_used: string;
-  hardware_check: any;
-  summary: string;
-  status: string;
-  pages: Array<{
-    page_number: number;
-    scene_type: string;
-    source_description: string;
-    prompt: string;
-    saved_path: string;
-    image_url: string;
-    provider: string;
-    model: string;
-    generation_time_sec: number;
-    cost_estimate: number;
-    is_simulated: boolean;
-    review_status: string;
-  }>;
-}
-
 export interface Order {
   id: string;
   order_number: string;
@@ -498,16 +473,6 @@ export const api = {
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error("Failed to update AI settings");
-    return res.json();
-  },
-
-  async runPOCTest(childName: string = "Mia"): Promise<POCTestResult> {
-    const res = await fetch(`${API_BASE}/admin/ai/poc-test`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ child_name: childName }),
-    });
-    if (!res.ok) throw new Error("Failed to run character consistency POC");
     return res.json();
   },
 

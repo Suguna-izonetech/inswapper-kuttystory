@@ -161,19 +161,7 @@ export default function Layout() {
                 <li><Link to="/about" className="hover:text-[#C98A84] transition-colors">About Us</Link></li>
                 <li><Link to="/footsteps" className="hover:text-[#C98A84] transition-colors">Foot Steps Milestones</Link></li>
                 <li><Link to="/how-it-works" className="hover:text-[#C98A84] transition-colors">How It Works</Link></li>
-                <li><Link to="/poc" className="hover:text-[#C98A84] transition-colors">Character Consistency POC</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-editorial-serif text-sm font-semibold uppercase tracking-wider text-[#2D222A] mb-4">
-                Collections & Reading
-              </h4>
-              <ul className="space-y-2.5 text-xs text-[#695B64]">
                 <li><Link to="/collections" className="hover:text-[#C98A84] transition-colors">Thematic Collections</Link></li>
-                <li><Link to="/journal" className="hover:text-[#C98A84] transition-colors">The Atelier Journal</Link></li>
-                <li><Link to="/personalize/unicorn-story" className="hover:text-[#C98A84] transition-colors">The Magical Unicorn Edition</Link></li>
-                <li><Link to="/admin" className="text-[#A2949E] hover:text-[#C98A84] transition-colors">Studio Admin</Link></li>
               </ul>
             </div>
 
