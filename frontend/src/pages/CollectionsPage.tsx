@@ -1097,7 +1097,7 @@ export default function CollectionsPage() {
                         className="px-6 py-3 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs font-semibold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
                       >
                         <Sparkles className="w-4 h-4" />
-                        <span>Personalize Box Set</span>
+                        <span>Purchase</span>
                         <ArrowRight className="w-4 h-4" />
                       </Link>
                     </div>
@@ -1171,7 +1171,7 @@ export default function CollectionsPage() {
                   onClick={(e) => e.stopPropagation()}
                   className="mt-2 block w-full py-1.5 rounded-full bg-[#FAF7F2] hover:bg-[#FAEEED] text-[#C98A84] text-[11px] font-semibold border border-[#EBE3D9] transition-colors"
                 >
-                  Personalize
+                  Purchase
                 </Link>
               </div>
             </div>
@@ -1235,7 +1235,7 @@ export default function CollectionsPage() {
               to="/storybooks"
               className="inline-block mt-2 px-6 py-2.5 rounded-full bg-[#FAF7F2] hover:bg-[#FAEEED] text-xs font-semibold text-[#C98A84] border border-[#EBE3D9] transition-colors"
             >
-              Browse All Individual Books
+              Browse All Collections
             </Link>
           </div>
         </div>

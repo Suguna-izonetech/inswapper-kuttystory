@@ -45,10 +45,9 @@ export default function Layout() {
                 to={item.path}
                 end={item.end}
                 className={({ isActive }) =>
-                  `px-3.5 py-2 rounded-full text-xs xl:text-sm font-medium transition-all relative ${
-                    isActive
-                      ? "text-[#C98A84] bg-[#FAEEED]/70 font-semibold"
-                      : "text-[#4E424B] hover:text-[#C98A84] hover:bg-[#FAEEED]/30"
+                  `px-3.5 py-2 rounded-full text-xs xl:text-sm font-medium transition-all relative ${isActive
+                    ? "text-[#C98A84] bg-[#FAEEED]/70 font-semibold"
+                    : "text-[#4E424B] hover:text-[#C98A84] hover:bg-[#FAEEED]/30"
                   }`
                 }
               >
@@ -96,10 +95,9 @@ export default function Layout() {
                   end={item.end}
                   onClick={() => setMobileMenuOpen(false)}
                   className={({ isActive }) =>
-                    `px-4 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-between ${
-                      isActive
-                        ? "bg-[#FAEEED] text-[#C98A84] font-semibold"
-                        : "text-[#2D222A] hover:bg-[#FAF7F2]"
+                    `px-4 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-between ${isActive
+                      ? "bg-[#FAEEED] text-[#C98A84] font-semibold"
+                      : "text-[#2D222A] hover:bg-[#FAF7F2]"
                     }`
                   }
                 >
@@ -187,7 +185,7 @@ export default function Layout() {
                 Children's photographs are stored in private encrypted storage and processed solely for book generation with parental consent.
               </p>
               <div className="text-[11px] text-[#A2949E]">
-                ReportLab 210×210 mm Print Ready Engine • ISO 19005 Compliance
+                ReportLab 8×8 mm Print Ready Engine • ISO 19005 Compliance
               </div>
             </div>
           </div>

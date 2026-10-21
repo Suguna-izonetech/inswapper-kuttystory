@@ -57,7 +57,7 @@ type TabType = "dashboard" | "orders" | "previews" | "stories" | "page_editor" |
 export default function AdminDashboardPage({ initialTab }: { initialTab?: TabType }) {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(authService.getUser());
-  
+
   // Initialize tab from prop or URL
   const getInitialTab = (): TabType => {
     if (initialTab) return initialTab;
@@ -976,11 +976,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
               setActiveTab("dashboard");
               window.history.pushState(null, "", "/admin");
             }}
-            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === "dashboard"
+            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeTab === "dashboard"
                 ? "bg-[#8B3DFF] text-white shadow-sm shadow-[#8B3DFF]/20"
                 : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-            }`}
+              }`}
           >
             <LayoutDashboard className="w-4 h-4 shrink-0" />
             <span>Dashboard</span>
@@ -991,11 +990,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
               setActiveTab("orders");
               window.history.pushState(null, "", "/admin/orders");
             }}
-            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === "orders"
+            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeTab === "orders"
                 ? "bg-[#8B3DFF] text-white shadow-sm shadow-[#8B3DFF]/20"
                 : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-            }`}
+              }`}
           >
             <Package className="w-4 h-4 shrink-0" />
             <span>Orders</span>
@@ -1006,11 +1004,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
               setActiveTab("previews");
               window.history.pushState(null, "", "/admin/previews");
             }}
-            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === "previews"
+            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeTab === "previews"
                 ? "bg-[#8B3DFF] text-white shadow-sm shadow-[#8B3DFF]/20"
                 : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-            }`}
+              }`}
           >
             <Sparkles className="w-4 h-4 shrink-0" />
             <span>Previews</span>
@@ -1021,11 +1018,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
               setActiveTab("stories");
               window.history.pushState(null, "", "/admin/stories");
             }}
-            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === "stories"
+            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeTab === "stories"
                 ? "bg-[#8B3DFF] text-white shadow-sm shadow-[#8B3DFF]/20"
                 : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-            }`}
+              }`}
           >
             <BookOpen className="w-4 h-4 shrink-0" />
             <span>Stories</span>
@@ -1036,11 +1032,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
               setActiveTab("page_editor");
               window.history.pushState(null, "", "/admin/page_editor");
             }}
-            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === "page_editor"
+            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeTab === "page_editor"
                 ? "bg-[#8B3DFF] text-white shadow-sm shadow-[#8B3DFF]/20"
                 : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-            }`}
+              }`}
           >
             <FileEdit className="w-4 h-4 shrink-0" />
             <span>Page Editor</span>
@@ -1052,11 +1047,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
               window.history.pushState(null, "", "/admin/child_stories");
               fetchAdminChildStories();
             }}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === "child_stories"
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeTab === "child_stories"
                 ? "bg-[#8B3DFF] text-white shadow-sm shadow-[#8B3DFF]/20"
                 : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-            }`}
+              }`}
           >
             <div className="flex items-center gap-3.5">
               <Feather className="w-4 h-4 shrink-0" />
@@ -1064,11 +1058,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
             </div>
             {adminChildStories.length > 0 && (
               <span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                  activeTab === "child_stories"
+                className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${activeTab === "child_stories"
                     ? "bg-white/20 text-white"
                     : "bg-purple-100 text-[#8B3DFF]"
-                }`}
+                  }`}
               >
                 {adminChildStories.length}
               </span>
@@ -1080,11 +1073,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
               setActiveTab("settings");
               window.history.pushState(null, "", "/admin/settings");
             }}
-            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === "settings"
+            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeTab === "settings"
                 ? "bg-[#8B3DFF] text-white shadow-sm shadow-[#8B3DFF]/20"
                 : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-            }`}
+              }`}
           >
             <Settings className="w-4 h-4 shrink-0" />
             <span>Settings</span>
@@ -1323,11 +1315,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                   <button
                     key={st}
                     onClick={() => setOrderStatusFilter(st)}
-                    className={`px-3 py-1.5 rounded-full transition capitalize shrink-0 ${
-                      orderStatusFilter === st
+                    className={`px-3 py-1.5 rounded-full transition capitalize shrink-0 ${orderStatusFilter === st
                         ? "bg-[#8B3DFF] text-white font-semibold"
                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
+                      }`}
                   >
                     {st === "all" ? "All Orders" : st}
                   </button>
@@ -1447,22 +1438,20 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                   <button
                     type="button"
                     onClick={() => setPreviewFilter("all")}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                      previewFilter === "all"
+                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${previewFilter === "all"
                         ? "bg-[#8B3DFF] text-white shadow-xs"
                         : "bg-transparent text-gray-600 hover:text-gray-900"
-                    }`}
+                      }`}
                   >
                     All
                   </button>
                   <button
                     type="button"
                     onClick={() => setPreviewFilter("purchased")}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                      previewFilter === "purchased"
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${previewFilter === "purchased"
                         ? "bg-[#8B3DFF] text-white shadow-xs"
                         : "bg-transparent text-gray-600 hover:text-gray-900"
-                    }`}
+                      }`}
                   >
                     Purchased
                   </button>
@@ -1570,11 +1559,11 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                                 {job.created_formatted ||
                                   (job.created_at
                                     ? new Date(job.created_at).toLocaleDateString("en-US", {
-                                        month: "short",
-                                        day: "numeric",
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      })
+                                      month: "short",
+                                      day: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })
                                     : "Recently")}
                               </span>
                             </td>
@@ -1673,11 +1662,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                   <button
                     key={cat}
                     onClick={() => setStoryCategoryFilter(cat)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
-                      storyCategoryFilter === cat
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${storyCategoryFilter === cat
                         ? "bg-[#8B3DFF] text-white shadow-xs"
                         : "bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-100"
-                    }`}
+                      }`}
                   >
                     {cat === "all" ? "All Categories" : cat}
                   </button>
@@ -2003,11 +1991,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                       setSelectedGender("boy");
                       if (activePage) syncPageForm(activePage);
                     }}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition ${
-                      selectedGender === "boy"
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition ${selectedGender === "boy"
                         ? "bg-[#8B3DFF] text-white shadow-xs"
                         : "text-gray-600 hover:text-gray-900"
-                    }`}
+                      }`}
                   >
                     Boy
                   </button>
@@ -2017,11 +2004,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                       setSelectedGender("girl");
                       if (activePage) syncPageForm(activePage);
                     }}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition ${
-                      selectedGender === "girl"
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition ${selectedGender === "girl"
                         ? "bg-[#8B3DFF] text-white shadow-xs"
                         : "text-gray-600 hover:text-gray-900"
-                    }`}
+                      }`}
                   >
                     Girl
                   </button>
@@ -2039,11 +2025,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                     key={p.id}
                     type="button"
                     onClick={() => handleSelectPage(idx)}
-                    className={`w-9 h-9 rounded-xl font-bold text-xs flex items-center justify-center transition-all ${
-                      selectedPageIndex === idx
+                    className={`w-9 h-9 rounded-xl font-bold text-xs flex items-center justify-center transition-all ${selectedPageIndex === idx
                         ? "bg-[#8B3DFF] text-white shadow-sm ring-2 ring-[#8B3DFF]/20"
                         : "bg-white border border-gray-200 hover:border-[#8B3DFF]/40 text-gray-700 hover:bg-purple-50/30"
-                    }`}
+                      }`}
                   >
                     {p.page_number}
                   </button>
@@ -2597,11 +2582,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                         key={preset}
                         type="button"
                         onClick={() => togglePreset(preset)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
-                          active
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${active
                             ? "bg-[#8B3DFF] text-white border-[#8B3DFF] shadow-xs"
                             : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                        }`}
+                          }`}
                       >
                         {preset}
                       </button>
@@ -2743,11 +2727,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                 <button
                   key={f}
                   onClick={() => { setChildStoryFilter(f); fetchAdminChildStories(f); }}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold cursor-pointer capitalize transition ${
-                    childStoryFilter === f
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold cursor-pointer capitalize transition ${childStoryFilter === f
                       ? "bg-[#8B3DFF] text-white"
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
+                    }`}
                 >
                   {f === "all" ? "All Submissions" : f === "featured" ? "⭐ Featured" : f.charAt(0).toUpperCase() + f.slice(1)}
                 </button>
@@ -2821,12 +2804,11 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                             </span>
                           </td>
                           <td className="px-5 py-4">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold capitalize ${
-                              story.status === "featured" ? "bg-amber-50 text-amber-700 border border-amber-200" :
-                              story.status === "approved" ? "bg-emerald-50 text-emerald-700" :
-                              story.status === "pending" ? "bg-orange-50 text-orange-600" :
-                              "bg-red-50 text-red-600"
-                            }`}>
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold capitalize ${story.status === "featured" ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                                story.status === "approved" ? "bg-emerald-50 text-emerald-700" :
+                                  story.status === "pending" ? "bg-orange-50 text-orange-600" :
+                                    "bg-red-50 text-red-600"
+                              }`}>
                               {story.status === "featured" ? "⭐ Featured" : story.status}
                             </span>
                           </td>
@@ -2979,11 +2961,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                     <button
                       key={st}
                       onClick={() => handleUpdateStatus(selectedOrder.id, st)}
-                      className={`py-2 px-3 rounded-xl font-semibold transition text-xs ${
-                        selectedOrder.status === st
+                      className={`py-2 px-3 rounded-xl font-semibold transition text-xs ${selectedOrder.status === st
                           ? "bg-[#8B3DFF] text-white shadow-xs"
                           : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
+                        }`}
                     >
                       {st}
                     </button>
@@ -2993,7 +2974,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
 
               <div className="p-3.5 rounded-2xl bg-gray-50 text-gray-600">
                 <span className="font-semibold text-gray-900 block mb-1">Format Specification</span>
-                <p>Standard Heirloom 210×210 mm • {selectedOrder.format_type?.replace(/_/g, " ") || "Print Hardcover"}</p>
+                <p>Standard Heirloom 8×8 mm • {selectedOrder.format_type?.replace(/_/g, " ") || "Print Hardcover"}</p>
               </div>
             </div>
 
@@ -3338,7 +3319,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                       </>
                     )}
                   </p>
-                  
+
                   {/* Pro enhancement: allow cover URL optionally if no PDF is attached */}
                   {!newBookPdfFile && (
                     <div className="pt-2 border-t border-purple-100/60">

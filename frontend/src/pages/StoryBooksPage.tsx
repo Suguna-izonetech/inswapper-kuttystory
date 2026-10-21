@@ -41,191 +41,90 @@ interface StoryCatalogItem {
   }[];
 }
 
-const CURATED_STORIES: StoryCatalogItem[] = [
-  {
-    id: "unicorn-story-curated",
-    slug: "unicorn-story",
-    title: "The Girl & the Magical Unicorn",
-    category: "Fairy Tales",
-    age_range: "3 - 8 Years",
-    min_age: 3,
-    max_age: 8,
-    page_count: 26,
-    price_digital: 799,
-    price_print: 1399,
-    description: "In the whispered heart of Whispering Meadow, a kind-hearted child discovers an enchanted unicorn lost in the dawn mist. Together, they embark on a luminous quest of friendship.",
-    cover_image_url: "/unicorn_cover.png",
-    rating: 4.9,
-    review_count: 148,
-    tag: "Bestseller",
-    is_live: true,
-    sample_spreads: [
-      {
-        page: 3,
-        title: "The Whispering Meadow",
-        text: "The sun stretched golden fingers across the dew, and there, between silver birch trees, stood a creature of shimmering starlight.",
-        scene: "A radiant unicorn greets your child beneath towering ancient trees filled with fireflies."
-      },
-      {
-        page: 7,
-        title: "The Bridge of Fallen Stars",
-        text: "With a brave smile and a gentle hand on the unicorn's silver mane, they stepped onto the celestial rainbow bridge.",
-        scene: "Walking across shimmering starlight arches above a misty valley of soft clouds."
-      },
-      {
-        page: 14,
-        title: "The Crystal Lantern",
-        text: "The forest whispered secrets of old, and in your child's hand glowed the light of true kindness.",
-        scene: "Surrounded by friendly woodland animals holding glowing glass acorns."
-      }
-    ]
-  },
-  {
-    id: "starlight-dragon",
-    slug: "starlight-dragon",
-    title: "The Starlight Dragon",
-    category: "Bedtime & Magic",
-    age_range: "3 - 7 Years",
-    min_age: 3,
-    max_age: 7,
-    page_count: 24,
-    price_digital: 799,
-    price_print: 1399,
-    description: "A gentle baby dragon with wings of midnight velvet collects fallen shooting stars to tuck sleepy dreamers into bed with warm starlight glow.",
-    cover_image_url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80",
-    rating: 5.0,
-    review_count: 92,
-    tag: "Staff Favorite",
-    is_live: false,
-    sample_spreads: [
-      {
-        page: 2,
-        title: "Night Sky Whispers",
-        text: "When the clock struck eight, a soft purple spark lit upon the nursery windowsill.",
-        scene: "A tiny velvet dragon holding a celestial lantern peering softly through moonlit windows."
-      },
-      {
-        page: 8,
-        title: "Catching Falling Stars",
-        text: "Together they caught seven fallen constellations and wove them into a cozy bedtime quilt.",
-        scene: "Floating peacefully through a dreamy pastel night sky with smiling crescent moon."
-      }
-    ]
-  },
-  {
-    id: "secret-treehouse",
-    slug: "secret-treehouse",
-    title: "The Secret Treehouse Society",
-    category: "Courage & Kindness",
-    age_range: "5 - 9 Years",
-    min_age: 5,
-    max_age: 9,
-    page_count: 28,
-    price_digital: 899,
-    price_print: 1499,
-    description: "Hidden deep inside an ancient banyan tree is a sanctuary where curious creatures gather to solve whimsical mysteries and bake berry pies.",
-    cover_image_url: "https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?auto=format&fit=crop&w=800&q=80",
-    rating: 4.8,
-    review_count: 67,
-    tag: "New Release",
-    is_live: false,
-    sample_spreads: [
-      {
-        page: 4,
-        title: "The Hidden Spiral Stairs",
-        text: "Twisting around the mossy trunk, carved wooden steps led straight into the leafy canopy.",
-        scene: "Your child discovering a glowing brass key nestled in a hollow tree trunk."
-      }
-    ]
-  },
-  {
-    id: "ocean-voyager",
-    slug: "ocean-voyager",
-    title: "The Little Ocean Voyager",
-    category: "Animal Adventures",
-    age_range: "2 - 5 Years",
-    min_age: 2,
-    max_age: 5,
-    page_count: 22,
-    price_digital: 799,
-    price_print: 1399,
-    description: "A playful adventure across coral reefs with a singing dolphin and an ancient sea turtle who guards the secret treasure of the glowing pearls.",
-    cover_image_url: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80",
-    rating: 4.9,
-    review_count: 114,
-    tag: "Popular",
-    is_live: false,
-    sample_spreads: [
-      {
-        page: 5,
-        title: "Coral Symphony",
-        text: "Under the turquoise waves, bubbles carried songs of kindness to playful seals.",
-        scene: "Your child wearing a golden shell crown swimming alongside playful turquoise sea creatures."
-      }
-    ]
-  },
-  {
-    id: "whispering-woods",
-    slug: "whispering-woods",
-    title: "The Knight of Whispering Woods",
-    category: "Courage & Kindness",
-    age_range: "6 - 10 Years",
-    min_age: 6,
-    max_age: 10,
-    page_count: 30,
-    price_digital: 899,
-    price_print: 1499,
-    description: "Armed only with a wooden sword, a kind smile, and an empathetic heart, a young knight proves that true strength lies in understanding others.",
-    cover_image_url: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=80",
-    rating: 4.9,
-    review_count: 83,
-    tag: "Character Builder",
-    is_live: false,
-    sample_spreads: [
-      {
-        page: 6,
-        title: "The Great Mountain Path",
-        text: "The path was steep, but courage does not mean being fearless — it means continuing with a caring heart.",
-        scene: "Facing a gentle giant guardian who only wanted someone to listen to his ancient flute song."
-      }
-    ]
-  },
-  {
-    id: "cloud-baker",
-    slug: "cloud-baker",
-    title: "The Baker of Sweet Cloud Dreams",
-    category: "Wonder & Space",
-    age_range: "2 - 6 Years",
-    min_age: 2,
-    max_age: 6,
-    page_count: 24,
-    price_digital: 799,
-    price_print: 1399,
-    description: "High in the marshmallow clouds, your child kneads sunshine dough, sprinkles rainbow sugar, and bakes sweet lullaby dreams for children asleep below.",
-    cover_image_url: "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=800&q=80",
-    rating: 5.0,
-    review_count: 53,
-    tag: "Sweet Dreams",
-    is_live: false,
-    sample_spreads: [
-      {
-        page: 3,
-        title: "The Cloud Kitchen",
-        text: "Spoons made of moonlight and whisks of gentle breeze whipped up cotton candy clouds.",
-        scene: "Wearing a chef hat, your child dusting sugar glitter over fluffy pink sunset clouds."
-      }
-    ]
+function formatCategory(cat?: string): string {
+  if (!cat) return "Adventure";
+  if (cat === cat.toUpperCase()) {
+    return cat.charAt(0) + cat.slice(1).toLowerCase();
   }
-];
+  return cat;
+}
 
-const CATEGORIES = [
-  "All Stories",
-  "Fairy Tales",
-  "Bedtime & Magic",
-  "Courage & Kindness",
-  "Animal Adventures",
-  "Wonder & Space"
-];
+function parseAgeRange(ageRange?: string, minAge?: number, maxAge?: number) {
+  let min = minAge || 3;
+  let max = maxAge || 7;
+  if (ageRange) {
+    const matches = ageRange.match(/(\d+)\s*[-–to]\s*(\d+)/i);
+    if (matches) {
+      min = parseInt(matches[1], 10);
+      max = parseInt(matches[2], 10);
+    }
+  }
+  return { min, max };
+}
+
+const DEFAULT_TAGS = ["Bestseller", "New Release", "Popular", "Staff Favorite", "Featured"];
+const DEFAULT_RATINGS = [5.0, 4.9, 4.8, 4.9, 5.0];
+const DEFAULT_REVIEWS = [148, 114, 92, 83, 67];
+
+function mapTemplateToCatalogItem(template: StoryTemplate, index: number): StoryCatalogItem {
+  let sampleSpreads: StoryCatalogItem["sample_spreads"] = [];
+  if (template.pages && template.pages.length > 0) {
+    const textPages = template.pages.filter(
+      (p) => p.page_type !== "cover" && (p.story_text || p.extracted_text)
+    );
+    const selected = textPages.length >= 2 ? textPages.slice(0, 3) : template.pages.slice(0, 3);
+    if (selected.length > 0) {
+      sampleSpreads = selected.map((p) => ({
+        page: p.page_number,
+        title: `Page ${p.page_number} Spread`,
+        text: (p.story_text || p.extracted_text || `Scene illustration for ${template.title}`).replace(
+          /\[Name\]|\{name\}|\[child_name\]|\{child_name\}/g,
+          "your child"
+        ),
+        scene: p.scene_description || `Illustrated personalized story scene from ${template.title}.`
+      }));
+    }
+  }
+
+  if (sampleSpreads.length === 0) {
+    sampleSpreads = [
+      {
+        page: 1,
+        title: "The Adventure Begins",
+        text: `One beautiful morning, your child steps into the magical realm of ${template.title}.`,
+        scene: `Opening story spread illustration for ${template.title}.`
+      },
+      {
+        page: Math.floor((template.page_count || 24) / 2),
+        title: "The Heart of the Journey",
+        text: "With curiosity and wonder, an extraordinary discovery awaits along the golden path.",
+        scene: "A breathtaking full-bleed illustration celebrating courage and friendship."
+      }
+    ];
+  }
+
+  const { min, max } = parseAgeRange(template.age_range, template.min_age, template.max_age);
+
+  return {
+    id: template.id,
+    slug: template.slug,
+    title: template.title,
+    category: formatCategory(template.category),
+    age_range: template.age_range || `Ages ${min}–${max}`,
+    min_age: min,
+    max_age: max,
+    page_count: template.page_count || 24,
+    price_digital: template.price_digital || 799,
+    price_print: template.price_print || 1399,
+    description: template.description || `An enchanting personalized storybook where your child becomes the hero of ${template.title}.`,
+    cover_image_url: template.cover_image_url || "/unicorn_cover.png",
+    rating: DEFAULT_RATINGS[index % DEFAULT_RATINGS.length],
+    review_count: DEFAULT_REVIEWS[index % DEFAULT_REVIEWS.length],
+    tag: DEFAULT_TAGS[index % DEFAULT_TAGS.length],
+    is_live: true,
+    sample_spreads: sampleSpreads
+  };
+}
 
 const AGE_FILTERS = [
   { label: "All Ages", min: 0, max: 99 },
@@ -236,7 +135,8 @@ const AGE_FILTERS = [
 ];
 
 export default function StoryBooksPage() {
-  const [stories, setStories] = useState<StoryCatalogItem[]>(CURATED_STORIES);
+  const [stories, setStories] = useState<StoryCatalogItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("All Stories");
   const [selectedAge, setSelectedAge] = useState("All Ages");
   const [searchQuery, setSearchQuery] = useState("");
@@ -244,38 +144,32 @@ export default function StoryBooksPage() {
   const [activeSpreadIndex, setActiveSpreadIndex] = useState(0);
 
   useEffect(() => {
-    // Attempt to merge live stories from API if available
+    setLoading(true);
     api.getStories()
       .then((apiStories: StoryTemplate[]) => {
         if (apiStories && apiStories.length > 0) {
-          setStories((prev) => {
-            const liveSlugs = new Set(apiStories.map((s) => s.slug));
-            const updated = prev.map((item) => {
-              const matched = apiStories.find((s) => s.slug === item.slug);
-              if (matched) {
-                return {
-                  ...item,
-                  title: matched.title,
-                  description: matched.description || item.description,
-                  cover_image_url: matched.cover_image_url || item.cover_image_url,
-                  page_count: matched.page_count || item.page_count,
-                  price_digital: matched.price_digital || item.price_digital,
-                  price_print: matched.price_print || item.price_print,
-                  is_live: true
-                };
-              }
-              return item;
-            });
-            return updated;
-          });
+          const mapped = apiStories.map((template, idx) => mapTemplateToCatalogItem(template, idx));
+          setStories(mapped);
+        } else {
+          setStories([]);
         }
       })
-      .catch((err) => console.log("Catalog using local templates:", err));
+      .catch((err) => {
+        console.error("Error loading stories:", err);
+        setStories([]);
+      })
+      .finally(() => setLoading(false));
   }, []);
+
+  const categories = [
+    "All Stories",
+    ...Array.from(new Set(stories.map((s) => s.category).filter(Boolean)))
+  ];
 
   const filteredStories = stories.filter((story) => {
     const matchesCat =
-      selectedCategory === "All Stories" || story.category === selectedCategory;
+      selectedCategory === "All Stories" ||
+      story.category?.toLowerCase() === selectedCategory.toLowerCase();
     const ageFilter = AGE_FILTERS.find((a) => a.label === selectedAge);
     const matchesAge =
       !ageFilter ||
@@ -362,11 +256,10 @@ export default function StoryBooksPage() {
                 <button
                   key={age.label}
                   onClick={() => setSelectedAge(age.label)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 ${
-                    selectedAge === age.label
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 ${selectedAge === age.label
                       ? "bg-[#2D222A] text-white shadow-xs"
                       : "bg-[#FAF7F2] text-[#695B64] hover:bg-[#F2EEF7]"
-                  }`}
+                    }`}
                 >
                   {age.label}
                 </button>
@@ -380,15 +273,14 @@ export default function StoryBooksPage() {
               <Filter className="w-3.5 h-3.5 text-[#8F9E8B]" />
               <span>Theme:</span>
             </span>
-            {CATEGORIES.map((cat) => (
+            {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 ${
-                  selectedCategory === cat
+                className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 ${selectedCategory === cat
                     ? "bg-[#C98A84] text-white shadow-xs"
                     : "bg-[#FAF7F2] text-[#695B64] hover:bg-[#FAEEED] hover:text-[#C98A84]"
-                }`}
+                  }`}
               >
                 {cat}
               </button>
@@ -410,7 +302,19 @@ export default function StoryBooksPage() {
           </div>
         </div>
 
-        {filteredStories.length === 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="editorial-card p-6 bg-white border border-[#EBE3D9] animate-pulse space-y-4">
+                <div className="aspect-square bg-[#FAF7F2] rounded-2xl flex items-center justify-center">
+                  <BookOpen className="w-10 h-10 text-[#EBE3D9]" />
+                </div>
+                <div className="h-4 bg-[#FAF7F2] rounded w-3/4" />
+                <div className="h-3 bg-[#FAF7F2] rounded w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : filteredStories.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-2xl border border-[#EBE3D9] p-8 space-y-4">
             <BookOpen className="w-12 h-12 text-[#C98A84]/60 mx-auto" />
             <h3 className="font-editorial-serif text-xl font-bold text-[#2D222A]">
@@ -502,7 +406,7 @@ export default function StoryBooksPage() {
 
                     <div className="text-[11px] text-[#8F9E8B] flex items-center gap-1.5 pt-1">
                       <CheckCircle className="w-3.5 h-3.5 text-[#8F9E8B]" />
-                      <span>{story.page_count} Full-Bleed Pages • 210×210 mm Archival Hardcover</span>
+                      <span>{story.page_count} Full-Bleed Pages • 8×8 mm Archival Hardcover</span>
                     </div>
                   </div>
                 </div>
@@ -620,45 +524,52 @@ export default function StoryBooksPage() {
 
             {/* Modal Content */}
             <div className="p-6 overflow-y-auto space-y-6">
-              <div className="aspect-16/9 bg-[#FAEEED]/40 rounded-2xl border border-[#EBE3D9] p-8 flex flex-col justify-between relative overflow-hidden">
-                <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-white/90 text-xs font-medium text-[#2D222A] border border-[#EBE3D9]">
-                  Spread {activeSpreadIndex + 1} of {previewStory.sample_spreads.length}
-                </div>
+              {(() => {
+                const currentSpread = previewStory.sample_spreads[activeSpreadIndex] || previewStory.sample_spreads[0];
+                if (!currentSpread) return null;
+                return (
+                  <>
+                    <div className="aspect-16/9 bg-[#FAEEED]/40 rounded-2xl border border-[#EBE3D9] p-8 flex flex-col justify-between relative overflow-hidden">
+                      <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-white/90 text-xs font-medium text-[#2D222A] border border-[#EBE3D9]">
+                        Spread {activeSpreadIndex + 1} of {previewStory.sample_spreads.length}
+                      </div>
 
-                <div className="space-y-3 max-w-lg">
-                  <span className="text-xs uppercase tracking-widest text-[#C98A84] font-semibold">
-                    Page {previewStory.sample_spreads[activeSpreadIndex].page} Preview
-                  </span>
-                  <h4 className="font-editorial-serif text-2xl font-bold text-[#2D222A]">
-                    {previewStory.sample_spreads[activeSpreadIndex].title}
-                  </h4>
-                  <p className="font-story text-base sm:text-lg text-[#2D222A] italic leading-relaxed">
-                    “{previewStory.sample_spreads[activeSpreadIndex].text}”
-                  </p>
-                </div>
+                      <div className="space-y-3 max-w-lg">
+                        <span className="text-xs uppercase tracking-widest text-[#C98A84] font-semibold">
+                          Page {currentSpread.page} Preview
+                        </span>
+                        <h4 className="font-editorial-serif text-2xl font-bold text-[#2D222A]">
+                          {currentSpread.title}
+                        </h4>
+                        <p className="font-story text-base sm:text-lg text-[#2D222A] italic leading-relaxed">
+                          “{currentSpread.text}”
+                        </p>
+                      </div>
 
-                <div className="bg-white/90 backdrop-blur-md rounded-xl p-4 border border-[#EBE3D9] text-xs text-[#695B64]">
-                  <strong className="text-[#2D222A] block mb-0.5">Scene Illustration Note:</strong>
-                  {previewStory.sample_spreads[activeSpreadIndex].scene}
-                </div>
-              </div>
+                      <div className="bg-white/90 backdrop-blur-md rounded-xl p-4 border border-[#EBE3D9] text-xs text-[#695B64]">
+                        <strong className="text-[#2D222A] block mb-0.5">Scene Illustration Note:</strong>
+                        {currentSpread.scene}
+                      </div>
+                    </div>
 
-              {/* Spread selector tabs */}
-              <div className="flex gap-2">
-                {previewStory.sample_spreads.map((spread, idx) => (
-                  <button
-                    key={spread.page}
-                    onClick={() => setActiveSpreadIndex(idx)}
-                    className={`flex-1 py-2 px-3 rounded-xl border text-xs font-medium transition-all ${
-                      activeSpreadIndex === idx
-                        ? "bg-[#C98A84] text-white border-[#C98A84]"
-                        : "bg-[#FAF7F2] text-[#695B64] border-[#EBE3D9] hover:bg-[#FAEEED]"
-                    }`}
-                  >
-                    Spread {idx + 1} (Page {spread.page})
-                  </button>
-                ))}
-              </div>
+                    {/* Spread selector tabs */}
+                    <div className="flex gap-2">
+                      {previewStory.sample_spreads.map((spread, idx) => (
+                        <button
+                          key={spread.page || idx}
+                          onClick={() => setActiveSpreadIndex(idx)}
+                          className={`flex-1 py-2 px-3 rounded-xl border text-xs font-medium transition-all ${activeSpreadIndex === idx
+                              ? "bg-[#C98A84] text-white border-[#C98A84]"
+                              : "bg-[#FAF7F2] text-[#695B64] border-[#EBE3D9] hover:bg-[#FAEEED]"
+                            }`}
+                        >
+                          Spread {idx + 1} (Page {spread.page})
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* Modal Footer */}

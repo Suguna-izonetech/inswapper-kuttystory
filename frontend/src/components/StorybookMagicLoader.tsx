@@ -247,7 +247,7 @@ export default function StorybookMagicLoader({
     {
       id: 4,
       name: `Compiling ${totalPages} Editorial Spreads`,
-      detail: `Formatting 210×210mm archival spreads for 3D flipbook`,
+      detail: `Formatting 8×8mm archival spreads for 3D flipbook`,
       pct: 95,
       icon: BookOpen,
     },
@@ -330,10 +330,10 @@ export default function StorybookMagicLoader({
       {/* Main Showcase Stage: 3D Levitating Book & Magical Easel */}
       <div className="py-8 sm:py-10 flex flex-col items-center justify-center relative z-10">
         <div className="relative w-full max-w-xl mx-auto flex flex-col items-center">
-          
+
           {/* Levitating 3D Storybook Visual */}
           <div className="relative animate-float-gentle flex items-center justify-center">
-            
+
             {/* Golden & Rose Radiant Backlight Glow */}
             <div className="absolute inset-0 -m-8 rounded-full bg-gradient-to-r from-[#C98A84]/30 via-[#F5D0C5]/40 to-[#C98A84]/30 blur-2xl animate-magic-glow pointer-events-none" />
 
@@ -350,13 +350,13 @@ export default function StorybookMagicLoader({
 
             {/* The 3D Open Hardcover Book Spread */}
             <div className="relative w-[310px] sm:w-[460px] h-[190px] sm:h-[260px] rounded-2xl bg-[#FAF7F2] shadow-2xl border-4 border-[#DDD3C4] flex overflow-hidden">
-              
+
               {/* Left Page: Child's Likeness Medallion Frame */}
               <div className="w-1/2 h-full bg-[#FFFDF9] border-r border-[#EBE3D9] p-3 sm:p-5 flex flex-col items-center justify-between relative">
-                
+
                 {/* Book Header Spine Texture */}
                 <div className="absolute left-0 inset-y-0 w-4 bg-gradient-to-r from-[#D8CCC0]/60 to-transparent pointer-events-none" />
-                
+
                 <span className="text-[10px] uppercase tracking-wider text-[#A8988F] font-bold">
                   Protagonist Reference
                 </span>
@@ -376,7 +376,7 @@ export default function StorybookMagicLoader({
                           <Smile className="w-10 h-10" />
                         </div>
                       )}
-                      
+
                       {/* Shimmer wave across photo */}
                       <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/50 to-transparent animate-scanner-line pointer-events-none" />
                     </div>
@@ -400,10 +400,10 @@ export default function StorybookMagicLoader({
 
               {/* Right Page: Fairy Tale Watercolor Scene Canvas */}
               <div className="w-1/2 h-full bg-[#FFFDF9] p-3 sm:p-5 flex flex-col items-center justify-between relative overflow-hidden">
-                
+
                 {/* Book Page Spine Shadow */}
                 <div className="absolute left-0 inset-y-0 w-4 bg-gradient-to-r from-black/10 to-transparent pointer-events-none" />
-                
+
                 {/* Page turning flap animation */}
                 <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-[#C98A84]/15 to-transparent animate-page-flip pointer-events-none" />
 
@@ -413,7 +413,7 @@ export default function StorybookMagicLoader({
 
                 {/* Animated Watercolor Canvas Simulation */}
                 <div className="relative w-full h-24 sm:h-36 rounded-xl overflow-hidden bg-gradient-to-br from-[#FAEEED] via-[#F2EEF7] to-[#FAF5E8] border border-[#EBE3D9] flex flex-col items-center justify-center p-2 text-center shadow-inner my-auto">
-                  
+
                   {/* Floating stardust inside the page */}
                   <div className="absolute top-2 right-2 text-xs text-[#C5A059] animate-bounce">
                     ✨
@@ -434,10 +434,10 @@ export default function StorybookMagicLoader({
                     {smoothProgress < 25
                       ? "Analyzing likeness & expressions..."
                       : smoothProgress < 50
-                      ? "Weaving magical scenery..."
-                      : smoothProgress < 75
-                      ? "Painting watercolor brushstrokes..."
-                      : "Binding archival spreads..."}
+                        ? "Weaving magical scenery..."
+                        : smoothProgress < 75
+                          ? "Painting watercolor brushstrokes..."
+                          : "Binding archival spreads..."}
                   </p>
                 </div>
 
@@ -490,7 +490,7 @@ export default function StorybookMagicLoader({
 
       {/* Interactive Bottom Deck: Rotating Fun Facts & Scene Teaser Tabs */}
       <div className="mt-6 pt-6 border-t border-[#EBE3D9] grid grid-cols-1 md:grid-cols-12 gap-5 relative z-10">
-        
+
         {/* Left Column: Rotating Story Fun Fact Carousel (Keeps user reading & entertained) */}
         <div className="md:col-span-7 p-4 sm:p-5 rounded-2xl bg-white border border-[#EBE3D9] shadow-xs flex flex-col justify-between">
           <div className="space-y-2">
@@ -517,9 +517,8 @@ export default function StorybookMagicLoader({
                   {STORY_FUN_FACTS.map((_, i) => (
                     <div
                       key={i}
-                      className={`w-1.5 h-1.5 rounded-full transition-all ${
-                        activeFactIdx === i ? "bg-[#C98A84] w-3" : "bg-[#D8CCC0]"
-                      }`}
+                      className={`w-1.5 h-1.5 rounded-full transition-all ${activeFactIdx === i ? "bg-[#C98A84] w-3" : "bg-[#D8CCC0]"
+                        }`}
                     />
                   ))}
                 </div>
@@ -573,11 +572,10 @@ export default function StorybookMagicLoader({
                     e.stopPropagation();
                     setActiveTeaserIdx(idx);
                   }}
-                  className={`flex-1 py-1 px-2 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 ${
-                    activeTeaserIdx === idx
+                  className={`flex-1 py-1 px-2 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 ${activeTeaserIdx === idx
                       ? "bg-white text-[#C98A84] shadow-xs border border-[#C98A84]/30"
                       : "text-[#695B64] hover:bg-white/60"
-                  }`}
+                    }`}
                 >
                   <span>Scene {scene.number}</span>
                 </button>

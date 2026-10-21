@@ -189,7 +189,7 @@ export default function FootStepsPage() {
           </div>
         </div>
       </section>
-      
+
       {/* 4. Book Sales Map Reach Section */}
       <BookSalesMapSection />
 
@@ -214,7 +214,7 @@ export default function FootStepsPage() {
                 “When our son started kindergarten, he had so much separation anxiety. We gave him his KuttyStory book where he walked bravely through the Whispering Woods. He hugged that book every night before school.”
               </p>
               <div className="text-xs font-bold text-[#2D222A] pt-1">
-                — Priya & Karthik M., London, UK
+                — Priya & Karthik M., Chennai
               </div>
             </div>
 
@@ -226,7 +226,7 @@ export default function FootStepsPage() {
                 “We stamped Maya's 1st birthday footprint on the commemorative page. Holding the hardbound book and looking at her likeness as the unicorn's friend brought tears to her grandparents’ eyes.”
               </p>
               <div className="text-xs font-bold text-[#2D222A] pt-1">
-                — Sarah & David B., Toronto, Canada
+                — Sarah & David B., Mumbai
               </div>
             </div>
           </div>

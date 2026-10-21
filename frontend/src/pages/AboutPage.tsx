@@ -159,7 +159,7 @@ export default function AboutPage() {
               4. Museum Archival Print
             </h3>
             <p className="text-xs text-[#695B64] leading-relaxed">
-              Deterministic 210×210 mm vector typesetting engine. Heavyweight 170gsm silk paper, reinforced cloth spine, and vegetable-based eco inks that resist water drops and sunlight fading.
+              Deterministic 8x8 mm vector typesetting engine. Heavyweight 170gsm silk paper, reinforced cloth spine, and vegetable-based eco inks that resist water drops and sunlight fading.
             </p>
           </div>
         </div>
@@ -179,9 +179,9 @@ export default function AboutPage() {
 
             <div className="space-y-1 pt-4 md:pt-0">
               <div className="font-editorial-serif text-4xl sm:text-5xl font-bold text-[#8F9E8B]">
-                42
+                23
               </div>
-              <div className="text-xs font-medium text-[#2D222A]">Countries Delivered</div>
+              <div className="text-xs font-medium text-[#2D222A]">States Delivered</div>
               <div className="text-[11px] text-[#695B64]">With tracked express shipping</div>
             </div>
 
@@ -278,7 +278,7 @@ export default function AboutPage() {
 
           <div>
             <Link
-              to="/personalize/unicorn-story"
+              to="/storybooks"
               className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs sm:text-sm font-semibold shadow-md transition-all"
             >
               <span>Start Personalizing Today</span>

@@ -126,7 +126,7 @@ export default function PersonalizePage() {
       .then((data) => {
         setJob(data);
         if (data.story_slug && data.story_slug !== slug) {
-          api.getStory(data.story_slug).then(s => setStory(s)).catch(() => {});
+          api.getStory(data.story_slug).then(s => setStory(s)).catch(() => { });
         }
       })
       .catch((err) => console.error("Initial job load error:", err));
@@ -136,7 +136,7 @@ export default function PersonalizePage() {
         const updated = await api.getPersonalizationJob(jobId);
         setJob(updated);
         if (updated.story_slug && updated.story_slug !== slug && (!story || story.slug !== updated.story_slug)) {
-          api.getStory(updated.story_slug).then(s => setStory(s)).catch(() => {});
+          api.getStory(updated.story_slug).then(s => setStory(s)).catch(() => { });
         }
         const statusLower = updated.status?.toLowerCase();
         if (statusLower === "completed" || statusLower === "failed" || statusLower === "done") {
@@ -502,8 +502,8 @@ export default function PersonalizePage() {
                         type="button"
                         onClick={() => setChildGender("girl")}
                         className={`py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${childGender === "girl"
-                            ? "border-[#EC4899] bg-[#FDF2F8] text-[#BE185D] shadow-2xs ring-1 ring-[#EC4899]"
-                            : "border-[#D8CCC0] bg-[#FAF7F2] text-[#695B64] hover:bg-white"
+                          ? "border-[#EC4899] bg-[#FDF2F8] text-[#BE185D] shadow-2xs ring-1 ring-[#EC4899]"
+                          : "border-[#D8CCC0] bg-[#FAF7F2] text-[#695B64] hover:bg-white"
                           }`}
                       >
                         <span>👧</span>
@@ -514,8 +514,8 @@ export default function PersonalizePage() {
                         type="button"
                         onClick={() => setChildGender("boy")}
                         className={`py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${childGender === "boy"
-                            ? "border-[#3B82F6] bg-[#EFF6FF] text-[#1D4ED8] shadow-2xs ring-1 ring-[#3B82F6]"
-                            : "border-[#D8CCC0] bg-[#FAF7F2] text-[#695B64] hover:bg-white"
+                          ? "border-[#3B82F6] bg-[#EFF6FF] text-[#1D4ED8] shadow-2xs ring-1 ring-[#3B82F6]"
+                          : "border-[#D8CCC0] bg-[#FAF7F2] text-[#695B64] hover:bg-white"
                           }`}
                       >
                         <span>👦</span>
@@ -711,7 +711,7 @@ export default function PersonalizePage() {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs text-[#695B64]">
-                  <span>Square 210×210 mm Trim</span>
+                  <span>Square 8×8 mm Trim</span>
                   <span className="text-[#8F9E8B] font-semibold">{story.page_count} Pages</span>
                 </div>
                 <h3 className="font-editorial-serif text-2xl font-bold text-[#2D222A]">
@@ -754,13 +754,12 @@ export default function PersonalizePage() {
                 const isJobCompleted = statusLower === "completed" || statusLower === "done";
                 const isJobFailed = statusLower === "failed";
                 return (
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                    isJobCompleted
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isJobCompleted
                       ? "bg-[#EEF4ED] text-[#8F9E8B]"
                       : isJobFailed
-                      ? "bg-[#FEF2F2] text-[#EF4444]"
-                      : "bg-[#FAEEED] text-[#C98A84] ring-4 ring-[#C98A84]/15 shadow-xs"
-                  }`}>
+                        ? "bg-[#FEF2F2] text-[#EF4444]"
+                        : "bg-[#FAEEED] text-[#C98A84] ring-4 ring-[#C98A84]/15 shadow-xs"
+                    }`}>
                     {isJobCompleted ? (
                       <CheckCircle className="w-6 h-6 text-[#8F9E8B]" />
                     ) : isJobFailed ? (
@@ -814,22 +813,20 @@ export default function PersonalizePage() {
                 <div className="inline-flex rounded-full p-1 bg-[#F5EEDB] border border-[#DDD6C0] text-xs">
                   <button
                     onClick={() => setViewerMode("flipbook")}
-                    className={`px-3 py-1 rounded-full flex items-center gap-1.5 transition cursor-pointer font-medium ${
-                      viewerMode === "flipbook"
+                    className={`px-3 py-1 rounded-full flex items-center gap-1.5 transition cursor-pointer font-medium ${viewerMode === "flipbook"
                         ? "bg-[#C98A84] text-white shadow-xs"
                         : "text-[#695B64] hover:text-[#2D222A]"
-                    }`}
+                      }`}
                   >
                     <BookOpen className="w-3.5 h-3.5" />
                     <span>3D Realistic Flipbook</span>
                   </button>
                   <button
                     onClick={() => setViewerMode("spread")}
-                    className={`px-3 py-1 rounded-full flex items-center gap-1.5 transition cursor-pointer font-medium ${
-                      viewerMode === "spread"
+                    className={`px-3 py-1 rounded-full flex items-center gap-1.5 transition cursor-pointer font-medium ${viewerMode === "spread"
                         ? "bg-[#C98A84] text-white shadow-xs"
                         : "text-[#695B64] hover:text-[#2D222A]"
-                    }`}
+                      }`}
                   >
                     <Layout className="w-3.5 h-3.5" />
                     <span>Editorial Spread</span>
@@ -873,11 +870,10 @@ export default function PersonalizePage() {
                           key={lang.id}
                           onClick={() => handleLanguageChange(lang.id)}
                           disabled={isTranslating}
-                          className={`px-3 py-1 rounded-full text-xs font-semibold transition border cursor-pointer ${
-                            selectedLanguage === lang.id
+                          className={`px-3 py-1 rounded-full text-xs font-semibold transition border cursor-pointer ${selectedLanguage === lang.id
                               ? "bg-[#C98A84] text-white border-[#C98A84]"
                               : "bg-white text-gray-700 hover:bg-gray-100 border-gray-200"
-                          }`}
+                            }`}
                         >
                           {lang.label}
                         </button>
@@ -961,9 +957,8 @@ export default function PersonalizePage() {
                       <button
                         key={ast.id}
                         onClick={() => setCurrentPageIdx(idx)}
-                        className={`relative w-20 h-20 rounded-xl overflow-hidden shrink-0 border-2 transition cursor-pointer ${
-                          currentPageIdx === idx ? "border-[#C98A84] shadow-md scale-105" : "border-[#EBE3D9] opacity-70 hover:opacity-100"
-                        }`}
+                        className={`relative w-20 h-20 rounded-xl overflow-hidden shrink-0 border-2 transition cursor-pointer ${currentPageIdx === idx ? "border-[#C98A84] shadow-md scale-105" : "border-[#EBE3D9] opacity-70 hover:opacity-100"
+                          }`}
                       >
                         <img src={ast.image_url} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
                         <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] px-1 rounded">

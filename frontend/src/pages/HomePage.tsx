@@ -56,7 +56,7 @@ export default function HomePage() {
             <div className="flex items-center gap-6 pt-6 text-xs text-[#695B64]">
               <div className="flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4 text-[#8F9E8B]" />
-                <span>Deterministic 210×210 mm Print Engine</span>
+                <span>Deterministic 8 X 8 mm Print Engine</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-[#8F9E8B]" />
@@ -259,7 +259,7 @@ export default function HomePage() {
                 Deterministic PDF Layout
               </h3>
               <p className="text-xs leading-relaxed text-[#695B64]">
-                Artwork is typeset with our ReportLab deterministic layout engine at exact 210×210 mm trim size. Sharp vector typography, safe margins, and validated print-ready output.
+                Artwork is typeset with our ReportLab deterministic layout engine at exact 8×8 mm trim size. Sharp vector typography, safe margins, and validated print-ready output.
               </p>
             </div>
           </div>
@@ -290,7 +290,7 @@ export default function HomePage() {
               See How It Works
             </Link>
             <Link
-              to={stories.length > 0 ? `/personalize/${stories[0].slug}` : "/#stories"}
+              to="/storybooks"
               className="px-6 py-3.5 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs font-semibold text-center transition-colors shadow-sm"
             >
               Start Personalization

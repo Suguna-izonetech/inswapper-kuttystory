@@ -34,7 +34,7 @@ const STEPS: StepItem[] = [
     number: "01",
     title: "Select Story & Add Dedication",
     tagline: "Choose from our curated realm of fairy tales and adventures",
-    description: "Browse our library of classical narrative arcs. Enter your child’s name, age, and write a heartfelt dedication letter that will be typeset on Page 1 as a lifelong keepsake.",
+    description: "Browse our library of classical narrative arcs. Enter your child’s name, age, and write a heartfelt dedication letter that will be typeset on the last Page as a lifelong keepsake.",
     icon: BookOpen,
     colorBg: "bg-[#FAEEED]",
     colorText: "text-[#C98A84]",
@@ -61,8 +61,8 @@ const STEPS: StepItem[] = [
   {
     number: "03",
     title: "Character Consistency AI Painting",
-    tagline: "Transforming facial features into timeless watercolor art",
-    description: "Our fine-tuned generative pipeline gently maps your child's distinctive eye shape, smile, and facial structure into the story's painterly illustration style across all 26 pages.",
+    tagline: "Transforming facial features into timeless art",
+    description: "Our fine-tuned generative pipeline gently maps your child's distinctive eye shape, smile, and facial structure into the story's painterly illustration style across all 24 pages.",
     icon: Cpu,
     colorBg: "bg-[#EEF4ED]",
     colorText: "text-[#8F9E8B]",
@@ -74,28 +74,26 @@ const STEPS: StepItem[] = [
   },
   {
     number: "04",
-    title: "Interactive 3D Flipbook Preview",
+    title: "Interactive Flipbook Preview",
     tagline: "Turn the virtual pages before a single drop of ink is printed",
     description: "Review every spread of your child's book in our interactive 3D viewer. Read the poetry, inspect the illustrations, and verify every dedication detail with complete confidence.",
     icon: Eye,
     colorBg: "bg-[#FAF5E8]",
     colorText: "text-[#C5A059]",
     details: [
-      "Lifelike 3D book physics with sound effects and realistic lighting",
-      "Instant full-bleed inspection of all 26 illustrated pages",
-      "Regeneration options if any spread needs artistic adjustment"
+      "Instant full-bleed inspection of 5 illustrated pages"
     ]
   },
   {
     number: "05",
     title: "Archival Print & Global Dispatch",
     tagline: "Master bookbinding delivered to your family doorstep",
-    description: "Your book is typeset using our deterministic ReportLab engine at 210×210 mm, printed on archival 170gsm silk paper, bound in hardcover, and hand-wrapped with luxury ribbons.",
+    description: "Your book is typeset using our deterministic ReportLab engine at 8×8 mm, printed on archival 170gsm silk paper, bound in hardcover, and hand-wrapped with luxury ribbons.",
     icon: PackageCheck,
     colorBg: "bg-[#FAEEED]",
     colorText: "text-[#C98A84]",
     details: [
-      "210×210 mm square hardcover with protective matte laminate",
+      "8×8 mm square hardcover with protective matte laminate",
       "Smyth-sewn lie-flat binding built to survive enthusiastic bedtime hands",
       "Delivered in a presentation box with tracked international shipping"
     ]
@@ -147,7 +145,7 @@ export default function HowItWorksPage() {
           </h1>
 
           <p className="max-w-2xl mx-auto text-sm sm:text-base text-[#695B64] leading-relaxed">
-            From a single smartphone photo to an archival 210×210 mm hardcover, explore our 5-step journey that brings personalized magic into your child's bedtime routine.
+            From a single smartphone photo to an archival 8×8 mm hardcover, explore our 5-step journey that brings personalized magic into your child's bedtime routine.
           </p>
         </div>
       </section>
@@ -296,9 +294,8 @@ export default function HowItWorksPage() {
                     {faq.q}
                   </span>
                   <ChevronDown
-                    className={`w-5 h-5 text-[#C98A84] shrink-0 transition-transform duration-300 ${
-                      isOpen ? "rotate-180" : ""
-                    }`}
+                    className={`w-5 h-5 text-[#C98A84] shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
                 {isOpen && (
@@ -330,7 +327,7 @@ export default function HowItWorksPage() {
 
           <div>
             <Link
-              to="/personalize/unicorn-story"
+              to="/storybooks"
               className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs sm:text-sm font-semibold shadow-md transition-all"
             >
               <span>Personalize A Storybook</span>
