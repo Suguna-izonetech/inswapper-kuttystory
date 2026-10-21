@@ -40,7 +40,8 @@ import {
   Star,
   MessageSquareHeart,
   Video,
-  Pencil
+  Pencil,
+  CreditCard
 } from "lucide-react";
 import {
   api,
@@ -57,7 +58,7 @@ import {
   FeedbackItem,
 } from "@/lib/api";
 
-type TabType = "dashboard" | "orders" | "previews" | "stories" | "page_editor" | "settings" | "child_stories" | "feedback";
+type TabType = "dashboard" | "orders" | "payments" | "previews" | "stories" | "page_editor" | "settings" | "child_stories" | "feedback";
 
 export default function AdminDashboardPage({ initialTab }: { initialTab?: TabType }) {
   const navigate = useNavigate();
@@ -68,6 +69,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
     if (initialTab) return initialTab;
     const path = window.location.pathname.toLowerCase();
     if (path.includes("/feedback")) return "feedback";
+    if (path.includes("/payments")) return "payments";
     if (path.includes("/child_stories") || path.includes("/child-stories")) return "child_stories";
     if (path.includes("/stories")) return "stories";
     if (path.includes("/orders")) return "orders";
