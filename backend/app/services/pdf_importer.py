@@ -289,11 +289,38 @@ class PDFImporterService:
     ) -> StoryTemplate:
         """
         Idempotently import a storybook from a PDF file.
+        Supports both local file paths and MinIO storage object keys.
         Renders every page into high-resolution PNGs stored in MinIO, extracts text,
         and dynamically detects character face anchors for seamless AI personalization.
         """
-        if not os.path.exists(pdf_path):
-            raise FileNotFoundError(f"Source PDF not found at: {pdf_path}")
+        pdf_bytes = None
+        source_storage_path = None
+
+        # 1. Resolve PDF data (from local file or from MinIO)
+        if os.path.exists(str(pdf_path)):
+            with open(str(pdf_path), "rb") as f:
+                pdf_bytes = f.read()
+            # Store original PDF in MinIO object storage if not already there
+            stored_pdf_name = f"{slug}-original.pdf"
+            source_storage_path = storage.save_bytes(
+                data=pdf_bytes,
+                category="original_pdfs",
+                extension=".pdf",
+                custom_name=stored_pdf_name
+            )
+        else:
+            # Check if it's already an object in MinIO storage
+            try:
+                pdf_bytes = storage.get_bytes(str(pdf_path))
+                source_storage_path = str(pdf_path)
+            except Exception:
+                resolved = storage.resolve_path(str(pdf_path))
+                if resolved and os.path.exists(resolved):
+                    with open(resolved, "rb") as f:
+                        pdf_bytes = f.read()
+                    source_storage_path = str(pdf_path)
+                else:
+                    raise FileNotFoundError(f"Source PDF not found on disk or in MinIO storage: {pdf_path}")
             
         # Check if story already exists
         existing_story = db.query(StoryTemplate).filter(StoryTemplate.slug == slug).first()
@@ -303,11 +330,7 @@ class PDFImporterService:
                 print(f"Story '{slug}' already imported with {len(existing_story.pages)} pages. Skipping reimport.")
                 return existing_story
 
-        # Store original PDF in MinIO object storage
-        stored_pdf_name = f"{slug}-original.pdf"
-        dest_pdf_path = storage.save_file(pdf_path, category="original_pdfs", object_name=stored_pdf_name)
-
-        doc = fitz.open(str(pdf_path))
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         page_count = len(doc)
 
         if existing_story:
@@ -320,7 +343,7 @@ class PDFImporterService:
             story.price_digital = price_digital
             story.price_print = price_print
             story.currency = currency
-            story.source_pdf_path = dest_pdf_path
+            story.source_pdf_path = source_storage_path
             # Remove old pages if reimporting
             db.query(StoryPage).filter(StoryPage.story_id == story.id).delete()
         else:
@@ -330,7 +353,7 @@ class PDFImporterService:
                 description=description,
                 category=category,
                 age_range=age_range,
-                source_pdf_path=dest_pdf_path,
+                source_pdf_path=source_storage_path,
                 page_count=page_count,
                 status="published",
                 price_digital=price_digital,
@@ -392,7 +415,7 @@ class PDFImporterService:
                 page_index=idx,
                 page_number=page_num,
                 page_type=beat_info.get("type", "story"),
-                original_image_path=str(page_dest.resolve()),
+                original_image_path=str(page_dest),
                 story_text=beat_info.get("text", ""),
                 extracted_text=extracted,
                 scene_description=beat_info.get("scene", ""),
@@ -405,7 +428,8 @@ class PDFImporterService:
             db.add(story_page)
 
             if page_num == 1:
-                story.cover_image_path = str(page_dest.resolve())
+                story.cover_image_path = str(page_dest)
+
 
         db.commit()
         db.refresh(story)

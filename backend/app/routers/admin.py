@@ -123,6 +123,15 @@ def create_story(payload: StoryTemplateCreate, db: Session = Depends(get_db)):
     db.refresh(story)
     return enrich_story_urls(story)
 
+@router.get("/stories/upload")
+def stories_upload_info():
+    """Information endpoint for upload route (POST is used for creating stories with PDF)."""
+    return {
+        "status": "active",
+        "message": "Use POST /api/v1/admin/stories/upload with multipart/form-data to upload and import stories."
+    }
+
+
 @router.post("/stories/upload", response_model=StoryTemplateOut)
 async def create_story_with_upload(
     title: str = Form(...),
