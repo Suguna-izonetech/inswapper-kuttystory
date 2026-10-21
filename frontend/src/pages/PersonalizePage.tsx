@@ -13,7 +13,8 @@ import {
   FlipHorizontal,
   RotateCcw,
   BookOpen,
-  Layout
+  Layout,
+  Lock
 } from "lucide-react";
 import { api, StoryTemplate, PersonalizationJob, GeneratedAsset } from "@/lib/api";
 import { processSolidBackground } from "@/lib/imageProcessor";
@@ -23,6 +24,8 @@ import PhotoTipsGuide from "@/components/PhotoTipsGuide";
 import PhotoValidationStatus from "@/components/PhotoValidationStatus";
 import RealisticBookFlipViewer from "@/components/RealisticBookFlipViewer";
 import StorybookMagicLoader from "@/components/StorybookMagicLoader";
+import PaymentModal from "@/components/PaymentModal";
+import PdfDownloadModal from "@/components/PdfDownloadModal";
 
 export default function PersonalizePage() {
   const params = useParams<{ slug?: string }>();
@@ -71,6 +74,27 @@ export default function PersonalizePage() {
   const [currentPageIdx, setCurrentPageIdx] = useState(0);
   const [retryingAssetId, setRetryingAssetId] = useState<string | null>(null);
   const [viewerMode, setViewerMode] = useState<"flipbook" | "spread">("flipbook");
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  // PDF Download loading animation modal state
+  const [downloadModal, setDownloadModal] = useState<{
+    isOpen: boolean;
+    url: string | null;
+    filename?: string;
+    formatTitle?: string;
+  }>({
+    isOpen: false,
+    url: null,
+  });
+
+  const triggerPdfDownload = (url: string, filename: string, formatTitle: string) => {
+    setDownloadModal({
+      isOpen: true,
+      url,
+      filename,
+      formatTitle,
+    });
+  };
 
   // Multi-Language Translation states
   const [selectedLanguage, setSelectedLanguage] = useState("english");
@@ -780,24 +804,83 @@ export default function PersonalizePage() {
               </div>
             </div>
 
-            {/* Right Status Badges */}
-            <div className="flex items-center gap-4">
-              <div className="text-right">
+            {/* Right Status Badges & CTAs */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="text-right hidden sm:block">
                 <span className="text-xs text-[#695B64] block">Progress</span>
                 <span className="font-editorial-serif text-lg font-bold text-[#2D222A]">
                   {job.completed_pages} of {job.total_pages || 5} Pages
                 </span>
               </div>
+
               {(job.status?.toLowerCase() === "completed" || job.status?.toLowerCase() === "done") && (
-                <a
-                  href={`/api/v1/personalization/${job.id}/pdf?lang=${selectedLanguage}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-5 py-2.5 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Download Preview PDF ({selectedLanguage.toUpperCase()})</span>
-                </a>
+                <>
+                  {!job.is_paid ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          triggerPdfDownload(
+                            `/api/v1/personalization/${job.id}/pdf?lang=${selectedLanguage}`,
+                            `${(job.child_name || "Child").replace(/\s+/g, "_")}_Preview_5Pages.pdf`,
+                            "5-Page Preview Storybook PDF"
+                          )
+                        }
+                        className="px-4 py-2 rounded-full border border-[#EBE3D9] hover:bg-[#FAF7F2] text-[#4E424B] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                        title="Download free 5-page preview watermarked PDF"
+                      >
+                        <Download className="w-3.5 h-3.5 text-[#695B64]" />
+                        <span>Preview PDF</span>
+                      </button>
+
+                      <button
+                        onClick={() => setShowPaymentModal(true)}
+                        className="px-5 py-2.5 rounded-full bg-gradient-to-r from-[#8B3DFF] to-[#C98A84] hover:from-[#7828f7] hover:to-[#B87A74] text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-[#8B3DFF]/20 hover:shadow-lg transition cursor-pointer"
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Unlock Full Storybook</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-emerald-600" />
+                        <span>Unlocked</span>
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          triggerPdfDownload(
+                            `/api/v1/personalization/${job.id}/pdf?mode=full&lang=${selectedLanguage}`,
+                            `${(job.child_name || "Child").replace(/\s+/g, "_")}_${(story?.title || "Storybook").replace(/\s+/g, "_")}_Full_Storybook.pdf`,
+                            `Full Illustrated Storybook PDF (${selectedLanguage.toUpperCase()})`
+                          )
+                        }
+                        className="px-5 py-2.5 rounded-full bg-[#8B3DFF] hover:bg-[#7828f7] text-white text-xs font-bold flex items-center gap-2 shadow-sm transition cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Download Full PDF ({selectedLanguage.toUpperCase()})</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          triggerPdfDownload(
+                            `/api/v1/personalization/${job.id}/print-pdf?size=8x8&color=rgb&lang=${selectedLanguage}`,
+                            `${(job.child_name || "Child").replace(/\s+/g, "_")}_${(story?.title || "Storybook").replace(/\s+/g, "_")}_Print_8x8.pdf`,
+                            "Print-Ready 8×8 Keepsake PDF"
+                          )
+                        }
+                        className="px-4 py-2 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs font-bold flex items-center gap-2 shadow-sm transition cursor-pointer"
+                        title="Complete print-ready 8×8 RGB PDF"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Print PDF (8×8)</span>
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -848,6 +931,8 @@ export default function PersonalizePage() {
                   onLanguageChange={handleLanguageChange}
                   translatedTexts={translations}
                   isTranslating={isTranslating}
+                  isPaid={Boolean(job.is_paid)}
+                  onUnlockStorybook={() => setShowPaymentModal(true)}
                 />
               ) : (
                 <div className="editorial-card p-8 bg-white space-y-6">
@@ -969,6 +1054,80 @@ export default function PersonalizePage() {
                   </div>
                 </div>
               )}
+
+              {/* Paywall Lock Banner as specified in Step A */}
+              {!job.is_paid ? (
+                <div className="editorial-card p-6 sm:p-8 bg-gradient-to-br from-[#2D222A] via-[#382633] to-[#2D222A] text-white rounded-3xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 border border-white/10 relative overflow-hidden">
+                  <div className="space-y-2 max-w-xl">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[#C98A84] text-[11px] font-bold tracking-wider uppercase border border-white/10">
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>5-Page Free Preview Completed</span>
+                    </div>
+                    <h3 className="font-editorial-serif text-2xl sm:text-3xl font-bold text-[#FAF7F2]">
+                      Unlock {job.child_name || "Your Child"}'s Full Adventure
+                    </h3>
+                    <p className="text-xs sm:text-sm text-[#EBE3D9] leading-relaxed">
+                      You have viewed the first 5 preview pages of {job.child_name || "your child"}'s adventure! Unlock all 26+ pages and get your print-ready PDF.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0 w-full md:w-auto">
+                    <button
+                      onClick={() => setShowPaymentModal(true)}
+                      className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-gradient-to-r from-[#8B3DFF] to-[#C98A84] hover:from-[#7828f7] hover:to-[#B87A74] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#8B3DFF]/30 hover:shadow-xl transition cursor-pointer"
+                    >
+                      <Lock className="w-4 h-4" />
+                      <span>Unlock Full Storybook</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="editorial-card p-6 sm:p-7 bg-[#ECFDF5] border border-[#A7F3D0] rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs uppercase tracking-wider">
+                      <Sparkles className="w-4 h-4 text-emerald-600" />
+                      <span>Full Storybook Unlocked</span>
+                    </div>
+                    <h4 className="font-editorial-serif text-xl font-bold text-[#065F46]">
+                      All 26+ Pages & Print Files Ready for {job.child_name}
+                    </h4>
+                    <p className="text-xs text-emerald-800/80">
+                      High-resolution deterministic PDF files are generated and ready for instant reading or printing.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        triggerPdfDownload(
+                          `/api/v1/personalization/${job.id}/pdf?mode=full&lang=${selectedLanguage}`,
+                          `${(job.child_name || "Child").replace(/\s+/g, "_")}_${(story?.title || "Storybook").replace(/\s+/g, "_")}_Full_Storybook.pdf`,
+                          `Full Illustrated Storybook PDF (${selectedLanguage.toUpperCase()})`
+                        )
+                      }
+                      className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#8B3DFF] hover:bg-[#7828f7] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Download Full PDF</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        triggerPdfDownload(
+                          `/api/v1/personalization/${job.id}/print-pdf?size=8x8&color=rgb&lang=${selectedLanguage}`,
+                          `${(job.child_name || "Child").replace(/\s+/g, "_")}_${(story?.title || "Storybook").replace(/\s+/g, "_")}_Print_8x8.pdf`,
+                          "Print-Ready 8×8 Keepsake PDF"
+                        )
+                      }
+                      className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Print PDF</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             /* Interactive Enchanted Storybook Atelier Generation Stage */
@@ -980,6 +1139,36 @@ export default function PersonalizePage() {
             />
           )}
         </div>
+      )}
+
+      {/* Payment & Checkout Modal */}
+      {job && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          job={job}
+          story={story}
+          selectedLanguage={selectedLanguage}
+          onPaymentSuccess={() => {
+            if (jobId) {
+              api.getPersonalizationJob(jobId).then((updated) => setJob(updated));
+            }
+          }}
+        />
+      )}
+
+      {/* PDF Download Loading Animation & Progress Modal */}
+      {job && (
+        <PdfDownloadModal
+          isOpen={downloadModal.isOpen}
+          onClose={() => setDownloadModal((prev) => ({ ...prev, isOpen: false }))}
+          downloadUrl={downloadModal.url}
+          filename={downloadModal.filename}
+          childName={job.child_name}
+          storyTitle={story?.title}
+          formatTitle={downloadModal.formatTitle}
+          language={selectedLanguage}
+        />
       )}
     </div>
   );

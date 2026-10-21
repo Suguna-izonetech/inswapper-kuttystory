@@ -83,7 +83,9 @@ def enrich_job_urls(job: PersonalizationJob) -> dict:
         "created_at": job.created_at,
         "updated_at": job.updated_at,
         "pages_label": free_pages,
-        "is_purchased": bool(getattr(job, "books", None) or getattr(job, "user_id", None) == "purchased"),
+        "is_purchased": bool(getattr(job, "is_paid", False) or getattr(job, "books", None) or getattr(job, "user_id", None) == "purchased"),
+        "is_paid": bool(getattr(job, "is_paid", False)),
+        "paid_at": job.paid_at.isoformat() if getattr(job, "paid_at", None) else None,
         "created_formatted": created_fmt,
         "pdf_download_url": f"/api/v1/personalization/{job.id}/pdf",
         "print_pdf_url": f"/api/v1/personalization/{job.id}/print-pdf?size=8x8&color=rgb",
@@ -344,6 +346,13 @@ def download_full_print_pdf(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
+    # Guard: Require payment for full print PDF
+    if not getattr(job, "is_paid", False) and color != "admin_preview":
+        raise HTTPException(
+            status_code=402,
+            detail="Payment required to download full print-ready PDF. Please complete payment to unlock."
+        )
+
     story = job.story or db.query(StoryTemplate).filter(StoryTemplate.id == job.story_id).first()
     child_name = job.child_name or "Little Explorer"
     story_title = story.title if story else "Personalized Story"
@@ -395,14 +404,20 @@ def download_preview_pdf(
     color: str = Query("rgb"),
     db: Session = Depends(get_db)
 ):
-    # If mode is full/print/admin, generate the full 8x8 RGB PDF with all pages!
-    if mode.lower() in ["full", "print", "admin"]:
-        return download_full_print_pdf(job_id=job_id, lang=lang, size=size, color=color, db=db)
-
-    from app.services.translation_service import translation_service
     job = db.query(PersonalizationJob).filter(PersonalizationJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+
+    # If mode is full/print, verify job is paid
+    if mode.lower() in ["full", "print"]:
+        if not getattr(job, "is_paid", False):
+            raise HTTPException(
+                status_code=402,
+                detail="Payment required to download full storybook PDF. Please unlock the storybook."
+            )
+        return download_full_print_pdf(job_id=job_id, lang=lang, size=size, color=color, db=db)
+    elif mode.lower() == "admin":
+        return download_full_print_pdf(job_id=job_id, lang=lang, size=size, color="admin_preview", db=db)
 
     story = job.story or db.query(StoryTemplate).filter(StoryTemplate.id == job.story_id).first()
     child_name = job.child_name or "Little Explorer"

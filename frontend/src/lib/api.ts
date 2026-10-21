@@ -111,6 +111,8 @@ export interface PersonalizationJob {
   updated_at: string;
   pages_label?: string;
   is_purchased?: boolean;
+  is_paid?: boolean;
+  paid_at?: string;
   created_formatted?: string;
   pdf_download_url?: string;
   print_pdf_url?: string;
@@ -141,7 +143,30 @@ export interface Order {
   currency: string;
   status: string;
   payment_status: string;
+  payment_intent_id?: string;
+  razorpay_order_id?: string;
+  razorpay_payment_id?: string;
   shipping_address?: string;
+  created_at: string;
+}
+
+export interface PaymentTransaction {
+  id: string;
+  order_id?: string;
+  job_id?: string;
+  razorpay_order_id?: string;
+  razorpay_payment_id?: string;
+  amount: number;
+  currency: string;
+  status: string;
+  method?: string;
+  customer_name?: string;
+  customer_email?: string;
+  format_type: string;
+  story_title?: string;
+  child_name?: string;
+  order_number?: string;
+  error_description?: string;
   created_at: string;
 }
 
@@ -272,6 +297,79 @@ export const api = {
       method: "DELETE",
     });
     if (!res.ok) throw new Error("Failed to delete order");
+  },
+
+  async getPaymentConfig(): Promise<{ razorpay_key: string; currency: string }> {
+    const res = await fetch(`${API_BASE}/payments/config`);
+    if (!res.ok) throw new Error("Failed to load payment config");
+    return res.json();
+  },
+
+  async createPaymentOrder(payload: {
+    job_id: string;
+    format_type: "digital" | "print_hardcover";
+    shipping_address?: any;
+    customer_name?: string;
+    customer_email?: string;
+    customer_phone?: string;
+  }): Promise<{
+    razorpay_order_id: string;
+    amount: number;
+    currency: string;
+    razorpay_key: string;
+    amount_display: number;
+    format_type: string;
+    story_title: string;
+    child_name: string;
+  }> {
+    const res = await fetch(`${API_BASE}/payments/create-order`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to initiate payment");
+    }
+    return res.json();
+  },
+
+  async verifyPayment(payload: {
+    job_id: string;
+    format_type: string;
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+    shipping_address?: any;
+    customer_name?: string;
+    customer_email?: string;
+    customer_phone?: string;
+  }): Promise<{
+    success: boolean;
+    order_number: string;
+    order_id: string;
+    job_id: string;
+    format_type: string;
+    amount: number;
+    status: string;
+    message: string;
+  }> {
+    const res = await fetch(`${API_BASE}/payments/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Payment verification failed");
+    }
+    return res.json();
+  },
+
+  async getPaymentTransactions(): Promise<PaymentTransaction[]> {
+    const res = await fetch(`${API_BASE}/payments/transactions`);
+    if (!res.ok) throw new Error("Failed to fetch payment transactions");
+    return res.json();
   },
 
   async reseedDashboard(): Promise<{ status: string; message: string }> {

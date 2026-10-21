@@ -741,3 +741,10 @@ def get_book_sales_by_state(
         "state_counts": state_counts
     }
 
+
+@router.get("/payments")
+def get_admin_payments(limit: int = 50, offset: int = 0, db: Session = Depends(get_db)):
+    """Fetch payment transactions for the Admin Payments view."""
+    from app.routers.payments import list_payment_transactions
+    return list_payment_transactions(limit=limit, offset=offset, db=db)
+

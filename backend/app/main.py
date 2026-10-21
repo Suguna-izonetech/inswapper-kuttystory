@@ -7,12 +7,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base, SessionLocal, get_db
 from app.services.pdf_importer import PDFImporterService
-from app.routers import stories, personalization, books, admin, ai_admin, storage, auth, child_stories
+from app.routers import stories, personalization, books, admin, ai_admin, storage, auth, child_stories, payments
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. Initialize database tables
+    # 1. Initialize database tables & schema migrations
     Base.metadata.create_all(bind=engine)
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE personalization_jobs ADD COLUMN IF NOT EXISTS is_paid BOOLEAN DEFAULT FALSE;"))
+            conn.execute(text("ALTER TABLE personalization_jobs ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP;"))
+            conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS razorpay_order_id VARCHAR(100);"))
+            conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS razorpay_payment_id VARCHAR(100);"))
+            conn.commit()
+    except Exception as e:
+        print(f"Notice during startup schema migration check: {e}")
     
     # 2. Idempotent import of the Unicorn Story PDF from sample-assets
     sample_pdf = settings.STORAGE_DIR.parent.parent / "sample-assets" / "unicorn Story.pdf"
@@ -64,6 +74,7 @@ app.include_router(ai_admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(storage.router, prefix=settings.API_V1_PREFIX)
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(child_stories.router, prefix=settings.API_V1_PREFIX)
+app.include_router(payments.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/api/health")
 def health_check():

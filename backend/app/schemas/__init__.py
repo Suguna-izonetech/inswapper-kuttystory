@@ -219,6 +219,8 @@ class PersonalizationOut(BaseModel):
     updated_at: datetime
     pages_label: Optional[str] = "4 free"
     is_purchased: Optional[bool] = False
+    is_paid: Optional[bool] = False
+    paid_at: Optional[datetime] = None
     created_formatted: Optional[str] = None
     pdf_download_url: Optional[str] = None
     print_pdf_url: Optional[str] = None
@@ -277,6 +279,9 @@ class OrderBase(BaseModel):
     currency: str = "INR"
     status: str = "Pending"
     payment_status: str = "paid"
+    payment_intent_id: Optional[str] = None
+    razorpay_order_id: Optional[str] = None
+    razorpay_payment_id: Optional[str] = None
     shipping_address: Optional[str] = None
 
 class OrderCreate(OrderBase):
@@ -301,3 +306,65 @@ class DashboardStatsOut(BaseModel):
     live_stories: int
     recent_orders: List[OrderOut]
     status_counts: Dict[str, int]
+
+
+# Payment Gateway Schemas
+class CreatePaymentOrderRequest(BaseModel):
+    job_id: str
+    format_type: str = "digital"  # "digital" | "print_hardcover"
+    shipping_address: Optional[Dict[str, Any]] = None
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+
+class CreatePaymentOrderResponse(BaseModel):
+    razorpay_order_id: str
+    amount: int  # in paise
+    currency: str = "INR"
+    razorpay_key: str
+    amount_display: float
+    format_type: str
+    story_title: str
+    child_name: str
+
+class VerifyPaymentRequest(BaseModel):
+    job_id: str
+    format_type: str = "digital"
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+    shipping_address: Optional[Dict[str, Any]] = None
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+
+class VerifyPaymentResponse(BaseModel):
+    success: bool
+    order_number: str
+    order_id: str
+    job_id: str
+    format_type: str
+    amount: float
+    status: str
+    message: str
+
+class PaymentTransactionOut(BaseModel):
+    id: str
+    order_id: Optional[str] = None
+    job_id: Optional[str] = None
+    razorpay_order_id: Optional[str] = None
+    razorpay_payment_id: Optional[str] = None
+    amount: float
+    currency: str = "INR"
+    status: str
+    method: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    format_type: str = "digital"
+    story_title: Optional[str] = None
+    child_name: Optional[str] = None
+    order_number: Optional[str] = None
+    error_description: Optional[str] = None
+    created_at: datetime
+    class Config:
+        from_attributes = True

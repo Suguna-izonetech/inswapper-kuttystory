@@ -123,6 +123,8 @@ class PersonalizationJob(Base):
     failed_pages = Column(Integer, default=0)
     retry_count = Column(Integer, default=0)
     error_details = Column(Text, nullable=True)
+    is_paid = Column(Boolean, default=False)
+    paid_at = Column(DateTime, nullable=True)
     
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -190,11 +192,35 @@ class Order(Base):
     status = Column(String(50), default="Pending")  # "In Production", "Paid", "Delivered", "Shipped", "Pending"
     payment_status = Column(String(30), default="paid")  # "unpaid", "authorized", "captured", "failed", "paid"
     payment_intent_id = Column(String(100), nullable=True)
+    razorpay_order_id = Column(String(100), nullable=True)
+    razorpay_payment_id = Column(String(100), nullable=True)
     shipping_address = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="orders")
     book = relationship("Book", back_populates="orders")
+
+
+class PaymentTransaction(Base):
+    __tablename__ = "payment_transactions"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    order_id = Column(String(36), ForeignKey("orders.id"), nullable=True)
+    job_id = Column(String(36), ForeignKey("personalization_jobs.id"), nullable=True)
+    razorpay_order_id = Column(String(100), nullable=True, index=True)
+    razorpay_payment_id = Column(String(100), nullable=True, index=True)
+    amount = Column(Float, nullable=False)
+    currency = Column(String(10), default="INR")
+    status = Column(String(30), default="created")  # "created", "captured", "failed"
+    method = Column(String(50), nullable=True)      # "upi", "card", "netbanking", etc.
+    customer_name = Column(String(100), nullable=True)
+    customer_email = Column(String(150), nullable=True)
+    format_type = Column(String(30), default="digital")  # "digital", "print_hardcover"
+    error_description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    order = relationship("Order", backref="transactions")
+    job = relationship("PersonalizationJob", backref="transactions")
 
 
 class AISettings(Base):

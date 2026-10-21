@@ -37,7 +37,8 @@ import {
   Heart,
   MapPin,
   GraduationCap,
-  Star
+  Star,
+  CreditCard
 } from "lucide-react";
 import {
   api,
@@ -45,6 +46,7 @@ import {
   UserProfile,
   AdminDashboardData,
   Order,
+  PaymentTransaction,
   StoryTemplate,
   StoryPage,
   AISettings,
@@ -52,7 +54,7 @@ import {
   ChildStory,
 } from "@/lib/api";
 
-type TabType = "dashboard" | "orders" | "previews" | "stories" | "page_editor" | "settings" | "child_stories";
+type TabType = "dashboard" | "orders" | "payments" | "previews" | "stories" | "page_editor" | "settings" | "child_stories";
 
 export default function AdminDashboardPage({ initialTab }: { initialTab?: TabType }) {
   const navigate = useNavigate();
@@ -62,6 +64,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
   const getInitialTab = (): TabType => {
     if (initialTab) return initialTab;
     const path = window.location.pathname.toLowerCase();
+    if (path.includes("/payments")) return "payments";
     if (path.includes("/child_stories") || path.includes("/child-stories")) return "child_stories";
     if (path.includes("/stories")) return "stories";
     if (path.includes("/orders")) return "orders";
@@ -92,6 +95,12 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
   const [newStatus, setNewStatus] = useState("Paid");
   const [newFormat, setNewFormat] = useState("print_hardcover");
   const [creatingOrder, setCreatingOrder] = useState(false);
+
+  // Payments & Transactions Data
+  const [paymentTransactions, setPaymentTransactions] = useState<PaymentTransaction[]>([]);
+  const [paymentSearch, setPaymentSearch] = useState("");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
+  const [loadingPayments, setLoadingPayments] = useState(false);
 
   // Stories & Page Editor Data
   const [stories, setStories] = useState<StoryTemplate[]>([]);
@@ -287,16 +296,29 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
     return () => clearInterval(interval);
   }, [jobs, generatingFullJob, selectedJobForPhotos]);
 
+  const fetchPaymentTransactions = async () => {
+    setLoadingPayments(true);
+    try {
+      const data = await api.getPaymentTransactions();
+      setPaymentTransactions(data || []);
+    } catch (err) {
+      console.error("Error loading payment transactions:", err);
+    } finally {
+      setLoadingPayments(false);
+    }
+  };
+
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [dash, storiesData, aiData, jobsData, ordersList, childStoriesData] = await Promise.all([
+      const [dash, storiesData, aiData, jobsData, ordersList, childStoriesData, paymentTxns] = await Promise.all([
         api.getDashboard().catch(() => null),
         api.getAdminStories().catch(() => []),
         api.getAISettings().catch(() => null),
         api.getJobs().catch(() => []),
         api.getOrders().catch(() => []),
         api.getAllChildStoriesAdmin().catch(() => []),
+        api.getPaymentTransactions().catch(() => []),
       ]);
 
       if (dash) setDashboardData(dash);
@@ -320,6 +342,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
       if (jobsData) setJobs(jobsData);
       if (ordersList) setOrders(ordersList);
       if (childStoriesData) setAdminChildStories(childStoriesData);
+      if (paymentTxns) setPaymentTransactions(paymentTxns);
     } catch (err) {
       console.error("Error loading dashboard data:", err);
     } finally {
@@ -334,6 +357,8 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
       setDashboardData(dash);
       const ordersList = await api.getOrders();
       setOrders(ordersList);
+      const txns = await api.getPaymentTransactions();
+      setPaymentTransactions(txns);
     } catch (err) {
       console.error("Refresh error:", err);
     } finally {
@@ -1001,6 +1026,33 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
 
           <button
             onClick={() => {
+              setActiveTab("payments");
+              window.history.pushState(null, "", "/admin/payments");
+              fetchPaymentTransactions();
+            }}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${activeTab === "payments"
+                ? "bg-[#8B3DFF] text-white shadow-sm shadow-[#8B3DFF]/20"
+                : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+              }`}
+          >
+            <div className="flex items-center gap-3.5">
+              <CreditCard className="w-4 h-4 shrink-0" />
+              <span>Payments</span>
+            </div>
+            {paymentTransactions.length > 0 && (
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${activeTab === "payments"
+                    ? "bg-white/20 text-white"
+                    : "bg-purple-100 text-[#8B3DFF]"
+                  }`}
+              >
+                {paymentTransactions.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
               setActiveTab("previews");
               window.history.pushState(null, "", "/admin/previews");
             }}
@@ -1362,8 +1414,34 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                               <div className="text-[11px] text-gray-400">{order.customer_email}</div>
                             )}
                           </td>
-                          <td className="py-4 px-6 text-xs text-gray-600 capitalize">
-                            {order.format_type?.replace(/_/g, " ") || "Print Hardcover"}
+                          <td className="py-4 px-6">
+                            {order.format_type === "digital" ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/70">
+                                <BookOpen className="w-3 h-3 text-blue-600" />
+                                <span>Digital PDF</span>
+                              </span>
+                            ) : (
+                              <div className="space-y-1">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200/70">
+                                  <Package className="w-3 h-3 text-amber-600" />
+                                  <span>Hardcover Book</span>
+                                </span>
+                                {order.shipping_address && (() => {
+                                  try {
+                                    const parsed = JSON.parse(order.shipping_address);
+                                    if (parsed.state || parsed.city) {
+                                      return (
+                                        <div className="text-[10px] text-gray-500 flex items-center gap-1">
+                                          <MapPin className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                                          <span className="truncate max-w-[130px] font-medium">{parsed.city ? `${parsed.city}, ` : ""}{parsed.state || ""}</span>
+                                        </div>
+                                      );
+                                    }
+                                  } catch (e) {}
+                                  return null;
+                                })()}
+                              </div>
+                            )}
                           </td>
                           <td className="py-4 px-6 font-semibold text-gray-900">
                             ₹{order.amount ? Number(order.amount).toLocaleString("en-IN") : "0"}
@@ -1401,6 +1479,264 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                         </tr>
                       ))
                     )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: PAYMENTS & RAZORPAY TRANSACTIONS VIEW */}
+        {activeTab === "payments" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-3xl font-bold tracking-tight text-gray-900">Payments & Transactions</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  Razorpay payment gateway logs, customer checkout verification, and transaction history.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={fetchPaymentTransactions}
+                  disabled={loadingPayments}
+                  className="px-3.5 py-1.5 rounded-xl bg-white border border-gray-200/80 text-gray-600 text-xs font-medium hover:bg-gray-50 flex items-center gap-1.5 shadow-xs transition"
+                  title="Refresh Payment Records"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-gray-500 ${loadingPayments ? "animate-spin" : ""}`} />
+                  <span>Refresh</span>
+                </button>
+
+                <a
+                  href="https://dashboard.razorpay.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-1.5 rounded-xl bg-[#8B3DFF] hover:bg-[#7828f7] text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Razorpay Dashboard</span>
+                </a>
+              </div>
+            </div>
+
+            {/* 4 Summary Stat Cards */}
+            {(() => {
+              const capturedTxns = paymentTransactions.filter(t => t.status?.toLowerCase() === "captured");
+              const totalCapturedAmount = capturedTxns.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+              const digitalCount = paymentTransactions.filter(t => t.format_type === "digital").length;
+              const printCount = paymentTransactions.filter(t => t.format_type === "print_hardcover").length;
+
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                  <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs">
+                    <span className="text-xs text-gray-400 font-medium">Total Captured Volume</span>
+                    <h3 className="text-2xl font-bold text-gray-900 mt-1">
+                      ₹{totalCapturedAmount.toLocaleString("en-IN")}
+                    </h3>
+                    <span className="text-[11px] text-emerald-600 font-semibold mt-1 block">
+                      {capturedTxns.length} Successful checkouts
+                    </span>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs">
+                    <span className="text-xs text-gray-400 font-medium">Digital PDF Editions</span>
+                    <h3 className="text-2xl font-bold text-blue-700 mt-1">{digitalCount}</h3>
+                    <span className="text-[11px] text-gray-400 mt-1 block">Instant high-res downloads</span>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs">
+                    <span className="text-xs text-gray-400 font-medium">Hardcover Keepsakes</span>
+                    <h3 className="text-2xl font-bold text-amber-700 mt-1">{printCount}</h3>
+                    <span className="text-[11px] text-gray-400 mt-1 block">Printed heirloom books</span>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs">
+                    <span className="text-xs text-gray-400 font-medium">Gateway Success Rate</span>
+                    <h3 className="text-2xl font-bold text-emerald-600 mt-1">
+                      {paymentTransactions.length > 0
+                        ? `${Math.round((capturedTxns.length / paymentTransactions.length) * 100)}%`
+                        : "100%"}
+                    </h3>
+                    <span className="text-[11px] text-gray-400 mt-1 block">Razorpay Checkout SDK</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Search & Filter Bar */}
+            <div className="bg-white p-4 rounded-2xl border border-gray-100/80 shadow-xs flex flex-col md:flex-row items-center gap-4 justify-between">
+              <div className="relative w-full md:w-80">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search by customer, payment ID, or title..."
+                  value={paymentSearch}
+                  onChange={(e) => setPaymentSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#8B3DFF]"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 text-xs font-medium">
+                {["all", "captured", "created", "failed"].map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setPaymentStatusFilter(st)}
+                    className={`px-3 py-1.5 rounded-full transition capitalize shrink-0 ${
+                      paymentStatusFilter === st
+                        ? "bg-[#8B3DFF] text-white font-semibold"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    {st === "all" ? "All Transactions" : st}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Payments Table */}
+            <div className="bg-white rounded-2xl shadow-xs border border-gray-100/80 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-[11px] font-semibold text-gray-400 tracking-wider uppercase">
+                      <th className="py-4 px-6 font-semibold">TRANSACTION / PAYMENT ID</th>
+                      <th className="py-4 px-6 font-semibold">CUSTOMER</th>
+                      <th className="py-4 px-6 font-semibold">STORY</th>
+                      <th className="py-4 px-6 font-semibold">EDITION</th>
+                      <th className="py-4 px-6 font-semibold">AMOUNT</th>
+                      <th className="py-4 px-6 font-semibold">STATUS</th>
+                      <th className="py-4 px-6 font-semibold">DATE & TIME</th>
+                      <th className="py-4 px-6 font-semibold text-right">ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100/80 text-sm">
+                    {(() => {
+                      const filtered = paymentTransactions.filter((txn) => {
+                        const searchLower = paymentSearch.toLowerCase();
+                        const matchesSearch =
+                          !paymentSearch ||
+                          (txn.id && txn.id.toLowerCase().includes(searchLower)) ||
+                          (txn.razorpay_payment_id && txn.razorpay_payment_id.toLowerCase().includes(searchLower)) ||
+                          (txn.customer_name && txn.customer_name.toLowerCase().includes(searchLower)) ||
+                          (txn.customer_email && txn.customer_email.toLowerCase().includes(searchLower)) ||
+                          (txn.story_title && txn.story_title.toLowerCase().includes(searchLower)) ||
+                          (txn.child_name && txn.child_name.toLowerCase().includes(searchLower));
+
+                        const matchesStatus =
+                          paymentStatusFilter === "all" ||
+                          txn.status?.toLowerCase() === paymentStatusFilter.toLowerCase();
+
+                        return matchesSearch && matchesStatus;
+                      });
+
+                      if (filtered.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={8} className="py-12 text-center text-gray-400 text-xs">
+                              {loadingPayments
+                                ? "Loading transactions..."
+                                : "No payment transactions found matching criteria."}
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return filtered.map((txn) => {
+                        const isCaptured = txn.status?.toLowerCase() === "captured";
+                        const isFailed = txn.status?.toLowerCase() === "failed";
+                        const createdDate = txn.created_at ? new Date(txn.created_at) : null;
+                        const dateFormatted = createdDate
+                          ? createdDate.toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "Recently";
+
+                        return (
+                          <tr key={txn.id} className="hover:bg-gray-50/60 transition-colors text-xs">
+                            <td className="py-4 px-6 font-medium text-gray-800">
+                              <div className="font-mono text-gray-900 font-semibold">{txn.razorpay_payment_id || "Awaiting Payment"}</div>
+                              <div className="text-[10px] text-gray-400 font-mono mt-0.5">
+                                Ref: {txn.order_number || txn.razorpay_order_id || txn.id.substring(0, 12)}
+                              </div>
+                            </td>
+
+                            <td className="py-4 px-6">
+                              <div className="font-semibold text-gray-900">{txn.customer_name || "Valued Customer"}</div>
+                              {txn.customer_email && (
+                                <div className="text-[11px] text-gray-400">{txn.customer_email}</div>
+                              )}
+                            </td>
+
+                            <td className="py-4 px-6 text-gray-700">
+                              <div className="font-medium text-gray-900">{txn.story_title || "Personalized Story"}</div>
+                              {txn.child_name && (
+                                <div className="text-[11px] text-purple-700 font-medium">For: {txn.child_name}</div>
+                              )}
+                            </td>
+
+                            <td className="py-4 px-6">
+                              {txn.format_type === "digital" ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  <BookOpen className="w-3 h-3 text-blue-600" />
+                                  <span>Digital PDF</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                  <Package className="w-3 h-3 text-amber-600" />
+                                  <span>Hardcover Keepsake</span>
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="py-4 px-6 font-bold text-gray-900 text-sm">
+                              ₹{Number(txn.amount || 0).toLocaleString("en-IN")}
+                            </td>
+
+                            <td className="py-4 px-6">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold capitalize ${
+                                  isCaptured
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : isFailed
+                                    ? "bg-red-50 text-red-700 border border-red-200"
+                                    : "bg-gray-100 text-gray-600 border border-gray-200"
+                                }`}
+                              >
+                                {isCaptured && <CheckCircle className="w-3 h-3 text-emerald-600" />}
+                                <span>{txn.status || "created"}</span>
+                              </span>
+                            </td>
+
+                            <td className="py-4 px-6 text-gray-500 text-[11px]">
+                              {dateFormatted}
+                            </td>
+
+                            <td className="py-4 px-6 text-right">
+                              {txn.razorpay_payment_id && !txn.razorpay_payment_id.startsWith("pay_test_") ? (
+                                <a
+                                  href={`https://dashboard.razorpay.com/app/payments/${txn.razorpay_payment_id}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-purple-50 text-gray-700 hover:text-[#8B3DFF] text-[11px] font-semibold transition"
+                                  title="View on Razorpay Dashboard"
+                                >
+                                  <span>Razorpay</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              ) : (
+                                <span className="text-[11px] text-gray-400 font-mono">Sandbox Log</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -2974,7 +3310,93 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
 
               <div className="p-3.5 rounded-2xl bg-gray-50 text-gray-600">
                 <span className="font-semibold text-gray-900 block mb-1">Format Specification</span>
-                <p>Standard Heirloom 8×8 mm • {selectedOrder.format_type?.replace(/_/g, " ") || "Print Hardcover"}</p>
+                <div className="flex items-center gap-2">
+                  {selectedOrder.format_type === "digital" ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                      <BookOpen className="w-3 h-3" /> Digital PDF Edition
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                      <Package className="w-3 h-3" /> Premium Hardcover Keepsake (8×8")
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Shipping Address Details for Hardcover */}
+              {selectedOrder.shipping_address && (() => {
+                try {
+                  const addr = JSON.parse(selectedOrder.shipping_address);
+                  return (
+                    <div className="p-4 rounded-2xl bg-[#FFFBF0] border border-[#FDE68A] text-gray-700 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-gray-900 text-xs flex items-center gap-1">
+                          <MapPin className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Shipping Address</span>
+                        </span>
+                        {addr.state && (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
+                            {addr.state}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs space-y-0.5 pt-1">
+                        <p className="font-semibold text-gray-900">{addr.full_name || selectedOrder.customer_name} {addr.phone ? `• ${addr.phone}` : ""}</p>
+                        <p>{addr.street_address}</p>
+                        {addr.landmark && <p className="text-gray-500">Landmark: {addr.landmark}</p>}
+                        <p>{addr.city ? `${addr.city}, ` : ""}{addr.state || ""} {addr.pincode ? `- ${addr.pincode}` : ""}</p>
+                      </div>
+                    </div>
+                  );
+                } catch (e) {
+                  return (
+                    <div className="p-3 rounded-xl bg-gray-50 text-xs text-gray-600">
+                      <strong>Address:</strong> {selectedOrder.shipping_address}
+                    </div>
+                  );
+                }
+              })()}
+
+              {/* Razorpay Payment Reference & Storybook Links */}
+              <div className="p-3.5 rounded-2xl bg-gray-50 text-gray-600 space-y-1.5">
+                <span className="font-semibold text-gray-900 block mb-1">Payment & Fulfillment Reference</span>
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div>
+                    <span className="text-gray-400 block">Payment ID</span>
+                    <span className="font-mono text-gray-800 font-medium">
+                      {selectedOrder.razorpay_payment_id || selectedOrder.payment_intent_id || "N/A"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block">Razorpay Order</span>
+                    <span className="font-mono text-gray-800 font-medium">
+                      {selectedOrder.razorpay_order_id || "Direct"}
+                    </span>
+                  </div>
+                </div>
+
+                {selectedOrder.job_id && (
+                  <div className="pt-2 border-t border-gray-200/60 flex items-center gap-2">
+                    <a
+                      href={`/api/v1/personalization/${selectedOrder.job_id}/print-pdf?size=8x8&color=admin_preview`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-[#8B3DFF] text-white font-semibold text-[11px] flex items-center gap-1 hover:bg-[#7828f7] transition"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>Print-Ready PDF</span>
+                    </a>
+                    <a
+                      href={`/personalize?job_id=${selectedOrder.job_id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-gray-200 text-gray-800 font-semibold text-[11px] flex items-center gap-1 hover:bg-gray-300 transition"
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span>View Storybook</span>
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
 

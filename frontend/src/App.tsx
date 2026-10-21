@@ -24,6 +24,7 @@ export default function App() {
         <Route path="/admin" element={<AdminDashboardPage />} />
         <Route path="/admin/stories" element={<AdminDashboardPage initialTab="stories" />} />
         <Route path="/admin/orders" element={<AdminDashboardPage initialTab="orders" />} />
+        <Route path="/admin/payments" element={<AdminDashboardPage initialTab="payments" />} />
         <Route path="/admin/previews" element={<AdminDashboardPage initialTab="previews" />} />
         <Route path="/admin/page_editor" element={<AdminDashboardPage initialTab="page_editor" />} />
         <Route path="/admin/settings" element={<AdminDashboardPage initialTab="settings" />} />
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="how-it-works" element={<HowItWorksPage />} />
           <Route path="collections" element={<CollectionsPage />} />
           <Route path="journal" element={<JournalPage />} />
+          <Route path="personalize" element={<PersonalizePage />} />
           <Route path="personalize/:slug" element={<PersonalizePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
