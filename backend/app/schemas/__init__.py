@@ -369,7 +369,13 @@ class PaymentTransactionOut(BaseModel):
     class Config:
         from_attributes = True
 
-# Feedback / Review Schemas
+# Customer Feedback Schemas
+class FeedbackCreate(BaseModel):
+    name: str
+    place: str
+    rating: int = 5
+    review_text: Optional[str] = None
+
 class FeedbackBase(BaseModel):
     name: str
     place: str
@@ -379,20 +385,28 @@ class FeedbackBase(BaseModel):
     media_type: Optional[str] = None
     status: str = "pending"
 
-class FeedbackOut(FeedbackBase):
-    id: str
-    created_at: datetime
-    updated_at: datetime
-    class Config:
-        from_attributes = True
-
-class FeedbackStatusUpdate(BaseModel):
-    status: str
-
 class FeedbackUpdate(BaseModel):
     name: Optional[str] = None
     place: Optional[str] = None
     rating: Optional[int] = None
     review_text: Optional[str] = None
     status: Optional[str] = None
+
+class FeedbackStatusUpdate(BaseModel):
+    status: str  # "approved", "rejected", "pending"
+
+class FeedbackOut(BaseModel):
+    id: str
+    name: str
+    place: str
+    rating: int = 5
+    review_text: Optional[str] = None
+    media_url: Optional[str] = None
+    media_type: Optional[str] = None
+    status: str = "pending"
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
 
