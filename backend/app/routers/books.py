@@ -35,16 +35,25 @@ def download_book_pdf(book_id: str, db: Session = Depends(get_db)):
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     
-    pdf_path = Path(book.pdf_storage_path)
-    if not pdf_path.exists():
+    category = "previews" if getattr(book, "book_type", "preview") == "preview" else "final_books"
+    filename = Path(book.pdf_storage_path).name
+
+    try:
+        pdf_path = storage.get_file_path(category, filename)
+    except Exception:
+        resolved = storage.resolve_path(book.pdf_storage_path)
+        pdf_path = Path(resolved) if resolved else None
+
+    if not pdf_path or not pdf_path.exists():
         raise HTTPException(status_code=404, detail="PDF file missing from storage")
 
     job = db.query(PersonalizationJob).filter(PersonalizationJob.id == book.job_id).first()
     child_name = job.child_name.replace(" ", "_") if job else "Custom"
-    filename = f"{child_name}_and_the_Magical_Unicorn_{book.book_type}.pdf"
+    download_filename = f"{child_name}_and_the_Magical_Unicorn_{book.book_type}.pdf"
 
     return FileResponse(
         path=pdf_path,
-        filename=filename,
+        filename=download_filename,
         media_type="application/pdf"
     )
+

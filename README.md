@@ -103,6 +103,25 @@ python seed_admin.py --email custom@admin.com --password YourPassword123 --name 
 python seed_admin.py --list
 ```
 
+#### 🪣 MinIO Object Storage Setup
+The platform uses MinIO object storage for all assets instead of local folders:
+```powershell
+# Start local MinIO server (if running locally):
+C:\minio\minio.exe server C:\minio\data --console-address :9001
+
+# Sync or verify all assets in MinIO:
+python sync_to_minio.py
+python sync_to_minio.py --list
+```
+Configured in `backend/.env`:
+- `STORAGE_BACKEND=minio`
+- `MINIO_ENDPOINT=127.0.0.1:9000`
+- `MINIO_ACCESS_KEY=minioadmin`
+- `MINIO_SECRET_KEY=minioadmin`
+- `MINIO_BUCKET=kuttystory`
+- `MINIO_SECURE=false`
+
+
 ### 2. Start the Frontend
 ```powershell
 cd frontend

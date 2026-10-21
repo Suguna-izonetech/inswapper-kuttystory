@@ -131,8 +131,9 @@ class PDFComposerService:
 
         for idx, page_info in enumerate(pages_data):
             page_num = page_info.get("page_number", idx + 1)
-            page_type = page_info.get("page_type", "story")
-            img_path = page_info.get("image_path")
+            raw_img_path = page_info.get("image_path")
+            resolved_img_path = storage.resolve_path(raw_img_path) if raw_img_path else None
+            img_path = resolved_img_path if (resolved_img_path and os.path.exists(resolved_img_path)) else None
             story_text = page_info.get("story_text", "")
             for tag in ["[Name]", "[name]", "{name}", "[child_name]", "{child_name}"]:
                 story_text = story_text.replace(tag, child_name)
@@ -192,5 +193,8 @@ class PDFComposerService:
             c.showPage()
 
         c.save()
-        return str(pdf_path), preflight_validation
+        category = "previews" if book_type == "preview" else "final_books"
+        object_key = storage.save_file(pdf_path, category=category, object_name=output_filename)
+        return object_key, preflight_validation
+
 

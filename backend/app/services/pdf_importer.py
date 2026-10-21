@@ -222,18 +222,24 @@ UNICORN_DEFAULT_BEATS = [
 
 class PDFImporterService:
     @staticmethod
-    def detect_page_character_face(img_path: str) -> str:
+    def detect_page_character_face(img_source: Any) -> str:
         """
-        Dynamically detect character face in rendered page and return JSON string of outline points.
+        Dynamically detect character face in rendered page (filepath or bytes)
+        and return JSON string of outline points.
         """
         try:
             import cv2
             import math
             import json
+            import numpy as np
             yunet_path = Path(__file__).parent / "ai" / "face_detection_yunet.onnx"
             if not yunet_path.exists():
                 return ""
-            img_bgr = cv2.imread(img_path)
+            if isinstance(img_source, bytes):
+                nparr = np.frombuffer(img_source, np.uint8)
+                img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            else:
+                img_bgr = cv2.imread(str(img_source))
             if img_bgr is None:
                 return ""
             h, w = img_bgr.shape[:2]
@@ -249,20 +255,20 @@ class PDFImporterService:
                     if area > (w * h * 0.003) and score > best_score:
                         best_score = score
                         best_box = (bx, by, bw, bh)
-                if best_box:
-                    bx, by, bw, bh = best_box
-                    cx = bx + bw / 2.0
-                    cy = by + bh / 2.0
-                    rx = (bw / 2.0) * 1.05
-                    ry = (bh / 2.0) * 1.15
-                    pts = []
-                    for i in range(16):
-                        angle = (2 * math.pi * i) / 16
-                        px = round(((cx + rx * math.cos(angle)) / w) * 100.0, 2)
-                        py = round(((cy + ry * math.sin(angle)) / h) * 100.0, 2)
-                        pts.append([px, py])
-                    pts.append(pts[0])
-                    return json.dumps(pts)
+                    if best_box:
+                        bx, by, bw, bh = best_box
+                        cx = bx + bw / 2.0
+                        cy = by + bh / 2.0
+                        rx = (bw / 2.0) * 1.05
+                        ry = (bh / 2.0) * 1.15
+                        pts = []
+                        for i in range(16):
+                            angle = (2 * math.pi * i) / 16
+                            px = round(((cx + rx * math.cos(angle)) / w) * 100.0, 2)
+                            py = round(((cy + ry * math.sin(angle)) / h) * 100.0, 2)
+                            pts.append([px, py])
+                        pts.append(pts[0])
+                        return json.dumps(pts)
         except Exception as e:
             print(f"Notice: Face detection on import failed: {e}")
         return ""
@@ -283,7 +289,7 @@ class PDFImporterService:
     ) -> StoryTemplate:
         """
         Idempotently import a storybook from a PDF file.
-        Renders every page into high-resolution PNGs, extracts text,
+        Renders every page into high-resolution PNGs stored in MinIO, extracts text,
         and dynamically detects character face anchors for seamless AI personalization.
         """
         if not os.path.exists(pdf_path):
@@ -297,12 +303,11 @@ class PDFImporterService:
                 print(f"Story '{slug}' already imported with {len(existing_story.pages)} pages. Skipping reimport.")
                 return existing_story
 
-        # Copy original PDF safely into private storage
+        # Store original PDF in MinIO object storage
         stored_pdf_name = f"{slug}-original.pdf"
-        dest_pdf_path = settings.ORIGINAL_PDFS_DIR / stored_pdf_name
-        shutil.copy2(pdf_path, dest_pdf_path)
+        dest_pdf_path = storage.save_file(pdf_path, category="original_pdfs", object_name=stored_pdf_name)
 
-        doc = fitz.open(str(dest_pdf_path))
+        doc = fitz.open(str(pdf_path))
         page_count = len(doc)
 
         if existing_story:
@@ -315,7 +320,7 @@ class PDFImporterService:
             story.price_digital = price_digital
             story.price_print = price_print
             story.currency = currency
-            story.source_pdf_path = str(dest_pdf_path)
+            story.source_pdf_path = dest_pdf_path
             # Remove old pages if reimporting
             db.query(StoryPage).filter(StoryPage.story_id == story.id).delete()
         else:
@@ -325,7 +330,7 @@ class PDFImporterService:
                 description=description,
                 category=category,
                 age_range=age_range,
-                source_pdf_path=str(dest_pdf_path),
+                source_pdf_path=dest_pdf_path,
                 page_count=page_count,
                 status="published",
                 price_digital=price_digital,
@@ -336,25 +341,26 @@ class PDFImporterService:
             db.commit()
             db.refresh(story)
 
-        # Render pages and save page records
-        story_pages_dir = settings.SOURCE_PAGES_DIR / slug
-        story_pages_dir.mkdir(parents=True, exist_ok=True)
-
+        # Render pages and save page records into MinIO
         for idx in range(page_count):
             page_num = idx + 1
             page = doc[idx]
             
             # Render at 150 DPI (crisp high quality web & print preview: ~1240x1240 px)
             pix = page.get_pixmap(dpi=150)
-            page_filename = f"page_{page_num:02d}.png"
-            page_dest = story_pages_dir / page_filename
-            pix.save(str(page_dest))
+            page_bytes = pix.tobytes("png")
+            page_filename = f"{slug}/page_{page_num:02d}.png"
+            page_dest = storage.save_bytes(
+                data=page_bytes,
+                category="source_pages",
+                custom_name=page_filename
+            )
 
             # Selectable text
             extracted = page.get_text().strip()
 
             # Dynamic Face Detection on the imported illustration
-            detected_face_points = PDFImporterService.detect_page_character_face(str(page_dest))
+            detected_face_points = PDFImporterService.detect_page_character_face(page_bytes)
 
             # Beat matching: use unicorn template beats if applicable, otherwise generate smart beats
             if "unicorn" in slug.lower() and idx < len(UNICORN_DEFAULT_BEATS):

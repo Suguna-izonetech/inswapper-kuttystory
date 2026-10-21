@@ -3,7 +3,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
-from typing import List, Union
+from typing import List, Union, Optional
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -35,7 +35,16 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "noreply@kuttystory.co.in")
     SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
     
-    # Storage directories (Private local storage adapter)
+    # Storage Configuration (MinIO Object Storage)
+    STORAGE_BACKEND: str = os.getenv("STORAGE_BACKEND", "minio")
+    MINIO_ENDPOINT: str = os.getenv("MINIO_ENDPOINT", "127.0.0.1:9000")
+    MINIO_ACCESS_KEY: str = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+    MINIO_SECRET_KEY: str = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+    MINIO_BUCKET: str = os.getenv("MINIO_BUCKET", "kuttystory")
+    MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "false").lower() in ("true", "1", "yes")
+    MINIO_PUBLIC_URL: Optional[str] = os.getenv("MINIO_PUBLIC_URL", None)
+
+    # Storage directories (Cache / Scratch for temporary file processing)
     STORAGE_DIR: Path = STORAGE_BASE
     ORIGINAL_PDFS_DIR: Path = STORAGE_BASE / "original_pdfs"
     SOURCE_PAGES_DIR: Path = STORAGE_BASE / "source_pages"
@@ -70,7 +79,7 @@ class Settings(BaseSettings):
     PRINT_BLEED_MM: float = 3.0
     PRINT_SAFE_MARGIN_MM: float = 10.0
     
-    # CORS Allowed Origins
+    # CORS Allowed Origins - Fully driven by .env
     CORS_ORIGINS: Union[str, List[str]] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -97,7 +106,14 @@ class Settings(BaseSettings):
                     pass
             if not origins:
                 origins = [origin.strip() for origin in v.split(",") if origin.strip()]
-        return [o for o in origins if o != "*"]
+        
+        # Clean each origin: strip whitespace, quotes, and trailing slashes
+        cleaned = []
+        for o in origins:
+            clean = str(o).strip().strip("\"'").rstrip("/")
+            if clean and clean not in cleaned:
+                cleaned.append(clean)
+        return cleaned
 
 
 

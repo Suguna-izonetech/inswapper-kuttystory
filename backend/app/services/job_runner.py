@@ -104,13 +104,13 @@ class JobRunner:
                             face_outline_points=page.face_outline_points
                         )
 
-                    # Save generated image
+                    # Save generated image to MinIO
                     asset_filename = f"job_{job.id}_p{page.page_number:02d}_{int(time.time())}.{gen_res.format}"
-                    asset_dir = settings.GENERATED_ASSETS_DIR / job.id
-                    asset_dir.mkdir(parents=True, exist_ok=True)
-                    asset_path = str(asset_dir / asset_filename)
-                    with open(asset_path, "wb") as f:
-                        f.write(gen_res.image_bytes)
+                    asset_path = storage.save_bytes(
+                        data=gen_res.image_bytes,
+                        category="generated_assets",
+                        custom_name=f"{job.id}/{asset_filename}"
+                    )
 
                     # Record asset in DB
                     asset = GeneratedAsset(
@@ -227,11 +227,11 @@ class JobRunner:
                 )
 
             asset_filename = f"job_{job.id}_p{page.page_number:02d}_v{asset.asset_version + 1}_{int(time.time())}.{gen_res.format}"
-            asset_dir = settings.GENERATED_ASSETS_DIR / job.id
-            asset_dir.mkdir(parents=True, exist_ok=True)
-            new_path = str(asset_dir / asset_filename)
-            with open(new_path, "wb") as f:
-                f.write(gen_res.image_bytes)
+            new_path = storage.save_bytes(
+                data=gen_res.image_bytes,
+                category="generated_assets",
+                custom_name=f"{job.id}/{asset_filename}"
+            )
 
             asset.storage_path = new_path
             asset.asset_version += 1
@@ -320,11 +320,11 @@ class JobRunner:
                             prefer_local=False
                         )
                         asset_filename = f"job_{job.id}_p{page_num:02d}_{int(time.time())}.{gen_res.format}"
-                        asset_dir = settings.GENERATED_ASSETS_DIR / job.id
-                        asset_dir.mkdir(parents=True, exist_ok=True)
-                        asset_path = str(asset_dir / asset_filename)
-                        with open(asset_path, "wb") as f:
-                            f.write(gen_res.image_bytes)
+                        asset_path = storage.save_bytes(
+                            data=gen_res.image_bytes,
+                            category="generated_assets",
+                            custom_name=f"{job.id}/{asset_filename}"
+                        )
 
                         asset = GeneratedAsset(
                             job_id=job.id,

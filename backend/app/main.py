@@ -25,7 +25,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Notice during startup schema migration check: {e}")
     
-    # 2. Idempotent import of the Unicorn Story PDF from sample-assets
+    # 2. MinIO storage sync: Ensure bucket and sync any existing assets
+    try:
+        storage.sync_local_to_minio()
+    except Exception as e:
+        print(f"Notice during MinIO storage sync: {e}")
+
+    # 3. Idempotent import of the Unicorn Story PDF from sample-assets
     sample_pdf = settings.STORAGE_DIR.parent.parent / "sample-assets" / "unicorn Story.pdf"
     if sample_pdf.exists():
         db = SessionLocal()
@@ -64,41 +70,31 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS configuration from .env / settings
-cors_origins = [o for o in settings.CORS_ORIGINS if o != "*"]
+# CORS configuration - strictly driven by .env (settings.CORS_ORIGINS)
+origins_from_env = settings.CORS_ORIGINS
+has_wildcard = "*" in origins_from_env
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_origin_regex=r"^https?://.*",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
+if has_wildcard:
+    # When wildcard '*' is configured in .env, permit any origin dynamically while allowing credentials
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"^https?://.*",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
+else:
+    # Strictly enforce the explicit list of allowed origins from .env
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins_from_env,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
 
-@app.middleware("http")
-async def cors_headers_fallback_middleware(request, call_next):
-    origin = request.headers.get("origin")
-    if request.method == "OPTIONS":
-        from fastapi.responses import PlainTextResponse
-        headers = {
-            "Access-Control-Allow-Origin": origin or "*",
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-            "Access-Control-Allow-Headers": request.headers.get("access-control-request-headers", "*"),
-            "Access-Control-Max-Age": "600",
-        }
-        return PlainTextResponse("OK", status_code=200, headers=headers)
-
-    response = await call_next(request)
-    if origin:
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "*"
-        response.headers["Access-Control-Expose-Headers"] = "*"
-    return response
 
 
 # Register routers

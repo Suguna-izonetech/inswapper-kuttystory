@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
-from fastapi.responses import FileResponse
-from pathlib import Path
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.services.storage import storage
 from app.database import get_db
@@ -16,50 +15,47 @@ async def serve_file(
     db: Session = Depends(get_db)
 ):
     """
-    Serve storage files securely (images, videos, PDFs).
-    Makes feedback media public only after the related review is approved.
+    Serve storage files securely directly from MinIO object storage.
+    Streams media content (PNG, JPEG, WebP, PDF, MP4) with proper caching.
+    Enforces authorization check for pending feedback media.
     """
+    # Security check for feedback_media
+    if category == "feedback_media":
+        matched_feedback = db.query(Feedback).filter(
+            Feedback.media_url.like(f"%{filename}%")
+        ).first()
+        if matched_feedback and matched_feedback.status != "approved":
+            auth_header = request.headers.get("Authorization", "")
+            is_admin = bool(auth_header and "Bearer" in auth_header)
+            if not is_admin:
+                raise HTTPException(
+                    status_code=403,
+                    detail="This media is awaiting admin approval before public access."
+                )
+
     try:
-        file_path = storage.get_file_path(category, filename)
-        if not file_path.exists():
-            raise HTTPException(status_code=404, detail="File not found")
+        stream, media_type, content_length = storage.get_object_stream(category, filename)
 
-        # Security check for feedback_media
-        if category == "feedback_media":
-            # Check if media belongs to an approved review
-            matched_feedback = db.query(Feedback).filter(
-                Feedback.media_url.like(f"%{filename}%")
-            ).first()
-            if matched_feedback and matched_feedback.status != "approved":
-                # Check for admin authorization
-                auth_header = request.headers.get("Authorization", "")
-                is_admin = bool(auth_header and "Bearer" in auth_header)
-                if not is_admin:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="This media is awaiting admin approval before public access."
-                    )
+        def iterfile():
+            try:
+                for chunk in stream.stream(32768):
+                    yield chunk
+            finally:
+                stream.close()
+                stream.release_conn()
 
-        media_type = "application/octet-stream"
-        suffix = file_path.suffix.lower()
-        if suffix == ".png":
-            media_type = "image/png"
-        elif suffix in [".jpg", ".jpeg"]:
-            media_type = "image/jpeg"
-        elif suffix == ".webp":
-            media_type = "image/webp"
-        elif suffix == ".mp4":
-            media_type = "video/mp4"
-        elif suffix == ".webm":
-            media_type = "video/webm"
-        elif suffix in [".mov", ".quicktime"]:
-            media_type = "video/quicktime"
-        elif suffix == ".pdf":
-            media_type = "application/pdf"
+        headers = {
+            "Content-Length": str(content_length),
+            "Cache-Control": "public, max-age=86400",
+            "Accept-Ranges": "bytes",
+        }
 
-        return FileResponse(file_path, media_type=media_type)
+        return StreamingResponse(
+            iterfile(),
+            media_type=media_type,
+            headers=headers
+        )
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
+        raise HTTPException(status_code=404, detail=f"File not found in storage: {str(e)}")
