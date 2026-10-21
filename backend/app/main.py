@@ -79,6 +79,16 @@ def health_check():
 def admin_dashboard_alias(db = Depends(get_db)):
     return admin.get_dashboard_data(db)
 
+@app.get("/api/v1/book-sales/by-state")
+def public_book_sales_by_state(
+    period: str = "30days",
+    from_date: str = None,
+    to_date: str = None,
+    db = Depends(get_db)
+):
+    return admin.get_book_sales_by_state(period=period, from_date=from_date, to_date=to_date, db=db)
+
+
 @app.get("/")
 def root():
     return {

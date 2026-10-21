@@ -664,3 +664,80 @@ def delete_order(order_id: str, db: Session = Depends(get_db)):
     db.delete(order)
     db.commit()
     return {"status": "success", "message": f"Order {order_id} deleted"}
+
+
+@router.get("/book-sales/by-state")
+def get_book_sales_by_state(
+    period: str = "30days",
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Get completed, paid book sales grouped by shipping state.
+    Strictly excludes cancelled and refunded orders.
+    Calculates metrics for the 28 states of India and union territories.
+    """
+    import json
+    from datetime import datetime, timedelta
+
+    today = datetime(2026, 10, 21)
+    if period == "30days":
+        start_dt = today - timedelta(days=29)
+        end_dt = today + timedelta(days=1)
+    elif period == "1year":
+        start_dt = today - timedelta(days=364)
+        end_dt = today + timedelta(days=1)
+    else:
+        start_dt = datetime.strptime(from_date, "%Y-%m-%d") if from_date else today - timedelta(days=29)
+        end_dt = datetime.strptime(to_date, "%Y-%m-%d") + timedelta(days=1) if to_date else today + timedelta(days=1)
+
+    valid_statuses = ["Paid", "Delivered", "Shipped", "In Production"]
+    query = db.query(Order).filter(
+        Order.created_at >= start_dt,
+        Order.created_at <= end_dt,
+        Order.payment_status == "paid",
+        Order.status.in_(valid_statuses),
+        ~Order.status.in_(["Cancelled", "Refunded"]),
+        Order.payment_status != "refunded"
+    )
+    orders = query.all()
+
+    state_counts = {}
+    total_books = 0
+    for o in orders:
+        s_id = "other"
+        if o.shipping_address:
+            try:
+                addr_data = json.loads(o.shipping_address)
+                s_id = addr_data.get("state_id", "other").lower()
+            except Exception:
+                pass
+        state_counts[s_id] = state_counts.get(s_id, 0) + 1
+        total_books += 1
+
+    indian_28_states = {
+        "ap", "ar", "as", "br", "ct", "ga", "gj", "hr", "hp", "jh",
+        "ka", "kl", "mp", "mh", "mn", "ml", "mz", "nl", "or", "pb",
+        "rj", "sk", "tn", "tg", "tr", "up", "ut", "wb"
+    }
+
+    states_reached_count = sum(1 for s in indian_28_states if state_counts.get(s, 0) > 0)
+
+    top_state_id = max(state_counts, key=state_counts.get) if state_counts else "tn"
+    top_state_count = state_counts.get(top_state_id, 0)
+
+    return {
+        "period": period,
+        "from_date": start_dt.strftime("%Y-%m-%d"),
+        "to_date": (end_dt - timedelta(days=1)).strftime("%Y-%m-%d"),
+        "total_books": total_books,
+        "states_reached_count": states_reached_count,
+        "total_indian_states": 28,
+        "top_state": {
+            "id": top_state_id,
+            "count": top_state_count
+        },
+        "state_counts": state_counts
+    }
+

@@ -157,41 +157,65 @@ export default function FootStepsPage() {
   return (
     <div className="pb-24">
       {/* 1. Hero Section */}
-      <section className="bg-gradient-to-b from-[#FAEEED]/40 via-[#FAF7F2] to-[#FAF7F2] pt-14 pb-18 px-4 sm:px-6 lg:px-8 border-b border-[#EBE3D9]">
-        <div className="max-w-5xl mx-auto text-center space-y-5">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-[#C98A84]/30 text-xs font-semibold text-[#C98A84] shadow-xs">
-            <Footprints className="w-3.5 h-3.5 text-[#C98A84]" />
-            <span>Childhood Milestone Keepsakes</span>
-          </div>
+      <section className="bg-[#FAF7F2] border-b border-[#EBE3D9] overflow-hidden">
+        <div className="w-full max-w-[1560px] mx-auto px-4 sm:px-6 lg:px-10 xl:px-14 py-8 sm:py-12 lg:py-14">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-6 lg:gap-4 xl:gap-6">
+            {/* Left Column (neatly bounded so it does not create trailing empty space) */}
+            <div className="w-full lg:w-[42%] xl:w-[38%] 2xl:w-[36%] shrink-0 flex flex-col items-start text-left z-10">
+              {/* White Pill Badge */}
+              <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-white border border-[#E3D9CD] shadow-[0_1px_3px_rgba(45,34,42,0.04)] mb-5">
+                <span className="text-xs font-semibold tracking-wide text-[#2D222A]">
+                  Childhood Milestone Keepsakes
+                </span>
+              </div>
 
-          <h1 className="font-editorial-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-[#2D222A] tracking-tight">
-            Foot Steps: Every Milestone <span className="italic font-normal text-[#C98A84]">Woven into Wonder</span>
-          </h1>
+              {/* Bold 3-line Headline */}
+              <h1 className="font-editorial-serif text-3xl sm:text-4xl md:text-5xl lg:text-[3.25rem] font-bold text-[#2D222A] leading-[1.15] tracking-tight mb-5">
+                Foot Steps:<br />
+                Every Milestone<br />
+                <span className="italic font-normal text-[#C98A84]">Woven into Wonder</span>
+              </h1>
 
-          <p className="max-w-2xl mx-auto text-sm sm:text-base text-[#695B64] leading-relaxed">
-            Childhood slips through our fingers in a blink of an eye. The KuttyStory Foot Steps collection preserves every tender leap — from their first tiny steps to school milestones — as permanent heirloom literature.
-          </p>
+              {/* Description Paragraph */}
+              <p className="text-sm sm:text-base text-[#2D222A]/85 leading-relaxed max-w-lg mb-8 font-editorial-sans">
+                Childhood slips through our fingers in a blink of an eye. The KuttyStory Foot Steps collection preserves every tender leap — from their first tiny steps to school milestones — as permanent heirloom literature.
+              </p>
 
-          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
-            <a
-              href="#stages"
-              className="px-6 py-3 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs sm:text-sm font-semibold transition-all flex items-center gap-2"
-            >
-              <span>Explore Milestone Stages</span>
-              <ArrowRight className="w-4 h-4" />
-            </a>
-            <Link
-              to="/storybooks"
-              className="px-6 py-3 rounded-full bg-white border border-[#EBE3D9] text-[#2D222A] text-xs sm:text-sm font-medium hover:border-[#C98A84]"
-            >
-              <span>Browse Catalog</span>
-            </Link>
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-3.5">
+                <a
+                  href="#stages"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-xs sm:text-sm font-semibold transition-all duration-200 shadow-xs hover:shadow active:scale-[0.98]"
+                >
+                  <span>Explore Milestone Stages</span>
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+                <Link
+                  to="/storybooks"
+                  className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-white border border-[#E3D9CD] text-[#2D222A] text-xs sm:text-sm font-medium hover:border-[#C98A84] hover:text-[#C98A84] transition-all duration-200 shadow-xs"
+                >
+                  <span>Browse Catalog</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Right Column Illustration (fills remaining space, generous prominence without excessive margins) */}
+            <div className="w-full lg:flex-1 flex items-center justify-center lg:justify-end">
+              <img
+                src="/footsteps-hero-storybook.png"
+                alt="Open KuttyStory 3D pop-up storybook illustration featuring whimsical forest creatures, a cozy cottage, rolling hills, and a glowing moon rising from heirloom pages"
+                className="w-full h-auto max-w-2xl lg:max-w-none object-contain block select-none pointer-events-none lg:scale-105 xl:scale-110 2xl:scale-115 origin-center lg:origin-right motion-safe:transition-transform motion-safe:duration-700 hover:scale-[1.16]"
+                loading="eager"
+              />
+            </div>
           </div>
         </div>
       </section>
 
       {/* 4. Book Sales Map Reach Section */}
-      <BookSalesMapSection />
+      <div id="stages" className="scroll-mt-8">
+        <BookSalesMapSection />
+      </div>
 
       {/* 5. Parent Memories & Testimonials */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-24">
