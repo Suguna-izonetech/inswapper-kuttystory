@@ -748,3 +748,21 @@ def get_admin_payments(limit: int = 50, offset: int = 0, db: Session = Depends(g
     from app.routers.payments import list_payment_transactions
     return list_payment_transactions(limit=limit, offset=offset, db=db)
 
+
+@router.post("/seed")
+def reseed_database(db: Session = Depends(get_db)):
+    """Reseed admin accounts and initial story templates."""
+    from app.seed_admin import seed_admin_users
+    from app.seed_stories import seed as seed_stories
+    try:
+        admin_res = seed_admin_users(db=db)
+        seed_stories()
+        return {
+            "status": "success",
+            "message": "Database reseeded successfully with admin logins and story catalog.",
+            "admins": [a["email"] for a in admin_res]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reseed database: {str(e)}")
+
+

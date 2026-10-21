@@ -48,6 +48,13 @@ async def lifespan(app: FastAPI):
     else:
         print(f"Warning: sample PDF not found at {sample_pdf}")
 
+    # 3. Idempotently seed default admin logins
+    try:
+        from app.seed_admin import seed_admin_users
+        seed_admin_users()
+    except Exception as e:
+        print(f"Notice during startup admin seed: {e}")
+
     yield
 
 app = FastAPI(

@@ -78,21 +78,40 @@ Both backend and frontend can be started with simple commands:
 cd backend
 pip install -r requirements.txt
 alembic upgrade head
-python seed_stories.py
+python seed_admin.py     # Seeds default admin accounts
+python seed_stories.py   # Ingests & configures story catalog
+# Or seed everything at once:
+# python seed.py
 uvicorn app.main:app --reload
 ```
 - API Health Check: `http://127.0.0.1:8000/api/health`
 - Interactive API Docs (Swagger): `http://127.0.0.1:8000/docs`
-- Configuration: Controlled via [`backend/.env`](file:///c:/izone%20projects/Baby%20story/backend/.env) (and template [`backend/.env.example`](file:///c:/izone%20projects/Baby%20story/backend/.env.example))
+- Configuration: Controlled via `backend/.env` (and template `backend/.env.example`)
 
-### 2. Start the Next.js Frontend
+#### 🔐 Default Admin Logins
+| Email | Password | Name | Role |
+| :--- | :--- | :--- | :--- |
+| **`admin@kuttystory.com`** | `Admin@123` | Admin Master | admin |
+| **`suguna.izonetech@gmail.com`** | `Suguna@123` | Suguna | admin |
+
+*To seed a custom admin:*
+```powershell
+python seed_admin.py --email custom@admin.com --password YourPassword123 --name "Custom Admin"
+```
+*To list all existing admin users in database:*
+```powershell
+python seed_admin.py --list
+```
+
+### 2. Start the Frontend
 ```powershell
 cd frontend
 npm run dev
 ```
 - Runs automatically on port **`5173`**
 - Web Application: `http://localhost:5173`
-- Configuration: Controlled via [`frontend/.env`](file:///c:/izone%20projects/Baby%20story/frontend/.env) (and template [`frontend/.env.example`](file:///c:/izone%20projects/Baby%20story/frontend/.env.example))
+- Admin Login: `http://localhost:5173/admin_login`
+- Configuration: Controlled via `frontend/.env` (and template `frontend/.env.example`)
 
 ### 3. Run the Automated Backend Test Suite
 ```powershell
@@ -109,6 +128,7 @@ python test_backend.py
 | :--- | :--- |
 | **`http://localhost:5173`** | Customer Homepage (Story showcase, atelier process, trust charter) |
 | **`http://localhost:5173/personalize/unicorn-story`** | Guided Personalization Wizard & Interactive Book Viewer |
+| **`http://localhost:5173/admin_login`** | Atelier Admin Authentication (Login, Register, Password Reset) |
 | **`http://localhost:5173/admin`** | Admin Studio (Overview KPIs, Page Editor, AI Settings, Job Monitor) |
 | **`http://localhost:8000/docs`** | FastAPI Swagger Interactive Documentation |
 
