@@ -328,30 +328,58 @@ class StorageManager:
     # URL & Path Helpers
     # --------------------------------------------------------------------------
 
+    @property
+    def dynamic_minio_base_url(self) -> str:
+        """
+        Dynamically generate the MinIO base URL strictly from MINIO_ENDPOINT, MINIO_BUCKET, and MINIO_SECURE from .env.
+        Supports both raw hostnames (e.g. minio.risingsuntech.in or 127.0.0.1:9000)
+        and full URLs (e.g. https://minio.risingsuntech.in).
+        """
+        if settings.MINIO_PUBLIC_URL:
+            return settings.MINIO_PUBLIC_URL.rstrip("/")
+
+        raw_endpoint = (settings.MINIO_ENDPOINT or "127.0.0.1:9000").strip()
+        protocol = "https" if settings.MINIO_SECURE else "http"
+
+        if raw_endpoint.startswith("https://"):
+            protocol = "https"
+            endpoint = raw_endpoint.replace("https://", "", 1).rstrip("/")
+        elif raw_endpoint.startswith("http://"):
+            protocol = "http"
+            endpoint = raw_endpoint.replace("http://", "", 1).rstrip("/")
+        else:
+            endpoint = raw_endpoint.rstrip("/")
+
+        bucket = (settings.MINIO_BUCKET or "kuttystory").strip("/")
+        return f"{protocol}://{endpoint}/{bucket}"
+
     def get_public_url(self, abs_path_or_key: Optional[str]) -> Optional[str]:
         """
         Generate public web-accessible URL for an asset.
-        Directs through MINIO_PUBLIC_URL if configured, or through backend streaming endpoint.
+        Dynamically constructs the link using MINIO_ENDPOINT and MINIO_BUCKET from .env.
+        Example: http://127.0.0.1:9000/kuttystory/source_pages/unicorn-story/page_01.png
         """
         if not abs_path_or_key:
             return None
-        if (
-            abs_path_or_key.startswith("http://")
-            or abs_path_or_key.startswith("https://")
-            or abs_path_or_key.startswith("data:")
-            or abs_path_or_key.startswith("blob:")
-        ):
+
+        # Data and blob URLs are returned as-is
+        if abs_path_or_key.startswith("data:") or abs_path_or_key.startswith("blob:"):
+            return abs_path_or_key
+
+        base = self.dynamic_minio_base_url
+
+        # If it's already a direct MinIO URL matching our base URL, return as-is
+        if abs_path_or_key.startswith(f"{base}/"):
             return abs_path_or_key
 
         category, filename = self._parse_category_and_filename(abs_path_or_key)
         if not category or not filename:
+            # If unable to parse category but it is already a full external URL, return as-is
+            if abs_path_or_key.startswith("http://") or abs_path_or_key.startswith("https://"):
+                return abs_path_or_key
             return abs_path_or_key
 
-        if settings.MINIO_PUBLIC_URL:
-            base = settings.MINIO_PUBLIC_URL.rstrip("/")
-            return f"{base}/{category}/{filename}"
-
-        return f"{settings.API_V1_PREFIX}/storage/{category}/{filename}"
+        return f"{base}/{category}/{filename}"
 
     def resolve_path(self, path_str: Optional[str]) -> Optional[str]:
         """
