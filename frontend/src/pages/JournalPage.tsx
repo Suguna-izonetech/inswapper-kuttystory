@@ -21,6 +21,7 @@ import {
   Award
 } from "lucide-react";
 import { api, ChildStory, SubmitChildStoryPayload } from "@/lib/api";
+import ParentingCorner from "@/components/parenting/ParentingCorner";
 
 interface JournalArticle {
   id: string;
@@ -426,6 +427,13 @@ export default function JournalPage() {
               </div>
             )}
           </section>
+        )}
+
+        {/* 2.5 PARENTING ACTIVITIES CORNER */}
+        {selectedCat === "Parenting & Articles" && (
+          <div className="pb-8">
+            <ParentingCorner />
+          </div>
         )}
 
         {/* 3. ATELIER ARTICLES (PRESERVED) */}
