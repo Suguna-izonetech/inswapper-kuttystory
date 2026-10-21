@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Sparkles, ArrowRight, ShieldCheck, BookOpen, CheckCircle, Compass } from "lucide-react";
+import { Sparkles, ArrowRight, ShieldCheck, BookOpen, CheckCircle } from "lucide-react";
 import { api, StoryTemplate } from "@/lib/api";
 import { HardcoverBook } from "@/components/HardcoverBook";
 
@@ -117,8 +117,8 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {/* Main Story: Unicorn Story */}
-          {stories.map((story) => (
+          {/* Main Story Cards (up to 3) */}
+          {stories.slice(0, 3).map((story) => (
             <div key={story.id} className="editorial-card overflow-hidden flex flex-col group">
               <div className="relative aspect-square p-5 sm:p-6 bg-gradient-to-b from-[#FDFCFB] via-[#F8F5EE] to-[#EFE8DD] flex items-center justify-center overflow-hidden border-b border-[#EBE3D9]/70">
                 <div className="w-[82%] sm:w-[86%] max-w-[320px] aspect-square flex items-center justify-center mx-auto">
@@ -164,52 +164,17 @@ export default function HomePage() {
               </div>
             </div>
           ))}
+        </div>
 
-          {/* Coming Soon Card 1 */}
-          <div className="editorial-card p-6 flex flex-col justify-between opacity-75 border-dashed border-[#D8CCC0]">
-            <div className="space-y-4">
-              <div className="aspect-square rounded-xl bg-[#F7F3EC] flex flex-col items-center justify-center p-6 text-center text-[#695B64]">
-                <Sparkles className="w-10 h-10 text-[#B8A9C9] mb-3" />
-                <span className="font-editorial-serif text-xl font-semibold text-[#2D222A]">The Starlight Dragon</span>
-                <span className="text-[11px] text-[#A2949E] mt-1">Expanding Catalog</span>
-              </div>
-              <div>
-                <span className="px-2.5 py-0.5 rounded-full bg-[#F2EEF7] text-[#7E6E92] text-[10px] font-medium">
-                  In Production
-                </span>
-                <h4 className="font-editorial-serif text-xl font-semibold text-[#2D222A] mt-2">
-                  The Starlight Dragon
-                </h4>
-                <p className="text-xs text-[#695B64] mt-1">
-                  A gentle dragon who gathers fallen stars to light the quiet night sky for dreaming children.
-                </p>
-              </div>
-            </div>
-            <div className="pt-4 text-xs text-[#A2949E]">Available in Next Release</div>
-          </div>
-
-          {/* Coming Soon Card 2 */}
-          <div className="editorial-card p-6 flex flex-col justify-between opacity-75 border-dashed border-[#D8CCC0]">
-            <div className="space-y-4">
-              <div className="aspect-square rounded-xl bg-[#F7F3EC] flex flex-col items-center justify-center p-6 text-center text-[#695B64]">
-                <Compass className="w-10 h-10 text-[#8F9E8B] mb-3" />
-                <span className="font-editorial-serif text-xl font-semibold text-[#2D222A]">The Secret Treehouse</span>
-                <span className="text-[11px] text-[#A2949E] mt-1">Expanding Catalog</span>
-              </div>
-              <div>
-                <span className="px-2.5 py-0.5 rounded-full bg-[#EEF4ED] text-[#4E7048] text-[10px] font-medium">
-                  In Production
-                </span>
-                <h4 className="font-editorial-serif text-xl font-semibold text-[#2D222A] mt-2">
-                  The Secret Treehouse
-                </h4>
-                <p className="text-xs text-[#695B64] mt-1">
-                  Discover a hidden sanctuary nestled in ancient boughs where enchanted animals gather to share stories.
-                </p>
-              </div>
-            </div>
-            <div className="pt-4 text-xs text-[#A2949E]">Available in Next Release</div>
-          </div>
+        {/* View All Button */}
+        <div className="mt-12 flex justify-center">
+          <Link
+            to="/storybooks"
+            className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-full bg-[#FAEEED] hover:bg-[#F5DFDC] text-[#C98A84] hover:text-[#B87A74] text-sm font-semibold border border-[#C98A84]/30 hover:border-[#C98A84] shadow-xs hover:shadow transition-all"
+          >
+            <span>View All</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       </section>
 
