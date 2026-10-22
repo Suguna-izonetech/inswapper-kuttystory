@@ -60,7 +60,7 @@ const STEPS: StepItem[] = [
   },
   {
     number: "03",
-    title: "Character Consistency AI Painting",
+    title: "Character Consistency & Story Painting",
     tagline: "Transforming facial features into timeless art",
     description: "Our fine-tuned generative pipeline gently maps your child's distinctive eye shape, smile, and facial structure into the story's painterly illustration style across all 24 pages.",
     icon: Cpu,
@@ -111,19 +111,15 @@ const FAQS = [
   },
   {
     q: "How long does printing and delivery take?",
-    a: "Digital editions are ready within minutes after personalization. For physical hardcovers, printing and Smyth-sewn binding takes 2 to 3 business days. Domestic shipping takes 3 to 5 business days, while international express delivery takes 6 to 9 business days."
+    a: "Digital editions are ready within minutes after personalization. For physical hardcovers, printing and Smyth-sewn binding takes 5 to 7 business days. Domestic shipping takes 2 to 7 business days, while international express delivery takes 6 to 9 business days."
   },
   {
     q: "How do you protect my child's photo and biometrics?",
-    a: "Your family's privacy is sacred. Photos are stored in isolated encrypted storage solely for the purpose of generating your storybook. We never use your child's photos to train public artificial intelligence models, and photos are automatically shredded after order fulfillment."
+    a: "Your family's privacy is sacred. Photos are stored in isolated encrypted storage solely for the purpose of generating your storybook. We never use your child's photos to train public models, and photos are automatically shredded after order fulfillment."
   },
   {
     q: "Can I order multiple copies for grandparents and relatives?",
-    a: "Yes! Once your book is created, you can easily add duplicate hardcovers for grandparents, aunts, and godparents at a generous 30% bundle discount during checkout."
-  },
-  {
-    q: "What happens if I'm not satisfied with the finished book?",
-    a: "We offer an unconditional Heirloom Guarantee. If the book doesn't bring genuine wonder and delight to your bedtime routine, reach out to our story curators for a complimentary re-render or a full refund."
+    a: "Yes! Share the love — you can easily add duplicate hardcovers for grandparents, relatives, and godparents. Enjoy a 30% bundle discount on duplicates at checkout, and get 10% off when you order more than 2 books!"
   }
 ];
 
@@ -140,8 +136,8 @@ export default function HowItWorksPage() {
             <span>The Atelier Process</span>
           </div>
 
-          <h1 className="font-editorial-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-[#2D222A] tracking-tight">
-            How Your Heirloom Book <span className="italic font-normal text-[#C98A84]">Comes to Life</span>
+          <h1 className="font-hero-heading text-4xl sm:text-5xl lg:text-6xl font-bold text-[#2D222A] tracking-tight">
+            How Your Heirloom Book <span className="font-fairy-tale text-[#C98A84]">Comes to Life</span>
           </h1>
 
           <p className="max-w-2xl mx-auto text-sm sm:text-base text-[#695B64] leading-relaxed">

@@ -62,7 +62,7 @@ class CharacterConsistencyEngine:
             resized = cropped.resize((512, 512), Image.Resampling.LANCZOS)
 
             # Composite over plain solid studio backdrop (#FAF7F2 Warm Ivory)
-            # Isolates child portrait and eliminates peripheral room/outdoor clutter for AI consistency
+            # Isolates child portrait and eliminates peripheral room/outdoor clutter for character consistency
             studio_bg = Image.new("RGB", (512, 512), (250, 247, 242))
             mask = Image.new("L", (512, 512), 0)
             draw = ImageDraw.Draw(mask)

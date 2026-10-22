@@ -24,8 +24,8 @@ export default function AboutPage() {
             <span>The Atelier Story & Mission</span>
           </div>
 
-          <h1 className="font-editorial-serif text-4xl sm:text-6xl lg:text-7xl font-bold text-[#2D222A] tracking-tight leading-[1.1]">
-            Every child deserves to see themselves as the <span className="italic font-normal text-[#C98A84]">hero</span> of the story.
+          <h1 className="font-hero-heading text-4xl sm:text-6xl lg:text-7xl font-bold text-[#2D222A] tracking-tight leading-[1.12]">
+            Every child deserves to see themselves as the <span className="font-fairy-tale text-[#C98A84]">hero</span> of the story.
           </h1>
 
           <p className="max-w-3xl mx-auto text-base sm:text-lg text-[#695B64] font-normal leading-relaxed">
@@ -130,7 +130,7 @@ export default function AboutPage() {
               <Sparkle className="w-6 h-6" />
             </div>
             <h3 className="font-editorial-serif text-xl font-bold text-[#2D222A]">
-              2. Gentle Likeness AI
+              2. Gentle Likeness Artistry
             </h3>
             <p className="text-xs text-[#695B64] leading-relaxed">
               Our fine-tuned generative pipeline maps child facial contours into classical watercolor illustration. Your child is immediately recognizable while effortlessly belonging in the story realm.
@@ -171,17 +171,17 @@ export default function AboutPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center divide-y md:divide-y-0 md:divide-x divide-[#EBE3D9]">
             <div className="space-y-1 pt-4 md:pt-0">
               <div className="font-editorial-serif text-4xl sm:text-5xl font-bold text-[#C98A84]">
-                25,000+
+                1,300
               </div>
-              <div className="text-xs font-medium text-[#2D222A]">Bedtime Smiles Created</div>
-              <div className="text-[11px] text-[#695B64]">In homes across the globe</div>
+              <div className="text-xs font-medium text-[#2D222A]">Books Sold & Delivered</div>
+              <div className="text-[11px] text-[#695B64]">In homes across India</div>
             </div>
 
             <div className="space-y-1 pt-4 md:pt-0">
               <div className="font-editorial-serif text-4xl sm:text-5xl font-bold text-[#8F9E8B]">
-                23
+                15 / 28
               </div>
-              <div className="text-xs font-medium text-[#2D222A]">States Delivered</div>
+              <div className="text-xs font-medium text-[#2D222A]">States Reached</div>
               <div className="text-[11px] text-[#695B64]">With tracked express shipping</div>
             </div>
 

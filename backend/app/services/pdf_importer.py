@@ -300,7 +300,7 @@ class PDFImporterService:
         Idempotently import a storybook from a PDF file.
         Supports both local file paths and MinIO storage object keys.
         Renders every page into high-resolution PNGs stored in MinIO, extracts text,
-        and dynamically detects character face anchors for seamless AI personalization.
+        and dynamically detects character face anchors for seamless story personalization.
         """
         pdf_bytes = None
         source_storage_path = None

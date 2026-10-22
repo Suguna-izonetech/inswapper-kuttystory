@@ -13,7 +13,7 @@ STORAGE_BASE = BACKEND_DIR / "storage"
 load_dotenv(BACKEND_DIR / ".env", override=True)
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Personalized AI Children's Storybook"
+    PROJECT_NAME: str = "Personalized Children's Storybook"
     API_V1_PREFIX: str = "/api/v1"
     
     # Database (PostgreSQL)
@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     PREVIEWS_DIR: Path = STORAGE_BASE / "previews"
     FINAL_BOOKS_DIR: Path = STORAGE_BASE / "final_books"
     
-    # AI Providers Configuration
+    # Image & Story Providers Configuration
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     HF_TOKEN: str = os.getenv("HF_TOKEN", "")
     FAL_KEY: str = os.getenv("FAL_KEY", "")
@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     
     # Budgets & Limits
     PER_BOOK_BUDGET_USD: float = 2.50
-    PREVIEW_PAGE_LIMIT: int = 5  # Configurable number of pages to generate during initial preview
+    PREVIEW_PAGE_LIMIT: int = int(os.getenv("PREVIEW_PAGE_LIMIT", "3"))  # Configurable number of pages to generate during initial preview
     MAX_GENERATION_RETRIES: int = 3
     PAID_FALLBACK_ENABLED: bool = False
 

@@ -591,7 +591,7 @@ export const api = {
 
   async getAISettings(): Promise<AISettings> {
     const res = await fetch(`${API_BASE}/admin/ai/settings`);
-    if (!res.ok) throw new Error("Failed to fetch AI settings");
+    if (!res.ok) throw new Error("Failed to fetch settings");
     return res.json();
   },
 
@@ -601,7 +601,7 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error("Failed to update AI settings");
+    if (!res.ok) throw new Error("Failed to update settings");
     return res.json();
   },
 

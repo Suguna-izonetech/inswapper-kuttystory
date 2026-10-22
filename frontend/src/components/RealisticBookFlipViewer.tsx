@@ -307,7 +307,7 @@ export default function RealisticBookFlipViewer({
 
                   {/* KuttyStory Atelier Logo Badge */}
                   <div className="absolute top-3 right-3 z-20 px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-md shadow-xs border border-[#EBE3D9] flex items-center gap-1.5 select-none">
-                    <img src="/logo.jpg" alt="KuttyStory" className="w-4 h-4 rounded-full object-cover" />
+                    <img src="/logo.png" alt="KuttyStory" className="w-4 h-4 rounded-full object-contain" />
                     <span className="font-editorial-serif font-bold text-xs text-[#2D222A] tracking-tight">KuttyStory</span>
                   </div>
 
@@ -588,7 +588,7 @@ export default function RealisticBookFlipViewer({
                     <Lock className="w-3.5 h-3.5" />
                   </div>
                   <span>
-                    You've reached the end of the 5-page preview. Unlock all 26+ pages of <strong>{childName}</strong>'s adventure!
+                    You've reached the end of the 3-page preview. Unlock all 26+ pages of <strong>{childName}</strong>'s adventure!
                   </span>
                 </div>
                 <button

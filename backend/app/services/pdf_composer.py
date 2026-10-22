@@ -130,6 +130,12 @@ class PDFComposerService:
         if is_cmyk:
             cmyk_cache_dir.mkdir(parents=True, exist_ok=True)
 
+        # Strictly limit free preview PDF to max 3 personalized pages
+        if book_type == "preview":
+            pages_data = pages_data[:3]
+
+        pages_rendered = 0
+
         for idx, page_info in enumerate(pages_data):
             page_num = page_info.get("page_number", idx + 1)
             raw_img_path = page_info.get("image_path")
@@ -139,49 +145,58 @@ class PDFComposerService:
             for tag in ["[Name]", "[name]", "{name}", "[child_name]", "{child_name}"]:
                 story_text = story_text.replace(tag, child_name)
 
+            # NOTE: For preview PDFs, NEVER draw empty template / blank pages!
+            if not img_path or not os.path.exists(img_path):
+                if book_type == "preview":
+                    continue  # Strictly omit missing images; never show empty template
+                preflight_validation["has_missing_images"] = True
+                preflight_validation["validation_passed"] = False
+                c.saveState()
+                c.setFillColor(fallback_bg)
+                c.rect(0, 0, page_w_pt, page_h_pt, fill=1, stroke=0)
+                c.restoreState()
+                c.showPage()
+                pages_rendered += 1
+                continue
+
             c.saveState()
 
             # 2. Draw Illustration Artwork (Full Bleed)
-            if img_path and os.path.exists(img_path):
-                draw_img_path = img_path
-                try:
-                    with Image.open(img_path) as pil_img:
-                        w, h = pil_img.size
-                        dpi_x = (w / (page_w_pt / 72.0))
-                        preflight_validation["dpi_check"].append({
-                            "page": page_num,
-                            "resolution_px": f"{w}x{h}",
-                            "effective_dpi": round(dpi_x, 1)
-                        })
+            draw_img_path = img_path
+            image_drawn = False
+            try:
+                with Image.open(img_path) as pil_img:
+                    w, h = pil_img.size
+                    dpi_x = (w / (page_w_pt / 72.0))
+                    preflight_validation["dpi_check"].append({
+                        "page": page_num,
+                        "resolution_px": f"{w}x{h}",
+                        "effective_dpi": round(dpi_x, 1)
+                    })
 
-                        if is_cmyk:
-                            # Convert to true 4-channel CMYK for print
-                            cmyk_filename = f"cmyk_{Path(img_path).stem}_{w}x{h}.jpg"
-                            cached_cmyk_path = cmyk_cache_dir / cmyk_filename
-                            if not cached_cmyk_path.exists() or os.path.getmtime(img_path) > os.path.getmtime(cached_cmyk_path):
-                                cmyk_img = pil_img.convert("CMYK")
-                                cmyk_img.save(str(cached_cmyk_path), format="JPEG", quality=96)
-                            draw_img_path = str(cached_cmyk_path)
+                    if is_cmyk:
+                        # Convert to true 4-channel CMYK for print
+                        cmyk_filename = f"cmyk_{Path(img_path).stem}_{w}x{h}.jpg"
+                        cached_cmyk_path = cmyk_cache_dir / cmyk_filename
+                        if not cached_cmyk_path.exists() or os.path.getmtime(img_path) > os.path.getmtime(cached_cmyk_path):
+                            cmyk_img = pil_img.convert("CMYK")
+                            cmyk_img.save(str(cached_cmyk_path), format="JPEG", quality=96)
+                        draw_img_path = str(cached_cmyk_path)
 
-                    c.drawImage(draw_img_path, 0, 0, width=page_w_pt, height=page_h_pt, preserveAspectRatio=True)
-                except Exception as e:
-                    print(f"Notice: Error drawing image on page {page_num}: {e}")
-                    preflight_validation["has_missing_images"] = True
-                    preflight_validation["validation_passed"] = False
-                    c.setFillColor(fallback_bg)
-                    c.rect(0, 0, page_w_pt, page_h_pt, fill=1, stroke=0)
-            else:
+                c.drawImage(draw_img_path, 0, 0, width=page_w_pt, height=page_h_pt, preserveAspectRatio=True)
+                image_drawn = True
+            except Exception as e:
+                print(f"Notice: Error drawing image on page {page_num}: {e}")
+                if book_type == "preview":
+                    c.restoreState()
+                    continue  # Strictly omit failed images in preview; no empty template
                 preflight_validation["has_missing_images"] = True
                 preflight_validation["validation_passed"] = False
                 c.setFillColor(fallback_bg)
                 c.rect(0, 0, page_w_pt, page_h_pt, fill=1, stroke=0)
 
-
-
-
-
             # 5. Preview Watermark badge (Only for free preview; Omitted for final print books)
-            if book_type == "preview":
+            if book_type == "preview" and image_drawn:
                 c.saveState()
                 c.setFillColor(banner_bg)
                 c.rect(0, page_h_pt - 26, 170, 26, fill=1, stroke=0)
@@ -192,15 +207,15 @@ class PDFComposerService:
 
             c.restoreState()
             c.showPage()
+            pages_rendered += 1
 
+            if book_type == "preview" and pages_rendered >= 3:
+                break
+
+        preflight_validation["page_count"] = pages_rendered
         c.save()
         category = "previews" if book_type == "preview" else "final_books"
         object_key = storage.save_file(pdf_path, category=category, object_name=output_filename)
-        try:
-            if pdf_path.exists():
-                pdf_path.unlink()
-        except Exception:
-            pass
         return object_key, preflight_validation
 
 

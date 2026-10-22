@@ -56,10 +56,14 @@ class JobRunner:
             # Get story pages
             story_pages = db.query(StoryPage).filter(StoryPage.story_id == job.story_id).order_by(StoryPage.page_index).all()
             
-            # Choose pages to personalize for preview
-            preview_limit = min(settings.PREVIEW_PAGE_LIMIT, len(story_pages))
-            # Pick representative beats across the story
-            preview_page_indices = [0, 2, 6, 9, 12] if len(story_pages) >= 13 else list(range(preview_limit))
+            # Choose pages to personalize for preview (strictly 3 images)
+            from app.models import AISettings
+            ai_conf = db.query(AISettings).filter(AISettings.id == "default").first()
+            limit_val = ai_conf.preview_page_limit if ai_conf and ai_conf.preview_page_limit else settings.PREVIEW_PAGE_LIMIT
+            preview_limit = min(limit_val, 3, len(story_pages))
+            # Pick 3 representative beats across the story (Cover/Intro, Page 3, Page 7)
+            preview_page_indices = [0, 2, 6] if len(story_pages) >= 7 else list(range(preview_limit))
+            preview_page_indices = preview_page_indices[:preview_limit]
             target_pages = [story_pages[i] for i in preview_page_indices if i < len(story_pages)]
 
             job.total_pages = len(target_pages)
@@ -144,7 +148,7 @@ class JobRunner:
 
             preview_filename = f"preview_{job.id}.pdf"
             pdf_path, validation = PDFComposerService.compose_storybook_pdf(
-                pages_data=generated_pages_data,
+                pages_data=generated_pages_data[:3],
                 output_filename=preview_filename,
                 book_type="preview",
                 child_name=job.child_name,
@@ -156,7 +160,7 @@ class JobRunner:
                 job_id=job.id,
                 book_type="preview",
                 pdf_storage_path=pdf_path,
-                page_count=len(generated_pages_data),
+                page_count=min(len(generated_pages_data), 3),
                 validation_status="valid" if validation["validation_passed"] else "flagged",
                 validation_details=json.dumps(validation)
             )
@@ -344,7 +348,7 @@ class JobRunner:
                         job.total_pages = len(story_pages)
                         pct = int((len(existing_assets) / len(story_pages)) * 100)
                         job.status = f"Rendering · {pct}%"
-                        job.current_stage = f"Rendering HD AI page {page_num} of {len(story_pages)}..."
+                        job.current_stage = f"Rendering HD page {page_num} of {len(story_pages)}..."
                         db.commit()
                     except Exception as fuse_err:
                         print(f"Notice: Face fusion fallback on full render page {page_num}: {fuse_err}")
@@ -366,7 +370,7 @@ class JobRunner:
             job.total_pages = len(pages_data)
             job.completed_pages = len(pages_data)
             job.status = "completed"
-            job.current_stage = "All HD AI pages generated successfully"
+            job.current_stage = "All HD pages generated successfully"
             db.commit()
 
             return pages_data

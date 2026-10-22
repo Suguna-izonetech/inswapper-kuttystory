@@ -174,6 +174,14 @@ export default function PersonalizePage() {
     return () => clearInterval(interval);
   }, [jobId]);
 
+  // Ensure currentPageIdx stays within preview page bounds (max 3 pages)
+  useEffect(() => {
+    const previewCount = Math.min((job?.assets || []).length, 3);
+    if (currentPageIdx >= previewCount && previewCount > 0) {
+      setCurrentPageIdx(previewCount - 1);
+    }
+  }, [job?.assets, currentPageIdx]);
+
   // Start live webcam stream
   const startCamera = async () => {
     setCameraError(null);
@@ -251,7 +259,7 @@ export default function PersonalizePage() {
         setRawPhotoFile(file);
         setOriginalPreview(dataUrl);
 
-        // Photo validation (YuNet AI face landmark analysis + client fallback)
+        // Photo validation (YuNet face landmark analysis + client fallback)
         setIsValidatingPhoto(true);
         validateChildPhoto(dataUrl, blob.size, blob)
           .then((report) => setValidationReport(report))
@@ -272,7 +280,7 @@ export default function PersonalizePage() {
     const url = URL.createObjectURL(file);
     setOriginalPreview(url);
 
-    // Run photo guidelines validation (YuNet AI face landmark analysis + client fallback)
+    // Run photo guidelines validation (YuNet face landmark analysis + client fallback)
     setIsValidatingPhoto(true);
     try {
       const report = await validateChildPhoto(url, file.size, file);
@@ -411,7 +419,7 @@ export default function PersonalizePage() {
     );
   }
 
-  const assets: GeneratedAsset[] = job?.assets || [];
+  const assets: GeneratedAsset[] = (job?.assets || []).slice(0, 3);
   const currentAsset = assets[currentPageIdx];
 
   return (
@@ -809,7 +817,7 @@ export default function PersonalizePage() {
               <div className="text-right hidden sm:block">
                 <span className="text-xs text-[#695B64] block">Progress</span>
                 <span className="font-editorial-serif text-lg font-bold text-[#2D222A]">
-                  {job.completed_pages} of {job.total_pages || 5} Pages
+                  {Math.min(job.completed_pages, assets.length || 3)} of {Math.min(job.total_pages || 3, 3)} Pages
                 </span>
               </div>
 
@@ -822,12 +830,12 @@ export default function PersonalizePage() {
                         onClick={() =>
                           triggerPdfDownload(
                             `/api/v1/personalization/${job.id}/pdf?lang=${selectedLanguage}`,
-                            `${(job.child_name || "Child").replace(/\s+/g, "_")}_Preview_5Pages.pdf`,
-                            "5-Page Preview Storybook PDF"
+                            `${(job.child_name || "Child").replace(/\s+/g, "_")}_Preview_3Pages.pdf`,
+                            "3-Page Preview Storybook PDF"
                           )
                         }
                         className="px-4 py-2 rounded-full border border-[#EBE3D9] hover:bg-[#FAF7F2] text-[#4E424B] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
-                        title="Download free 5-page preview watermarked PDF"
+                        title="Download free 3-page preview watermarked PDF"
                       >
                         <Download className="w-3.5 h-3.5 text-[#695B64]" />
                         <span>Preview PDF</span>
@@ -1061,13 +1069,13 @@ export default function PersonalizePage() {
                   <div className="space-y-2 max-w-xl">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[#C98A84] text-[11px] font-bold tracking-wider uppercase border border-white/10">
                       <Lock className="w-3.5 h-3.5" />
-                      <span>5-Page Free Preview Completed</span>
+                      <span>3-Page Free Preview Completed</span>
                     </div>
                     <h3 className="font-editorial-serif text-2xl sm:text-3xl font-bold text-[#FAF7F2]">
                       Unlock {job.child_name || "Your Child"}'s Full Adventure
                     </h3>
                     <p className="text-xs sm:text-sm text-[#EBE3D9] leading-relaxed">
-                      You have viewed the first 5 preview pages of {job.child_name || "your child"}'s adventure! Unlock all 26+ pages and get your print-ready PDF.
+                      You have viewed the first 3 preview pages of {job.child_name || "your child"}'s adventure! Unlock all 26+ pages and get your print-ready PDF.
                     </p>
                   </div>
 

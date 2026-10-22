@@ -175,9 +175,9 @@ export default function AdminLoginPage() {
     <div className="min-h-screen bg-[#F8F9FD] flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 font-sans text-[#1E293B]">
       {/* Brand Header */}
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center mb-8">
-        <Link to="/" className="inline-flex items-center gap-2.5 group mb-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#8B3DFF] text-white flex items-center justify-center shadow-md shadow-[#8B3DFF]/25 group-hover:scale-105 transition-transform">
-            <Sparkles className="w-5 h-5" />
+        <Link to="/" className="inline-flex items-center gap-3 group mb-3">
+          <div className="w-12 h-12 rounded-2xl bg-white border border-gray-100 p-1 flex items-center justify-center shadow-md shadow-[#8B3DFF]/15 group-hover:scale-105 transition-transform overflow-hidden">
+            <img src="/logo.png" alt="Kutty Story Logo" className="w-full h-full object-contain" />
           </div>
           <span className="text-3xl font-extrabold tracking-tight text-[#8B3DFF]">
             Kutty Story

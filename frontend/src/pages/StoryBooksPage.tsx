@@ -192,8 +192,8 @@ export default function StoryBooksPage() {
             <span>Curated Heirloom Library</span>
           </div>
 
-          <h1 className="font-editorial-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-[#2D222A] tracking-tight">
-            Story Books Where <span className="italic font-normal text-[#C98A84]">They Shine</span>
+          <h1 className="font-hero-heading text-4xl sm:text-5xl lg:text-6xl font-bold text-[#2D222A] tracking-tight">
+            Story Books Where <span className="font-fairy-tale text-[#C98A84]">They Shine</span>
           </h1>
 
           <p className="max-w-2xl mx-auto text-sm sm:text-base text-[#695B64] leading-relaxed">

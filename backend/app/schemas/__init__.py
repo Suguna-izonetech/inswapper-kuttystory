@@ -243,7 +243,7 @@ class BookOut(BaseModel):
     class Config:
         from_attributes = True
 
-# AI Settings & POC Schemas
+# Provider Settings & POC Schemas
 class AISettingsOut(BaseModel):
     active_story_provider: str
     active_image_provider: str

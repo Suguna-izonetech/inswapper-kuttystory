@@ -19,7 +19,7 @@
   --border-card: #E3D9CD;
   --font-heading: 'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-sans: 'Plus Jakarta Sans', 'Outfit', system-ui, -apple-system, sans-serif;
-  --font-story: 'Fraunces', Georgia, serif;
+  --font-story: 'Fraunces', 'Playfair Display', Georgia, serif;
 }
 
 body {
@@ -30,10 +30,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Modern Heading Typography (Replacing thin serif with modern, friendly Outfit) */
+/* Bespoke Storybook Editorial Typography */
 .font-editorial-serif {
-  font-family: var(--font-heading);
-  letter-spacing: -0.025em;
+  font-family: var(--font-story);
+  font-optical-sizing: auto;
+  letter-spacing: -0.015em;
 }
 
 .font-editorial-sans {
@@ -42,6 +43,24 @@ body {
 
 .font-story {
   font-family: var(--font-story);
+  font-optical-sizing: auto;
+}
+
+/* Dedicated Hero Display Typography for Storybook Headings */
+.font-hero-heading {
+  font-family: var(--font-story);
+  font-optical-sizing: auto;
+  font-variation-settings: "opsz" 144, "SOFT" 20;
+  letter-spacing: -0.02em;
+  text-rendering: optimizeLegibility;
+}
+
+/* Fairytale script/italic flourish for hero accents */
+.font-fairy-tale {
+  font-family: var(--font-story);
+  font-style: italic;
+  font-optical-sizing: auto;
+  font-variation-settings: "opsz" 144, "SOFT" 50;
 }
 
 /* Luxury card styling */

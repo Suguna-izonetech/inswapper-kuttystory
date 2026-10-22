@@ -83,8 +83,8 @@ export default function Layout() {
           {/* Logo */}
           <div className="flex items-center space-x-3">
             <Link to="/" className="flex items-center space-x-3 group">
-              <div className="w-10 h-10 rounded-full bg-[#FAEEED] border border-[#C98A84]/30 flex items-center justify-center text-[#C98A84] group-hover:scale-105 transition-transform overflow-hidden shadow-xs">
-                <img src="/logo.jpg" alt="KuttyStory Logo" className="w-full h-full object-cover" />
+              <div className="w-11 h-11 rounded-2xl bg-white border border-[#EBE3D9] p-0.5 flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden shadow-xs">
+                <img src="/logo.png" alt="KuttyStory Logo" className="w-full h-full object-contain" />
               </div>
               <div>
                 <span className="font-editorial-serif text-2xl font-bold tracking-tight text-[#2D222A] block leading-none">
@@ -196,8 +196,8 @@ export default function Layout() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
             <div className="space-y-4 md:col-span-1">
               <div className="flex items-center space-x-2.5">
-                <div className="w-6 h-6 rounded-full overflow-hidden border border-[#C98A84]/30 shadow-2xs">
-                  <img src="/logo.jpg" alt="KuttyStory" className="w-full h-full object-cover" />
+                <div className="w-8 h-8 rounded-xl overflow-hidden border border-[#EBE3D9] bg-white p-0.5 shadow-2xs flex items-center justify-center">
+                  <img src="/logo.png" alt="KuttyStory" className="w-full h-full object-contain" />
                 </div>
                 <span className="font-editorial-serif text-xl font-bold text-[#2D222A]">
                   KuttyStory

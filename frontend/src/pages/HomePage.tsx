@@ -27,12 +27,13 @@ export default function HomePage() {
               <span>Bespoke Heirloom Storybooks for Children</span>
             </div>
 
-            <h1 className="font-editorial-serif text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-[#2D222A] leading-[1.08]">
-              Where your child becomes the hero of their own <span className="italic font-normal text-[#C98A84]">fairy tale</span>.
+            <h1 className="font-hero-heading text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-[#2D222A] leading-[1.12]">
+              Where your child becomes the hero of their own{" "}
+              <span className="font-fairy-tale text-[#C98A84]">fairy tale</span>.
             </h1>
 
             <p className="text-base sm:text-lg text-[#695B64] font-normal leading-relaxed max-w-2xl">
-              Immerse your child into breathtaking, painterly adventures. Powered by gentle character-consistent AI and deterministic book typography, tailored with your child’s name and recognizable likeness.
+              Immerse your child into breathtaking, painterly adventures. Crafted with gentle character-consistent artistry and deterministic book typography, tailored with your child’s name and recognizable likeness.
             </p>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4">
@@ -209,7 +210,7 @@ export default function HomePage() {
                 2
               </div>
               <h3 className="font-editorial-serif text-2xl font-bold text-[#2D222A]">
-                Character Consistency AI
+                Character Consistency & Artistry
               </h3>
               <p className="text-xs leading-relaxed text-[#695B64]">
                 Our multi-stage pipeline integrates reference likeness across close-ups, dynamic scenes, and emotional moments while preserving the story’s timeless illustration style.
@@ -237,7 +238,7 @@ export default function HomePage() {
           <div className="space-y-4 max-w-2xl">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#8F9E8B]">
               <ShieldCheck className="w-4 h-4 text-[#8F9E8B]" />
-              <span>Responsible AI & Child Safety Charter</span>
+              <span>Responsible Privacy & Child Safety Charter</span>
             </div>
             <h3 className="font-editorial-serif text-3xl sm:text-4xl font-bold text-[#2D222A]">
               We respect your child’s privacy as sacred.

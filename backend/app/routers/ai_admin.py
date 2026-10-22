@@ -10,7 +10,7 @@ from app.schemas import AISettingsOut, AISettingsUpdate
 from app.config import settings
 from app.services.ai.diffusers_provider import diffusers_provider
 
-router = APIRouter(prefix="/admin/ai", tags=["AI Admin"])
+router = APIRouter(prefix="/admin/ai", tags=["Settings Admin"])
 
 def get_or_create_ai_settings(db: Session) -> AISettings:
     ai_conf = db.query(AISettings).filter(AISettings.id == "default").first()

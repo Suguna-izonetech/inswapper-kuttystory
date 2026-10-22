@@ -644,8 +644,8 @@ export default function CollectionsPage() {
 
           {/* Heading */}
           <div className="space-y-2">
-            <h1 className="font-editorial-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-[#2D222A] tracking-tight">
-              Masterpiece Hardcopy <span className="italic font-normal text-[#C98A84]">Collections</span>
+            <h1 className="font-hero-heading text-4xl sm:text-5xl lg:text-6xl font-bold text-[#2D222A] tracking-tight">
+              Masterpiece Hardcopy <span className="font-fairy-tale text-[#C98A84]">Collections</span>
             </h1>
             <p className="font-editorial-serif italic text-base sm:text-lg text-[#C5A059] font-medium">
               ✦ Traditional Smyth-Sewn Hardcovers • Gold Foil Stamped • Archival Gift Boxes ✦

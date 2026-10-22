@@ -458,10 +458,10 @@ export default function FootStepsPage() {
               </div>
 
               {/* Bold 3-line Headline */}
-              <h1 className="font-editorial-serif text-3xl sm:text-4xl md:text-5xl lg:text-[3.25rem] font-bold text-[#2D222A] leading-[1.15] tracking-tight mb-5">
+              <h1 className="font-hero-heading text-3xl sm:text-4xl md:text-5xl lg:text-[3.25rem] font-bold text-[#2D222A] leading-[1.15] tracking-tight mb-5">
                 Foot Steps:<br />
                 Every Milestone<br />
-                <span className="italic font-normal text-[#C98A84]">Woven into Wonder</span>
+                <span className="font-fairy-tale text-[#C98A84]">Woven into Wonder</span>
               </h1>
 
               {/* Description Paragraph */}

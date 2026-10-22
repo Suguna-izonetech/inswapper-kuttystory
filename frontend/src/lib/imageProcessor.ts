@@ -1,7 +1,7 @@
 /**
  * Client-Side Smart Background Removal & Studio Solid Backdrop Processor
  * Isolates the subject and replaces cluttered/unsuitable backgrounds with a clean solid color
- * to maximize AI character likeness and prevent hallucinated background clutter.
+ * to maximize character likeness and prevent background clutter.
  */
 
 export interface BackdropPreset {

@@ -21,7 +21,7 @@ async def validate_photo_endpoint(
     file: Optional[UploadFile] = File(None)
 ):
     """
-    AI-powered Deep Learning face validator (YuNet) checking:
+    Deep Learning face validator (YuNet) checking:
     1. Front-facing angle (nose between eyes, yaw symmetry, interocular distance)
     2. Uncovered face & mouth (hand/finger coverage, mouth landmark presence, lip contrast)
     3. Sunglasses & distance framing
@@ -245,7 +245,7 @@ def trigger_full_generation(
     db: Session = Depends(get_db)
 ):
     """
-    Asynchronously trigger full-book HD AI generation in the background.
+    Asynchronously trigger full-book HD generation in the background.
     Allows Admin to monitor live progress per page in the dashboard.
     """
     job = db.query(PersonalizationJob).filter(PersonalizationJob.id == job_id).first()
@@ -253,7 +253,7 @@ def trigger_full_generation(
         raise HTTPException(status_code=404, detail="Job not found")
 
     job.status = "Rendering · 0%"
-    job.current_stage = "Queued full-book HD AI rendering..."
+    job.current_stage = "Queued full-book HD rendering..."
     db.commit()
 
     from app.services.job_runner import job_runner
@@ -265,7 +265,7 @@ def trigger_full_generation(
     return {
         "status": "queued",
         "job_id": job.id,
-        "message": "Full-book HD AI generation started in background."
+        "message": "Full-book HD generation started in background."
     }
 
 def get_full_storybook_pages_for_print(
@@ -363,8 +363,7 @@ def download_full_print_pdf(
     if not all_pages_data:
         raise HTTPException(status_code=400, detail="No printable pages found for this storybook.")
 
-    print_filename = f"print_{job.id}_{lang}_{size}_{color}.pdf"
-    pdf_path, validation = PDFComposerService.compose_storybook_pdf(
+    storage_key, validation = PDFComposerService.compose_storybook_pdf(
         pages_data=all_pages_data,
         output_filename=print_filename,
         book_type="final",
@@ -374,9 +373,8 @@ def download_full_print_pdf(
         color_mode=color
     )
 
-    if os.path.exists(pdf_path):
-        with open(pdf_path, "rb") as f:
-            pdf_bytes = f.read()
+    try:
+        pdf_bytes = storage.get_bytes(storage_key)
         safe_child = child_name.replace(" ", "_")
         safe_title = story_title.replace(" ", "_")
         return Response(
@@ -386,7 +384,8 @@ def download_full_print_pdf(
                 "Content-Disposition": f'attachment; filename="{safe_child}_{safe_title}_Full_Print_{size}.pdf"'
             }
         )
-    raise HTTPException(status_code=500, detail="Failed to compose print PDF.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compose print PDF: {e}")
 
 @router.get("/{job_id}/pdf")
 def download_preview_pdf(
@@ -416,9 +415,13 @@ def download_preview_pdf(
     child_name = job.child_name or "Little Explorer"
     story_title = story.title if story else "Personalized Story"
 
-    # If english and pre-composed preview PDF exists in MinIO, return it
+    # If english and pre-composed preview PDF exists in MinIO with exactly 3 pages, return it
     if lang.lower() in ["english", "en"]:
-        preview_book = db.query(Book).filter(Book.job_id == job.id, Book.book_type == "preview").order_by(Book.created_at.desc()).first()
+        preview_book = db.query(Book).filter(
+            Book.job_id == job.id,
+            Book.book_type == "preview",
+            Book.page_count == 3
+        ).order_by(Book.created_at.desc()).first()
         if preview_book and preview_book.pdf_storage_path:
             try:
                 pdf_bytes = storage.get_bytes(preview_book.pdf_storage_path)
@@ -432,11 +435,17 @@ def download_preview_pdf(
             except Exception as e:
                 print(f"[MinIO] Notice fetching preview PDF: {e}")
 
-    # Check if generated assets exist and compose via PDFComposerService
+    # Check if generated assets exist and compose strictly top 3 pages via PDFComposerService
     from app.services.pdf_composer import PDFComposerService
-    assets = db.query(GeneratedAsset).filter(GeneratedAsset.job_id == job.id).order_by(GeneratedAsset.page_number).all()
+    assets = db.query(GeneratedAsset).filter(
+        GeneratedAsset.job_id == job.id,
+        GeneratedAsset.generation_status == "completed"
+    ).order_by(GeneratedAsset.page_number).all()
+
+    # Limit strictly to 3 preview images (never show empty template pages)
+    preview_assets = assets[:3]
     pages_data = []
-    for a in assets:
+    for a in preview_assets:
         res_asset = storage.resolve_path(a.storage_path)
         if res_asset and os.path.exists(res_asset):
             story_page = db.query(StoryPage).filter(StoryPage.id == a.story_page_id).first() if a.story_page_id else None
@@ -449,22 +458,21 @@ def download_preview_pdf(
             pages_data.append({
                 "page_number": a.page_number,
                 "page_type": story_page.page_type if story_page else ("cover" if a.page_number == 1 else "story"),
-                "image_path": a.storage_path,
+                "image_path": res_asset,
                 "story_text": text
             })
 
     if pages_data:
         preview_filename = f"preview_{job.id}_{lang}.pdf"
-        pdf_path, _ = PDFComposerService.compose_storybook_pdf(
-            pages_data=pages_data,
+        storage_key, _ = PDFComposerService.compose_storybook_pdf(
+            pages_data=pages_data[:3],
             output_filename=preview_filename,
             book_type="preview",
             child_name=child_name,
             story_title=story_title
         )
-        if os.path.exists(pdf_path):
-            with open(pdf_path, "rb") as f:
-                pdf_bytes = f.read()
+        try:
+            pdf_bytes = storage.get_bytes(storage_key)
             return Response(
                 content=pdf_bytes,
                 media_type="application/pdf",
@@ -472,70 +480,13 @@ def download_preview_pdf(
                     "Content-Disposition": f'inline; filename="{child_name}_{story_title}_{lang}_preview.pdf"'
                 }
             )
+        except Exception as e:
+            print(f"[PDF] Error retrieving composed preview PDF bytes: {e}")
 
-    # Fallback: Compose with story's original page images
-    if story and story.pages:
-        for p in sorted(story.pages, key=lambda p: p.page_number)[:5]:
-            img_p = p.original_image_path
-            if img_p and os.path.exists(img_p):
-                text = p.story_text or p.extracted_text or ""
-                for tag in ["[Name]", "[name]", "{name}", "[child_name]", "{child_name}"]:
-                    text = text.replace(tag, child_name)
-                if lang.lower() not in ["english", "en"]:
-                    text = translation_service.translate_text(text, lang, child_name=child_name)
-                pages_data.append({
-                    "page_number": p.page_number,
-                    "page_type": p.page_type,
-                    "image_path": img_p,
-                    "story_text": text
-                })
-        if pages_data:
-            preview_filename = f"preview_{job.id}_{lang}.pdf"
-            pdf_path, _ = PDFComposerService.compose_storybook_pdf(
-                pages_data=pages_data,
-                output_filename=preview_filename,
-                book_type="preview",
-                child_name=child_name,
-                story_title=story_title
-            )
-            if os.path.exists(pdf_path):
-                with open(pdf_path, "rb") as f:
-                    pdf_bytes = f.read()
-                return Response(
-                    content=pdf_bytes,
-                    media_type="application/pdf",
-                    headers={
-                        "Content-Disposition": f'inline; filename="{child_name}_{story_title}_{lang}_preview.pdf"'
-                    }
-                )
-
-    # PyMuPDF fallback
-    import pymupdf as fitz
-    doc = fitz.open()
-    p1 = doc.new_page(width=595, height=595)
-    p1.draw_rect(fitz.Rect(0, 0, 595, 595), color=None, fill=(0.97, 0.95, 1.0))
-    p1.insert_text((60, 90), "KUTTY STORY STUDIO", fontsize=14, color=(0.54, 0.24, 1.0))
-    p1.insert_text((60, 140), f"{child_name} &", fontsize=30, color=(0.1, 0.1, 0.1))
-    p1.insert_text((60, 180), story_title, fontsize=26, color=(0.54, 0.24, 1.0))
-    p1.insert_text((60, 215), f"Personalized Preview Edition ({lang.title()})", fontsize=12, color=(0.4, 0.4, 0.4))
-
-    cover_img = job.photo_path if (job.photo_path and os.path.exists(job.photo_path)) else None
-    if cover_img:
-        try:
-            p1.insert_image(fitz.Rect(60, 240, 535, 510), filename=cover_img, keep_proportion=True)
-        except Exception:
-            pass
-
-    p1.insert_text((60, 550), "Kutty Story Free Preview • www.kuttystory.co.in", fontsize=10, color=(0.6, 0.6, 0.6))
-
-    pdf_bytes = doc.tobytes()
-    doc.close()
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={
-            "Content-Disposition": f'inline; filename="{child_name}_{story_title}_{lang}_preview.pdf"'
-        }
+    # NOTE: Do NOT return empty template / fallback unpersonalized pages!
+    raise HTTPException(
+        status_code=400,
+        detail="Personalized preview illustrations are still being generated or not yet available. Please wait a moment."
     )
 
 @router.post("/test-render", response_model=PersonalizationOut)

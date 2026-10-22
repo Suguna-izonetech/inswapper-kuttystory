@@ -1,6 +1,6 @@
 /**
  * Child Photo Quality & Guidelines Validator
- * Performs real-time computer vision & deep learning AI analysis on uploaded photos
+ * Performs real-time computer vision analysis on uploaded photos
  * to detect validity against the 4 portrait guidelines:
  * 1. Clear front-facing photo (angle & centering)
  * 2. No eating or covered face (mouth & lower face obstruction by hands, food, or objects)
@@ -58,7 +58,7 @@ export async function validateChildPhoto(
   fileSize?: number,
   rawFileOrBlob?: File | Blob
 ): Promise<PhotoValidationReport> {
-  // 1. Try deep learning AI backend validation first (YuNet 5-point landmark detector)
+  // 1. Try deep learning backend validation first (YuNet 5-point landmark detector)
   let blobToValidate: Blob | null = rawFileOrBlob || null;
   if (!blobToValidate) {
     if (imageSrc.startsWith("data:")) {
@@ -481,7 +481,7 @@ export async function validateChildPhoto(
       }
       if (hasSunglasses) {
         recommendations.push(
-          "Sunglasses or tinted glasses detected. Our AI needs to see your child's natural eyes to create a faithful storybook character."
+          "Sunglasses or tinted glasses detected. Our studio needs to see your child's natural eyes to create a faithful storybook character."
         );
       }
       if (isFarAway) {
@@ -494,7 +494,7 @@ export async function validateChildPhoto(
       }
 
       const summary = isValid
-        ? "Photo verified! Meets all portrait guidelines and ready for AI storybook generation."
+        ? "Photo verified! Meets all portrait guidelines and ready for storybook generation."
         : hasCoveredMouth && isSideAngle
         ? "Photo needs attention: Face is turned sideways and mouth is covered by hand. Please face camera directly with an uncovered mouth."
         : hasCoveredMouth

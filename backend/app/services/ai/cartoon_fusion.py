@@ -20,7 +20,7 @@ class CartoonCharacterFusionEngine:
     Preserves authentic storybook artwork and illustrations across all pages
     while personalizing the character using the uploaded child/person photograph.
     
-    1. Primary Tier: High-Definition AI Neural Face Swap with CodeFormer/GFPGAN face restoration
+    1. Primary Tier: High-Definition Neural Face Swap with CodeFormer/GFPGAN face restoration
        (via ovi054/face-swap-pro or configured space) for hyper-accurate, photorealistic identity preservation.
     2. Secondary Tier: Automated Hugging Face fallback (tonyassi/face-swap).
     3. Tertiary Tier: Deep Local Face Detection (YuNet ONNX) + Poisson Seamless Cloning (cv2.seamlessClone)
@@ -220,7 +220,7 @@ class CartoonCharacterFusionEngine:
     ) -> GenerationResult:
         """
         Personalizes a storybook page by replacing the character's face with the child's real face:
-        - Prioritizes High-Definition AI Neural Face Swap with CodeFormer Face Restoration.
+        - Prioritizes High-Definition Neural Face Swap with CodeFormer Face Restoration.
         - Preserves 100% of the real person's authentic facial identity (eyes, nose, mouth, smile).
         - Automatically detects face positions dynamically across ANY uploaded story.
         - Provides intelligent Poisson seamless cloning fallback.
@@ -362,7 +362,7 @@ class CartoonCharacterFusionEngine:
                                 except Exception:
                                     pass
                 except Exception as e1:
-                    print(f"Notice: Primary AI face swap ({primary_space}) on {story_slug} Page {page_number}: {e1}")
+                    print(f"Notice: Primary face swap ({primary_space}) on {story_slug} Page {page_number}: {e1}")
 
                 # 2. Tier 2: Secondary Hugging Face Space Fallback (tonyassi/face-swap)
                 if not swapped_with_ai and primary_space != "tonyassi/face-swap":
@@ -395,7 +395,7 @@ class CartoonCharacterFusionEngine:
                                     except Exception:
                                         pass
                     except Exception as e2:
-                        print(f"Notice: Secondary AI face swap on {story_slug} Page {page_number}: {e2}")
+                        print(f"Notice: Secondary face swap on {story_slug} Page {page_number}: {e2}")
 
             # 3. Tier 3: High-Fidelity Local Poisson Face Fusion (Guaranteed 100% Real Face likeness)
             if not swapped_with_ai:

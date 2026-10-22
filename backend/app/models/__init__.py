@@ -230,7 +230,7 @@ class AISettings(Base):
     active_story_provider = Column(String(50), default="gemini")
     active_image_provider = Column(String(50), default="huggingface")
     active_model = Column(String(100), default="stabilityai/stable-diffusion-xl-base-1.0")
-    preview_page_limit = Column(Integer, default=5)
+    preview_page_limit = Column(Integer, default=3)
     max_retries = Column(Integer, default=3)
     concurrency_limit = Column(Integer, default=2)
     per_book_budget = Column(Float, default=2.50)

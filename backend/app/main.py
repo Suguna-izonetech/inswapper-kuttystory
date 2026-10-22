@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="Personalized AI Children's Storybook Platform Prototype API",
+    description="Personalized Children's Storybook Platform Prototype API",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -145,7 +145,7 @@ def public_book_sales_by_state(
 @app.get("/")
 def root():
     return {
-        "message": "Welcome to Personalized AI Children's Storybook API",
+        "message": "Welcome to Personalized Children's Storybook API",
         "docs_url": "/docs",
         "api_v1": settings.API_V1_PREFIX,
         "admin_dashboard": "/admin_dashboard"

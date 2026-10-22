@@ -95,7 +95,7 @@ export default function PhotoValidationStatus({
 
           <p className="text-xs text-[#4E424B] mt-1.5 font-editorial-sans">
             {isDisplayValid
-              ? "Your child's photo automatically passed all 4 portrait guidelines for AI illustration synthesis."
+              ? "Your child's photo automatically passed all 4 portrait guidelines for storybook illustration synthesis."
               : validationReport?.summary ||
                 "Photo quality warning detected. Please review the guidelines below or replace with a clearer photo."}
           </p>
@@ -182,7 +182,7 @@ export default function PhotoValidationStatus({
                   <Sparkles className="w-5 h-5 text-white" />
                 </div>
                 <span className="font-semibold text-white drop-shadow-md">
-                  Studio AI isolating child & applying backdrop...
+                  Studio isolating child & applying backdrop...
                 </span>
                 <span className="text-[10px] text-white/80">
                   Clean background ensures 100% illustration fidelity
@@ -217,7 +217,7 @@ export default function PhotoValidationStatus({
                 <p className="text-xs leading-relaxed opacity-90">
                   {validationReport?.summary ||
                     (isDisplayValid
-                      ? "Your photo has been successfully analyzed. The AI generator will preserve your child's natural facial structure, hair color, and expression across all 26 story pages."
+                      ? "Your photo has been successfully analyzed. The atelier will preserve your child's natural facial structure, hair color, and expression across all 26 story pages."
                       : "Photo quality warnings detected. Please review recommendations or replace photo.")}
                 </p>
                 {!isDisplayValid && validationReport?.recommendations && validationReport.recommendations.length > 0 && (
@@ -309,7 +309,7 @@ export default function PhotoValidationStatus({
             </div>
           </div>
 
-          {/* AI Studio Backdrop Optimization Section */}
+          {/* Studio Backdrop Optimization Section */}
           <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#EBE3D9] space-y-3">
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2.5 cursor-pointer font-semibold text-xs text-[#2D222A]">
@@ -321,7 +321,7 @@ export default function PhotoValidationStatus({
                 />
                 <span className="flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-[#C98A84]" />
-                  <span>AI Studio Backdrop Enhancement (Recommended)</span>
+                  <span>Studio Backdrop Enhancement (Recommended)</span>
                 </span>
               </label>
             </div>

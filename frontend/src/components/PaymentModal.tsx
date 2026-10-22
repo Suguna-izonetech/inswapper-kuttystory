@@ -178,7 +178,7 @@ export default function PaymentModal({
           currency: orderRes.currency,
           name: "Kutty Story Atelier",
           description: `${selectedFormat === "digital" ? "Digital Edition" : "Hardcover Heirloom"} • ${story?.title || "Enchanted Storybook"}`,
-          image: "/logo.jpg",
+          image: "/logo.png",
           order_id: orderRes.razorpay_order_id.startsWith("order_sim_") ? undefined : orderRes.razorpay_order_id,
           handler: async function (response: any) {
             try {

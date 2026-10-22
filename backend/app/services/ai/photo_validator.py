@@ -31,7 +31,7 @@ def validate_child_photo_ai(img_bytes: bytes) -> Dict[str, Any]:
         return {
             "is_valid": True,
             "score": 90,
-            "summary": "AI detector model not loaded; image accepted.",
+            "summary": "Detector model not loaded; image accepted.",
             "checks": []
         }
 
@@ -251,7 +251,7 @@ def validate_child_photo_ai(img_bytes: bytes) -> Dict[str, Any]:
     ]
 
     summary = (
-        "Photo verified! Meets all portrait guidelines and ready for AI storybook generation."
+        "Photo verified! Meets all portrait guidelines and ready for storybook generation."
         if is_valid
         else "Photo needs attention: " + "; ".join(recommendations)
     )

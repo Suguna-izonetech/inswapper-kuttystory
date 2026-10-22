@@ -205,7 +205,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
   const [selectedJobForPhotos, setSelectedJobForPhotos] = useState<PersonalizationJob | null>(null);
   const [generatingFullJob, setGeneratingFullJob] = useState<PersonalizationJob | null>(null);
 
-  // AI settings
+  // Provider settings
   const [aiSettings, setAiSettings] = useState<AISettings | null>(null);
   const [aiProvider, setAiProvider] = useState("huggingface");
   const [aiModel, setAiModel] = useState("stabilityai/stable-diffusion-xl-base-1.0");
@@ -735,10 +735,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
   const handleGenerateBaseArtAi = async () => {
     if (!activePage || !selectedStory) return;
     setGeneratingBaseArt(true);
-    setEditorNotice("Generating AI base illustration...");
+    setEditorNotice("Generating base illustration...");
     setTimeout(() => {
       setGeneratingBaseArt(false);
-      setEditorNotice("AI base artwork generated!");
+      setEditorNotice("Base artwork generated!");
       setTimeout(() => setEditorNotice(""), 3000);
     }, 1500);
   };
@@ -895,9 +895,9 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
         per_book_budget: Number(budgetCap),
       });
       setAiSettings(updated);
-      alert("AI Provider Settings updated successfully.");
+      alert("Provider Settings updated successfully.");
     } catch (err: any) {
-      alert("Error updating AI settings: " + err.message);
+      alert("Error updating settings: " + err.message);
     } finally {
       setSavingAi(false);
     }
@@ -1125,9 +1125,12 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
       {/* 1. Left Sidebar Navigation */}
       <aside className="w-64 bg-white border-r border-gray-100/90 flex flex-col shrink-0 min-h-screen sticky top-0 h-screen">
         {/* Brand Logo Header */}
-        <div className="px-7 pt-8 pb-7">
-          <Link to="/admin_dashboard" className="block">
-            <h1 className="text-2xl font-extrabold tracking-tight text-[#8B3DFF] font-sans">
+        <div className="px-6 pt-7 pb-6">
+          <Link to="/admin_dashboard" className="flex items-center gap-3 group">
+            <div className="w-10 h-10 rounded-xl bg-white border border-gray-100 p-0.5 shadow-xs overflow-hidden flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <img src="/logo.png" alt="Kutty Story Logo" className="w-full h-full object-contain" />
+            </div>
+            <h1 className="text-xl font-extrabold tracking-tight text-[#8B3DFF] font-sans">
               Kutty Story
             </h1>
           </Link>
@@ -2338,7 +2341,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
               className="hidden"
             />
 
-            {/* 1. Header Bar with CMS Title, AI Actions, and Book Selector */}
+            {/* 1. Header Bar with CMS Title, Actions, and Book Selector */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
                 <h2 className="text-[28px] font-extrabold tracking-tight text-[#111827]">
@@ -2363,17 +2366,17 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                 <button
                   type="button"
                   onClick={() => {
-                    setEditorNotice(`📖 Generating AI story text for ${selectedGender} pages...`);
+                    setEditorNotice(`📖 Generating story text for ${selectedGender} pages...`);
                     setTimeout(() => {
                       setPageEditText(`{{name}} stepped into the magical world of ${selectedStory.title}, ready for an extraordinary adventure.`);
-                      setEditorNotice("AI story text generated and updated!");
+                      setEditorNotice("Story text generated and updated!");
                       setTimeout(() => setEditorNotice(""), 3000);
                     }, 1200);
                   }}
                   className="px-4 py-2 rounded-xl bg-[#8B3DFF] hover:bg-[#7828f7] text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition"
                 >
                   <BookOpen className="w-3.5 h-3.5" />
-                  <span>Write story text (AI) — {selectedGender}</span>
+                  <span>Write story text — {selectedGender}</span>
                 </button>
 
                 <button
@@ -2611,7 +2614,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                         className="py-3 px-4 rounded-xl border border-dashed border-[#8B3DFF] text-[#8B3DFF] hover:bg-purple-50 font-semibold flex items-center justify-center gap-2 transition disabled:opacity-50"
                       >
                         <Sparkles className="w-4 h-4" />
-                        <span>{generatingBaseArt ? "Generating..." : "Generate base art (AI)"}</span>
+                        <span>{generatingBaseArt ? "Generating..." : "Generate base art"}</span>
                       </button>
                     </div>
 
@@ -3133,7 +3136,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
         {activeTab === "settings" && aiSettings && (
           <div className="max-w-3xl bg-white p-8 rounded-3xl border border-gray-100 shadow-xs space-y-6 animate-in fade-in duration-200">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Platform & AI Settings</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Platform & Provider Settings</h2>
               <p className="text-xs text-gray-500 mt-1">Configure image generation providers, budgets, and preview parameters.</p>
             </div>
 
@@ -3154,7 +3157,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                   className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#8B3DFF]"
                 >
                   <option value="huggingface">Hugging Face Diffusers (Serverless Inference)</option>
-                  <option value="fal_ai">FAL AI Fast Diffusion</option>
+                  <option value="fal_ai">FAL Fast Diffusion</option>
                   <option value="mock_poc">Deterministic Mock Provider</option>
                 </select>
               </div>
@@ -3196,7 +3199,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                 disabled={savingAi}
                 className="w-full py-3.5 rounded-xl bg-[#8B3DFF] hover:bg-[#7828f7] text-white text-xs font-semibold shadow-sm transition disabled:opacity-50"
               >
-                {savingAi ? "Updating Settings..." : "Save AI Provider Configuration"}
+                {savingAi ? "Updating Settings..." : "Save Provider Configuration"}
               </button>
             </div>
           </div>
@@ -4726,7 +4729,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                 <button
                   type="button"
                   onClick={() => handleDownloadPdf(selectedJobForPhotos, "preview")}
-                  title="Download 5-page preview PDF"
+                  title="Download 3-page preview PDF"
                   className="px-3 py-2 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5 text-gray-500" />
@@ -4814,7 +4817,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
         </div>
       )}
 
-      {/* 4. FULL BOOK HD AI GENERATION PROGRESS MODAL */}
+      {/* 4. FULL BOOK HD GENERATION PROGRESS MODAL */}
       {generatingFullJob && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-purple-100 relative overflow-hidden">

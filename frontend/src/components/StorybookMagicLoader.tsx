@@ -459,7 +459,7 @@ export default function StorybookMagicLoader({
             </div>
 
             <p className="text-xs text-[#4E424B] leading-relaxed">
-              {activeStage.detail}. The AI preserves {effectiveName}'s natural eye shape, joyful expression, and hair color across all story spreads.
+              {activeStage.detail}. The atelier preserves {effectiveName}'s natural eye shape, joyful expression, and hair color across all story spreads.
             </p>
           </div>
 
