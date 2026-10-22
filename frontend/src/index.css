@@ -17,9 +17,15 @@
   --gold-subtle: #FAF5E8;
   --border-light: #EBE3D9;
   --border-card: #E3D9CD;
-  --font-heading: 'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-sans: 'Plus Jakarta Sans', 'Outfit', system-ui, -apple-system, sans-serif;
-  --font-story: 'Fraunces', 'Playfair Display', Georgia, serif;
+  /* Primary Theme Fonts & Fonts from font.txt */
+  --font-nunito: 'Nunito', system-ui, -apple-system, sans-serif;
+  --font-quicksand: 'Quicksand', system-ui, -apple-system, sans-serif;
+  --font-georgia: 'Georgia', 'Fraunces', serif;
+  --font-poppins: 'Poppins', system-ui, -apple-system, sans-serif;
+
+  --font-heading: var(--font-quicksand);
+  --font-sans: var(--font-nunito);
+  --font-story: var(--font-georgia);
 }
 
 body {
@@ -30,10 +36,26 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Font.txt Typography Utilities */
+.font-nunito {
+  font-family: var(--font-nunito);
+}
+
+.font-quicksand {
+  font-family: var(--font-quicksand);
+}
+
+.font-georgia {
+  font-family: var(--font-georgia);
+}
+
+.font-poppins {
+  font-family: var(--font-poppins);
+}
+
 /* Bespoke Storybook Editorial Typography */
 .font-editorial-serif {
   font-family: var(--font-story);
-  font-optical-sizing: auto;
   letter-spacing: -0.015em;
 }
 
@@ -43,15 +65,12 @@ body {
 
 .font-story {
   font-family: var(--font-story);
-  font-optical-sizing: auto;
 }
 
 /* Dedicated Hero Display Typography for Storybook Headings */
 .font-hero-heading {
   font-family: var(--font-story);
-  font-optical-sizing: auto;
-  font-variation-settings: "opsz" 144, "SOFT" 20;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
   text-rendering: optimizeLegibility;
 }
 
@@ -59,8 +78,6 @@ body {
 .font-fairy-tale {
   font-family: var(--font-story);
   font-style: italic;
-  font-optical-sizing: auto;
-  font-variation-settings: "opsz" 144, "SOFT" 50;
 }
 
 /* Luxury card styling */
