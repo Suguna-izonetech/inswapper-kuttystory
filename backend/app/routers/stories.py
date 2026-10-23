@@ -10,6 +10,15 @@ from app.services.storage import storage
 router = APIRouter(prefix="/stories", tags=["Stories"])
 
 def enrich_story_urls(story: StoryTemplate) -> dict:
+    cover_url = storage.get_public_url(story.cover_image_path)
+    if not cover_url and story.pages:
+        for page in sorted(story.pages, key=lambda p: p.page_index):
+            if page.original_image_path:
+                cand = storage.get_public_url(page.original_image_path)
+                if cand:
+                    cover_url = cand
+                    break
+
     data = {
         "id": story.id,
         "slug": story.slug,
@@ -24,7 +33,7 @@ def enrich_story_urls(story: StoryTemplate) -> dict:
         "status": story.status,
         "page_count": story.page_count,
         "cover_image_path": story.cover_image_path,
-        "cover_image_url": storage.get_public_url(story.cover_image_path),
+        "cover_image_url": cover_url,
         "target_gender": getattr(story, "target_gender", "both") or "both",
         "min_age": getattr(story, "min_age", 2) or 2,
         "max_age": getattr(story, "max_age", 13) or 13,
@@ -67,7 +76,12 @@ def enrich_story_urls(story: StoryTemplate) -> dict:
 
 @router.get("", response_model=List[StoryTemplateOut])
 def list_stories(db: Session = Depends(get_db)):
-    stories = db.query(StoryTemplate).filter(StoryTemplate.status == "published").all()
+    stories = (
+        db.query(StoryTemplate)
+        .filter(StoryTemplate.status == "published")
+        .order_by(StoryTemplate.created_at.desc())
+        .all()
+    )
     return [enrich_story_urls(s) for s in stories]
 
 @router.get("/{slug_or_id}", response_model=StoryTemplateOut)

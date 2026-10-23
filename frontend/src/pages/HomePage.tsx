@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import { Sparkles, ArrowRight, ShieldCheck, BookOpen, CheckCircle, Type } from "lucide-react";
+import { Sparkles, ArrowRight, ShieldCheck, BookOpen, CheckCircle, Type, ChevronLeft, ChevronRight } from "lucide-react";
 import { api, StoryTemplate } from "@/lib/api";
 import { HardcoverBook } from "@/components/HardcoverBook";
 
@@ -13,7 +13,11 @@ const FONT_OPTIONS = [
 
 export default function HomePage() {
   const [stories, setStories] = useState<StoryTemplate[]>([]);
-  const [, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+  const latestStoryIdRef = useRef<string | null>(null);
+
   const [selectedFont, setSelectedFont] = useState<string>(() => {
     return localStorage.getItem("kutty_hero_font") || "georgia";
   });
@@ -23,12 +27,66 @@ export default function HomePage() {
     localStorage.setItem("kutty_hero_font", id);
   };
 
-  useEffect(() => {
+  const fetchStories = () => {
     api.getStories()
-      .then((data) => setStories(data))
+      .then((data) => {
+        setStories(data);
+        if (data.length > 0) {
+          const newestId = data[0].id;
+          if (latestStoryIdRef.current && latestStoryIdRef.current !== newestId) {
+            // New latest story uploaded in admin dashboard! Immediately show it as active hero
+            setCurrentSlideIndex(0);
+          }
+          latestStoryIdRef.current = newestId;
+        }
+      })
       .catch((err) => console.error("Error loading stories:", err))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchStories();
+
+    // Auto-refresh when tab regains focus or visibility (e.g., after uploading a story in admin dashboard)
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchStories();
+      }
+    };
+    window.addEventListener("focus", fetchStories);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // Light background poll every 15s to automatically catch newly uploaded stories
+    const pollTimer = setInterval(fetchStories, 15000);
+
+    return () => {
+      window.removeEventListener("focus", fetchStories);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      clearInterval(pollTimer);
+    };
   }, []);
+
+  // Filter published stories that have cover image or pages
+  const heroStories = stories.filter(
+    (s) => Boolean(s.cover_image_url || (s.pages && s.pages.some((p) => p.original_image_url)))
+  );
+
+  // Dynamic image changing: auto-cycle every 4.5s through stories when not hovered
+  useEffect(() => {
+    if (heroStories.length <= 1 || isHovered) return;
+
+    const interval = setInterval(() => {
+      setCurrentSlideIndex((prev) => (prev + 1) % heroStories.length);
+    }, 4500);
+
+    return () => clearInterval(interval);
+  }, [heroStories.length, isHovered]);
+
+  const activeIndex = heroStories.length > 0 ? currentSlideIndex % heroStories.length : 0;
+  const currentStory = heroStories[activeIndex] || stories[0];
+  const currentImageUrl = currentStory
+    ? api.resolveUrl(currentStory.cover_image_url || currentStory.pages?.[0]?.original_image_url)
+    : "";
 
   return (
     <div className="space-y-28 pb-16">
@@ -113,32 +171,145 @@ export default function HomePage() {
               {/* Decorative luxury frame */}
               <div className="absolute -inset-2 rounded-3xl bg-gradient-to-tr from-[#FAEEED] via-[#F2EEF7] to-[#FAF5E8] opacity-80 blur-xl"></div>
 
-              <div className="relative rounded-2xl bg-white p-3 shadow-xl border border-[#EBE3D9]">
+              <div
+                className="relative rounded-2xl bg-white p-3 shadow-xl border border-[#EBE3D9] group overflow-hidden"
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+              >
                 <div className="relative aspect-square rounded-xl overflow-hidden bg-[#FAF7F2]">
-                  {stories.length > 0 && stories[0].cover_image_url ? (
-                    <img
-                      src={stories[0].cover_image_url}
-                      alt="The Girl and the Magical Unicorn Cover"
-                      className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700"
-                    />
+                  {loading && !currentStory ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-[#695B64] p-8 text-center bg-[#FAEEED]/20 animate-pulse">
+                      <BookOpen className="w-12 h-12 text-[#C98A84]/50 mb-3" />
+                      <div className="h-4 w-32 bg-[#EBE3D9] rounded-full mb-2" />
+                      <div className="h-3 w-20 bg-[#EBE3D9]/60 rounded-full" />
+                    </div>
+                  ) : currentStory && currentImageUrl ? (
+                    <Link
+                      to={`/personalize/${currentStory.slug}`}
+                      className="block w-full h-full relative cursor-pointer"
+                    >
+                      <img
+                        key={currentStory.id}
+                        src={currentImageUrl}
+                        alt={`${currentStory.title} Cover`}
+                        className="w-full h-full object-cover transform hover:scale-105 transition-all duration-700 ease-out"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.style.display = "none";
+                        }}
+                      />
+                    </Link>
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-[#695B64] p-8 text-center bg-[#FAEEED]/30">
                       <BookOpen className="w-16 h-16 text-[#C98A84] mb-4 stroke-1" />
-                      <span className="font-editorial-serif text-2xl font-semibold text-[#2D222A]">The Girl & the Magical Unicorn</span>
-                      <span className="text-xs text-[#695B64] mt-2">26-Page Heirloom Edition</span>
+                      <span className="font-editorial-serif text-2xl font-semibold text-[#2D222A]">
+                        {currentStory?.title || "Heirloom Story"}
+                      </span>
+                      <span className="text-xs text-[#695B64] mt-2">
+                        {currentStory?.page_count || 26}-Page Heirloom Edition
+                      </span>
                     </div>
                   )}
 
-                  {/* Corner Badge */}
-                  <div className="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-md rounded-xl p-3 border border-[#EBE3D9] flex items-center justify-between shadow-sm">
-                    <div>
-                      <div className="text-xs font-semibold text-[#2D222A]">Unicorn Story Template</div>
-                      <div className="text-[11px] text-[#695B64]">26 Full-Bleed Pages • 1:1 Square Trim</div>
+                  {/* Top Badges & Dynamic Indicators */}
+                  {currentStory && (
+                    <div className="absolute top-3.5 left-3.5 right-3.5 z-20 flex items-center justify-between pointer-events-none">
+                      {/* Left: Latest Story tag vs Curated Story tag */}
+                      {activeIndex === 0 ? (
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 backdrop-blur-md border border-[#C98A84]/40 text-[#C98A84] text-xs font-semibold shadow-xs">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Latest Story</span>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md border border-[#EBE3D9] text-[#695B64] text-xs font-medium shadow-xs">
+                          <span>Story #{activeIndex + 1}</span>
+                        </div>
+                      )}
+
+                      {/* Right: Slide dots indicator */}
+                      {heroStories.length > 1 && (
+                        <div className="pointer-events-auto flex items-center gap-1.5 bg-black/35 backdrop-blur-md px-2.5 py-1.5 rounded-full shadow-xs">
+                          {heroStories.slice(0, 7).map((story, idx) => (
+                            <button
+                              key={story.id}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setCurrentSlideIndex(idx);
+                              }}
+                              className={`transition-all duration-300 rounded-full cursor-pointer ${
+                                idx === activeIndex
+                                  ? "w-4 h-1.5 bg-white shadow-xs"
+                                  : "w-1.5 h-1.5 bg-white/50 hover:bg-white/80"
+                              }`}
+                              title={story.title}
+                              aria-label={`Slide ${idx + 1}: ${story.title}`}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <span className="px-2.5 py-1 rounded-full bg-[#EEF4ED] text-[#4E7048] text-[11px] font-medium">
-                      Published
-                    </span>
-                  </div>
+                  )}
+
+                  {/* Next / Prev Navigation Arrows */}
+                  {heroStories.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setCurrentSlideIndex(
+                            (prev) => (prev - 1 + heroStories.length) % heroStories.length
+                          );
+                        }}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-[#2D222A] shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border border-[#EBE3D9]"
+                        aria-label="Previous story"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setCurrentSlideIndex(
+                            (prev) => (prev + 1) % heroStories.length
+                          );
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-[#2D222A] shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border border-[#EBE3D9]"
+                        aria-label="Next story"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+
+                  {/* Dynamic Corner / Bottom Floating Glassmorphism Badge */}
+                  {currentStory && (
+                    <div className="absolute bottom-4 left-4 right-4 z-20 bg-white/95 backdrop-blur-md rounded-xl p-3 border border-[#EBE3D9] flex items-center justify-between shadow-sm transition-all">
+                      <div className="min-w-0 pr-3">
+                        <div className="text-xs font-semibold text-[#2D222A] truncate">
+                          {currentStory.title}
+                        </div>
+                        <div className="text-[11px] text-[#695B64] truncate">
+                          {currentStory.page_count} Full-Bleed Pages • {currentStory.category || "1:1 Square Trim"}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-[#EEF4ED] text-[#4E7048] text-[11px] font-medium capitalize">
+                          {currentStory.status || "Published"}
+                        </span>
+                        <Link
+                          to={`/personalize/${currentStory.slug}`}
+                          className="px-3 py-1 rounded-full bg-[#C98A84] hover:bg-[#B87A74] text-white text-[11px] font-medium transition-colors flex items-center gap-1 shadow-2xs"
+                        >
+                          <span>Personalize</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
