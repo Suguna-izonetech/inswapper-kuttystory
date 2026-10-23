@@ -6,10 +6,10 @@ from app.config import settings
 def get_sync_database_url(url: str) -> str:
     """
     Ensure the database URL uses a synchronous driver for SQLAlchemy's synchronous engine / SessionLocal.
-    If the URL starts with postgresql+asyncpg://, adapt it to postgresql+psycopg2:// (or postgresql+pg8000://).
+    If the URL starts with postgresql+asyncpg://, adapt it to postgresql+psycopg:// (or postgresql+pg8000://).
     """
     if url.startswith("postgresql+asyncpg://"):
-        return url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+        return url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
     return url
 
 def get_async_database_url(url: str) -> str:

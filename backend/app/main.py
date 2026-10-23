@@ -12,18 +12,13 @@ from app.routers import stories, personalization, books, admin, ai_admin, storag
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. Initialize database tables & schema migrations
-    Base.metadata.create_all(bind=engine)
+    # 1. Initialize database tables & schema migrations safely via Alembic
     try:
-        from sqlalchemy import text
-        with engine.connect() as conn:
-            conn.execute(text("ALTER TABLE personalization_jobs ADD COLUMN IF NOT EXISTS is_paid BOOLEAN DEFAULT FALSE;"))
-            conn.execute(text("ALTER TABLE personalization_jobs ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP;"))
-            conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS razorpay_order_id VARCHAR(100);"))
-            conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS razorpay_payment_id VARCHAR(100);"))
-            conn.commit()
+        from app.db_init import run_database_migrations
+        run_database_migrations()
     except Exception as e:
         print(f"Notice during startup schema migration check: {e}")
+        Base.metadata.create_all(bind=engine)
     
     # 2. MinIO storage sync & DB path normalization
     try:
