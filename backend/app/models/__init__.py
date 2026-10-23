@@ -145,8 +145,8 @@ class GeneratedAsset(Base):
     page_number = Column(Integer, nullable=False)
     asset_version = Column(Integer, default=1)
     storage_path = Column(String(500), nullable=False)
-    provider = Column(String(50), default="huggingface")
-    model = Column(String(100), default="stabilityai/stable-diffusion-xl-base-1.0")
+    provider = Column(String(255), default="huggingface")
+    model = Column(String(255), default="stabilityai/stable-diffusion-xl-base-1.0")
     prompt_used = Column(Text, default="")
     generation_status = Column(String(30), default="completed")  # "pending", "completed", "failed"
     review_status = Column(String(30), default="pending_review")  # "pending_review", "approved", "rejected"

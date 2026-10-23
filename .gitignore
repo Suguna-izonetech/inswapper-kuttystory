@@ -67,3 +67,10 @@ backend/storage/temp_upload_*
 backend/storage/*.png
 backend/storage/*.jpg
 backend/storage/*.pdf
+
+# AI & ML Model Weights
+*.onnx
+*.bin
+*.pt
+*.pth
+*.safetensors
