@@ -89,27 +89,45 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8000",
         "https://apikuttystory.risingsuntech.in",
         "https://kuttystory.risingsuntech.in",
+        "https://kuttystory2.risingsuntech.in",
     ]
+    CORS_ORIGIN_REGEX: str = r"^https?://([a-zA-Z0-9-]+\.)*(risingsuntech\.in|localhost|127\.0\.0\.1)(:\d+)?$"
 
-    @field_validator("CORS_ORIGINS")
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
     def parse_cors_origins(cls, v):
         origins = []
         if isinstance(v, list):
-            origins = v
+            origins = list(v)
         elif isinstance(v, str):
             v = v.strip()
             if v.startswith("[") and v.endswith("]"):
                 try:
                     import json
-                    origins = json.loads(v)
+                    loaded = json.loads(v)
+                    if isinstance(loaded, list):
+                        origins = loaded
                 except Exception:
                     pass
             if not origins:
                 origins = [origin.strip() for origin in v.split(",") if origin.strip()]
         
+        # Core allowed origins guaranteed across environments
+        core_defaults = [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+            "https://apikuttystory.risingsuntech.in",
+            "https://kuttystory.risingsuntech.in",
+            "https://kuttystory2.risingsuntech.in",
+        ]
+        
         # Clean each origin: strip whitespace, quotes, and trailing slashes
         cleaned = []
-        for o in origins:
+        for o in list(origins) + core_defaults:
             clean = str(o).strip().strip("\"'").rstrip("/")
             if clean and clean not in cleaned:
                 cleaned.append(clean)

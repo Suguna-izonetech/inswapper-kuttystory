@@ -1,7 +1,8 @@
 import os
+import re
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -71,30 +72,65 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS configuration - strictly driven by .env (settings.CORS_ORIGINS)
+# CORS configuration - dynamically matches all risingsuntech.in subdomains, localhost, and env entries
 origins_from_env = settings.CORS_ORIGINS
 has_wildcard = "*" in origins_from_env
 
-if has_wildcard:
-    # When wildcard '*' is configured in .env, permit any origin dynamically while allowing credentials
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origin_regex=r"^https?://.*",
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["*"],
-    )
-else:
-    # Strictly enforce the explicit list of allowed origins from .env
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins_from_env,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["*"],
-    )
+cors_regex = r"^https?://.*" if has_wildcard else getattr(
+    settings,
+    "CORS_ORIGIN_REGEX",
+    r"^https?://([a-zA-Z0-9-]+\.)*(risingsuntech\.in|localhost|127\.0\.0\.1)(:\d+)?$"
+)
+try:
+    compiled_cors_regex = re.compile(cors_regex)
+except Exception:
+    compiled_cors_regex = re.compile(r"^https?://([a-zA-Z0-9-]+\.)*(risingsuntech\.in|localhost|127\.0\.0\.1)(:\d+)?$")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins_from_env,
+    allow_origin_regex=cors_regex,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+@app.middleware("http")
+async def ensure_cors_headers(request: Request, call_next):
+    origin = request.headers.get("origin")
+    is_allowed = False
+    if origin:
+        clean_origin = origin.strip().rstrip("/")
+        if has_wildcard or clean_origin in origins_from_env or compiled_cors_regex.match(clean_origin):
+            is_allowed = True
+
+    # Preflight OPTIONS request interception: ensure 200 OK with all required CORS headers
+    if request.method == "OPTIONS" and is_allowed and origin:
+        from fastapi.responses import Response
+        res = Response(status_code=200)
+        res.headers["Access-Control-Allow-Origin"] = origin
+        res.headers["Access-Control-Allow-Credentials"] = "true"
+        res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+        res.headers["Access-Control-Allow-Headers"] = request.headers.get("access-control-request-headers", "*")
+        res.headers["Access-Control-Max-Age"] = "86400"
+        return res
+
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        from fastapi.responses import JSONResponse
+        response = JSONResponse(
+            status_code=500,
+            content={"detail": "Internal Server Error", "error": str(exc)}
+        )
+
+    if is_allowed and origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+        response.headers["Access-Control-Expose-Headers"] = "*"
+    return response
 
 
 
