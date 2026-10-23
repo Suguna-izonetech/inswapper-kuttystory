@@ -72,9 +72,17 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS configuration - dynamically matches all risingsuntech.in subdomains, localhost, and env entries
+# CORS configuration - strictly retrieved from .env via settings.CORS_ORIGINS
 origins_from_env = settings.CORS_ORIGINS
 has_wildcard = "*" in origins_from_env
+
+allowed_origins_list = []
+for orig in origins_from_env:
+    cleaned = str(orig).strip().rstrip("/")
+    if cleaned and cleaned not in allowed_origins_list:
+        allowed_origins_list.append(cleaned)
+    if cleaned and f"{cleaned}/" not in allowed_origins_list:
+        allowed_origins_list.append(f"{cleaned}/")
 
 cors_regex = r"^https?://.*" if has_wildcard else getattr(
     settings,
@@ -86,14 +94,17 @@ try:
 except Exception:
     compiled_cors_regex = re.compile(r"^https?://([a-zA-Z0-9-]+\.)*(risingsuntech\.in|localhost|127\.0\.0\.1)(:\d+)?$")
 
+print(f"[CORS] Configured {len(allowed_origins_list)} allowed origin variants from .env")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins_from_env,
+    allow_origins=allowed_origins_list,
     allow_origin_regex=cors_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
+    max_age=86400,
 )
 
 @app.middleware("http")
@@ -102,7 +113,12 @@ async def ensure_cors_headers(request: Request, call_next):
     is_allowed = False
     if origin:
         clean_origin = origin.strip().rstrip("/")
-        if has_wildcard or clean_origin in origins_from_env or compiled_cors_regex.match(clean_origin):
+        if (
+            has_wildcard 
+            or clean_origin in allowed_origins_list 
+            or origin in allowed_origins_list
+            or (compiled_cors_regex and compiled_cors_regex.match(clean_origin))
+        ):
             is_allowed = True
 
     # Preflight OPTIONS request interception: ensure 200 OK with all required CORS headers
@@ -114,6 +130,7 @@ async def ensure_cors_headers(request: Request, call_next):
         res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
         res.headers["Access-Control-Allow-Headers"] = request.headers.get("access-control-request-headers", "*")
         res.headers["Access-Control-Max-Age"] = "86400"
+        res.headers["Vary"] = "Origin"
         return res
 
     try:
@@ -130,6 +147,7 @@ async def ensure_cors_headers(request: Request, call_next):
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
         response.headers["Access-Control-Expose-Headers"] = "*"
+        response.headers["Vary"] = "Origin"
     return response
 
 

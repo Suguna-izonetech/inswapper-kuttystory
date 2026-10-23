@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
-from pydantic_settings import BaseSettings
+from dotenv import load_dotenv, find_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 from typing import List, Union, Optional
 
@@ -9,8 +9,28 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 STORAGE_BASE = BACKEND_DIR / "storage"
 
-# Ensure environment variables from .env are loaded into os.environ
-load_dotenv(BACKEND_DIR / ".env", override=True)
+# Search and load .env file reliably from all likely locations
+def find_and_load_env():
+    candidates = [
+        BACKEND_DIR / ".env",
+        Path.cwd() / ".env",
+        BASE_DIR / ".env",
+    ]
+    env_file = None
+    for cand in candidates:
+        if cand.is_file():
+            env_file = cand
+            load_dotenv(cand, override=True)
+            break
+    if not env_file:
+        found = find_dotenv(usecwd=True)
+        if found and Path(found).is_file():
+            env_file = Path(found)
+            load_dotenv(env_file, override=True)
+    return str(env_file) if env_file else None
+
+ACTIVE_ENV_FILE = find_and_load_env()
+
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Personalized Children's Storybook"
@@ -79,65 +99,71 @@ class Settings(BaseSettings):
     PRINT_BLEED_MM: float = 3.0
     PRINT_SAFE_MARGIN_MM: float = 10.0
     
-    # CORS Allowed Origins - Fully driven by .env
-    CORS_ORIGINS: Union[str, List[str]] = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "https://apikuttystory.risingsuntech.in",
-        "https://kuttystory.risingsuntech.in",
-        "https://kuttystory2.risingsuntech.in",
-    ]
-    CORS_ORIGIN_REGEX: str = r"^https?://([a-zA-Z0-9-]+\.)*(risingsuntech\.in|localhost|127\.0\.0\.1)(:\d+)?$"
+    # CORS Allowed Origins - Strictly retrieved from .env
+    CORS_ORIGINS: Union[str, List[str]] = os.getenv("CORS_ORIGINS", "")
+    CORS_ORIGIN_REGEX: str = os.getenv(
+        "CORS_ORIGIN_REGEX", 
+        r"^https?://([a-zA-Z0-9-]+\.)*(risingsuntech\.in|localhost|127\.0\.0\.1)(:\d+)?$"
+    )
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):
+        raw = v
+        if raw is None or raw == "" or raw == []:
+            raw = (
+                os.getenv("CORS_ORIGINS")
+                or os.getenv("CORS_ORIGIN")
+                or os.getenv("ALLOWED_ORIGINS")
+                or ""
+            )
+
         origins = []
-        if isinstance(v, list):
-            origins = list(v)
-        elif isinstance(v, str):
-            v = v.strip()
-            if v.startswith("[") and v.endswith("]"):
+        if isinstance(raw, list):
+            origins = list(raw)
+        elif isinstance(raw, str):
+            raw_str = raw.strip()
+            if raw_str.startswith("[") and raw_str.endswith("]"):
                 try:
                     import json
-                    loaded = json.loads(v)
+                    loaded = json.loads(raw_str)
                     if isinstance(loaded, list):
                         origins = loaded
                 except Exception:
                     pass
-            if not origins:
-                origins = [origin.strip() for origin in v.split(",") if origin.strip()]
-        
-        # Core allowed origins guaranteed across environments
-        core_defaults = [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:8000",
-            "http://127.0.0.1:8000",
-            "https://apikuttystory.risingsuntech.in",
-            "https://kuttystory.risingsuntech.in",
-            "https://kuttystory2.risingsuntech.in",
-        ]
-        
-        # Clean each origin: strip whitespace, quotes, and trailing slashes
+            if not origins and raw_str:
+                origins = [origin.strip() for origin in raw_str.split(",") if origin.strip()]
+
         cleaned = []
-        for o in list(origins) + core_defaults:
+        for o in origins:
             clean = str(o).strip().strip("\"'").rstrip("/")
             if clean and clean not in cleaned:
                 cleaned.append(clean)
+
+        # If .env provided CORS origins, strictly respect and return them!
+        # Only fallback to standard defaults if .env had no CORS configuration at all
+        if not cleaned:
+            cleaned = [
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "http://localhost:8000",
+                "http://127.0.0.1:8000",
+                "https://apikuttystory.risingsuntech.in",
+                "https://kuttystory.risingsuntech.in",
+                "https://kuttystory2.risingsuntech.in",
+            ]
+
+        print(f"[CORS] Allowed origins strictly loaded from .env: {cleaned}")
         return cleaned
 
+    model_config = SettingsConfigDict(
+        env_file=ACTIVE_ENV_FILE if ACTIVE_ENV_FILE else ".env",
+        extra="allow",
+        case_sensitive=False
+    )
 
-
-    class Config:
-        env_file = ".env"
-        extra = "allow"
 
 settings = Settings()
 
