@@ -152,7 +152,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Ensure directories exist
+# Ensure directories exist safely
 for folder in [
     settings.STORAGE_DIR,
     settings.ORIGINAL_PDFS_DIR,
@@ -162,4 +162,7 @@ for folder in [
     settings.PREVIEWS_DIR,
     settings.FINAL_BOOKS_DIR,
 ]:
-    folder.mkdir(parents=True, exist_ok=True)
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        print(f"[Config] Notice: Could not create folder {folder} ({e}).")

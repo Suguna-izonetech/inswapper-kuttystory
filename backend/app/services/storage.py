@@ -84,9 +84,12 @@ class StorageManager:
         self._bucket_initialized = False
         self._minio_available: Optional[bool] = None
 
-        # Ensure local storage directories exist
+        # Safely ensure local storage directories exist without crashing on restricted permissions
         for cat in self.CATEGORIES:
-            (settings.STORAGE_DIR / cat).mkdir(parents=True, exist_ok=True)
+            try:
+                (settings.STORAGE_DIR / cat).mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                print(f"[Storage] Notice: Could not create folder '{cat}' in storage dir ({e}). Will use fallback cache when needed.")
 
     def _is_minio_reachable(self) -> bool:
         """Fast check to determine if MinIO server is listening on the configured endpoint."""
@@ -252,8 +255,14 @@ class StorageManager:
 
         # 1. Save to local storage
         local_dest = settings.STORAGE_DIR / object_key
-        local_dest.parent.mkdir(parents=True, exist_ok=True)
-        local_dest.write_bytes(data)
+        try:
+            local_dest.parent.mkdir(parents=True, exist_ok=True)
+            local_dest.write_bytes(data)
+        except Exception as e:
+            fallback = self._temp_cache_dir / object_key
+            fallback.parent.mkdir(parents=True, exist_ok=True)
+            fallback.write_bytes(data)
+            print(f"[Storage] Notice: Could not write {object_key} to storage dir ({e}), saved to cache.")
 
         # 2. Upload to MinIO if available
         if self._is_minio_reachable() and self.client:
@@ -289,8 +298,14 @@ class StorageManager:
 
         # 1. Save to local storage
         local_dest = settings.STORAGE_DIR / object_key
-        local_dest.parent.mkdir(parents=True, exist_ok=True)
-        local_dest.write_bytes(data)
+        try:
+            local_dest.parent.mkdir(parents=True, exist_ok=True)
+            local_dest.write_bytes(data)
+        except Exception as e:
+            fallback = self._temp_cache_dir / object_key
+            fallback.parent.mkdir(parents=True, exist_ok=True)
+            fallback.write_bytes(data)
+            print(f"[Storage] Notice: Could not write bytes {object_key} to storage dir ({e}), saved to cache.")
 
         # 2. Upload to MinIO if available
         if self._is_minio_reachable() and self.client:
@@ -328,9 +343,15 @@ class StorageManager:
 
         # 1. Save to local storage directory
         local_dest = settings.STORAGE_DIR / object_key
-        if local_dest.resolve() != path_obj.resolve():
-            local_dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(path_obj, local_dest)
+        try:
+            if local_dest.resolve() != path_obj.resolve():
+                local_dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path_obj, local_dest)
+        except Exception as e:
+            fallback = self._temp_cache_dir / object_key
+            fallback.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path_obj, fallback)
+            print(f"[Storage] Notice: Could not copy {object_key} to storage dir ({e}), copied to cache.")
 
         # 2. Upload to MinIO if available
         if self._is_minio_reachable() and self.client:
