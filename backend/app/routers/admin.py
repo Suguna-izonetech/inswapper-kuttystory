@@ -373,6 +373,13 @@ def update_story_page(page_id: str, payload: StoryPageUpdate, db: Session = Depe
     for k, v in payload.dict(exclude_unset=True).items():
         setattr(page, k, v)
 
+    # If outline was explicitly cleared or set to empty array, mark personalization_required = False
+    if page.face_outline_points in ["[]", ""]:
+        page.personalization_required = False
+        page.face_outline_points = "[]"
+    elif payload.personalization_required is not None:
+        page.personalization_required = payload.personalization_required
+
     db.commit()
     db.refresh(page)
     return serialize_page(page)

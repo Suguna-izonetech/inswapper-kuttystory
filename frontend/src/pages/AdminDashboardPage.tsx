@@ -159,6 +159,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
   const [pageNumberInput, setPageNumberInput] = useState<number>(1);
   const [pageStylePrompt, setPageStylePrompt] = useState<string>("children's storybook illustration, soft colours, consistent character, clean line art");
   const [facePoints, setFacePoints] = useState<[number, number][]>([]);
+  const [personalizationRequired, setPersonalizationRequired] = useState<boolean>(true);
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [autoTracing, setAutoTracing] = useState<boolean>(false);
   const [autoTracingAll, setAutoTracingAll] = useState<boolean>(false);
@@ -410,7 +411,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
           if (match) {
             setGeneratingFullJob(match);
             if (match.completed_pages >= match.total_pages && (match.status === "completed" || !match.status.includes("Rendering"))) {
-              const rawUrl = match.print_pdf_url || `/api/v1/personalization/${match.id}/print-pdf?size=8x8&color=rgb`;
+              const rawUrl = match.print_pdf_url || `/api/v1/personalization/${match.id}/print-pdf?size=8x8&color=rgb&admin=true`;
               const url = api.resolveUrl(rawUrl);
               window.open(url, "_blank");
               setTimeout(() => {
@@ -545,16 +546,20 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
     if (page.face_outline_points) {
       try {
         const pts = typeof page.face_outline_points === "string" ? JSON.parse(page.face_outline_points) : page.face_outline_points;
-        if (Array.isArray(pts)) {
+        if (Array.isArray(pts) && pts.length > 0) {
           setFacePoints(pts);
+          setPersonalizationRequired(page.personalization_required !== undefined && page.personalization_required !== null ? Boolean(page.personalization_required) : true);
         } else {
           setFacePoints([]);
+          setPersonalizationRequired(false);
         }
       } catch {
         setFacePoints([]);
+        setPersonalizationRequired(false);
       }
     } else {
       setFacePoints([]);
+      setPersonalizationRequired(false);
     }
     setSaveSuccess(false);
   };
@@ -596,7 +601,8 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
         scene_description: pageEditScene,
         prompt_template: pageEditPrompt,
         character_guidance: pageStylePrompt,
-        face_outline_points: JSON.stringify(facePoints),
+        personalization_required: personalizationRequired && facePoints.length > 0,
+        face_outline_points: facePoints.length > 0 ? JSON.stringify(facePoints) : "[]",
         text_x: Number(textX),
         text_y: Number(textY),
         font_size: Number(fontSize),
@@ -875,7 +881,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
     }
 
     // Directly download the complete print-ready PDF containing all pages with vivid colors
-    const rawUrl = job.print_pdf_url || `/api/v1/personalization/${job.id}/print-pdf?size=8x8&color=rgb`;
+    const rawUrl = job.print_pdf_url || `/api/v1/personalization/${job.id}/print-pdf?size=8x8&color=rgb&admin=true`;
     const url = api.resolveUrl(rawUrl);
     const link = document.createElement("a");
     link.href = url;
@@ -2641,22 +2647,56 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
 
                   {/* Face outline Trace Controls */}
                   <div className="space-y-3 pt-1">
+                    <div className="flex items-center justify-between p-3.5 rounded-2xl border border-purple-100 bg-purple-50/40">
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-gray-900 block">Personalize Character on this Page</span>
+                        <span className="text-[11px] text-gray-500 block">
+                          {personalizationRequired && facePoints.length > 0
+                            ? "Character face swap enabled. The child's face replaces the character inside the outline."
+                            : "Disabled. Pure original base illustration (e.g. animals, phoenix, scenery, objects)."}
+                        </span>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={personalizationRequired && facePoints.length > 0}
+                          onChange={(e) => {
+                            setPersonalizationRequired(e.target.checked);
+                            if (!e.target.checked) {
+                              setFacePoints([]);
+                            }
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#8B3DFF]"></div>
+                      </label>
+                    </div>
+
                     <label className="block font-bold text-gray-800">
                       Face outline — TRACE around the face on the preview →
                     </label>
                     <p className="text-gray-500 text-[11px] leading-relaxed">
-                      Press and drag to trace a free-form outline around the face only (follow the jaw & hairline, exclude the hair). The swap fills exactly inside your outline, so the template&apos;s hair is kept. Leave blank to swap the whole head.
+                      Press and drag to trace a free-form outline around the face only (follow the jaw & hairline, exclude the hair). Clear the outline for non-character pages (animals, objects, places).
                     </p>
 
                     <div className="flex items-center gap-4">
-                      <span className="text-emerald-600 font-bold flex items-center gap-1">
-                        Outline set ({facePoints.length} points) ✓
-                      </span>
+                      {facePoints.length > 0 ? (
+                        <span className="text-emerald-600 font-bold flex items-center gap-1 text-xs">
+                          Outline set ({facePoints.length} points) ✓
+                        </span>
+                      ) : (
+                        <span className="text-gray-500 font-medium text-xs">
+                          No outline (Base illustration will be preserved as-is)
+                        </span>
+                      )}
 
                       <button
                         type="button"
-                        onClick={() => setFacePoints([])}
-                        className="px-3 py-1 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-[11px] transition"
+                        onClick={() => {
+                          setFacePoints([]);
+                          setPersonalizationRequired(false);
+                        }}
+                        className="px-3 py-1 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-[11px] transition cursor-pointer"
                       >
                         Clear outline
                       </button>
