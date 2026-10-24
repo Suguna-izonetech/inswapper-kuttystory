@@ -12,22 +12,34 @@ STORAGE_BASE = BACKEND_DIR / "storage"
 # Search and load .env file reliably from all likely locations
 def find_and_load_env():
     candidates = [
+        BASE_DIR / ".env",
         BACKEND_DIR / ".env",
         Path.cwd() / ".env",
-        BASE_DIR / ".env",
     ]
-    env_file = None
+    # Check parent directory hierarchy
+    p = Path.cwd().resolve()
+    for _ in range(3):
+        cand = p / ".env"
+        if cand not in candidates:
+            candidates.append(cand)
+        if p == p.parent:
+            break
+        p = p.parent
+
+    primary_env = None
     for cand in candidates:
         if cand.is_file():
-            env_file = cand
             load_dotenv(cand, override=True)
-            break
-    if not env_file:
+            if not primary_env:
+                primary_env = cand
+
+    if not primary_env:
         found = find_dotenv(usecwd=True)
         if found and Path(found).is_file():
-            env_file = Path(found)
-            load_dotenv(env_file, override=True)
-    return str(env_file) if env_file else None
+            primary_env = Path(found)
+            load_dotenv(primary_env, override=True)
+
+    return str(primary_env) if primary_env else None
 
 ACTIVE_ENV_FILE = find_and_load_env()
 
@@ -109,43 +121,17 @@ class Settings(BaseSettings):
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):
-        raw = v
-        if raw is None or raw == "" or raw == []:
-            raw = (
-                os.getenv("CORS_ORIGINS")
-                or os.getenv("CORS_ORIGIN")
-                or os.getenv("ALLOWED_ORIGINS")
-                or ""
-            )
-
-        origins = []
-        if isinstance(raw, list):
-            origins = list(raw)
-        elif isinstance(raw, str):
-            raw_str = raw.strip()
-            if raw_str.startswith("[") and raw_str.endswith("]"):
-                try:
-                    import json
-                    loaded = json.loads(raw_str)
-                    if isinstance(loaded, list):
-                        origins = loaded
-                except Exception:
-                    pass
-            if not origins and raw_str:
-                origins = [origin.strip() for origin in raw_str.split(",") if origin.strip()]
-
-        cleaned = []
-        for o in origins:
-            clean = str(o).strip().strip("\"'").rstrip("/")
-            if clean and clean not in cleaned:
-                cleaned.append(clean)
-
-        # If .env provided CORS origins, strictly respect and return them!
-        # Only fallback to standard defaults if .env had no CORS configuration at all
-        if not cleaned:
-            cleaned = [
+        try:
+            from app.cors import cors_manager
+            cors_manager.reload()
+            return cors_manager.get_allowed_origins_list()
+        except Exception as e:
+            print(f"[CORS] Notice during cors_manager resolution in settings: {e}")
+            return [
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
+                "http://localhost:5174",
+                "http://127.0.0.1:5174",
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
                 "http://localhost:8000",
@@ -153,10 +139,8 @@ class Settings(BaseSettings):
                 "https://apikuttystory.risingsuntech.in",
                 "https://kuttystory.risingsuntech.in",
                 "https://kuttystory2.risingsuntech.in",
+                "https://kuttystory.co.in",
             ]
-
-        print(f"[CORS] Allowed origins strictly loaded from .env: {cleaned}")
-        return cleaned
 
     model_config = SettingsConfigDict(
         env_file=ACTIVE_ENV_FILE if ACTIVE_ENV_FILE else ".env",

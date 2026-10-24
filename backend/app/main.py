@@ -72,34 +72,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS configuration - strictly retrieved from .env via settings.CORS_ORIGINS
-origins_from_env = settings.CORS_ORIGINS
-has_wildcard = "*" in origins_from_env
-
-allowed_origins_list = []
-for orig in origins_from_env:
-    cleaned = str(orig).strip().rstrip("/")
-    if cleaned and cleaned not in allowed_origins_list:
-        allowed_origins_list.append(cleaned)
-    if cleaned and f"{cleaned}/" not in allowed_origins_list:
-        allowed_origins_list.append(f"{cleaned}/")
-
-cors_regex = r"^https?://.*" if has_wildcard else getattr(
-    settings,
-    "CORS_ORIGIN_REGEX",
-    r"^https?://([a-zA-Z0-9-]+\.)*(risingsuntech\.in|localhost|127\.0\.0\.1)(:\d+)?$"
-)
-try:
-    compiled_cors_regex = re.compile(cors_regex)
-except Exception:
-    compiled_cors_regex = re.compile(r"^https?://([a-zA-Z0-9-]+\.)*(risingsuntech\.in|localhost|127\.0\.0\.1)(:\d+)?$")
-
-print(f"[CORS] Configured {len(allowed_origins_list)} allowed origin variants from .env")
+# CORS configuration - powered by dynamic CorsManager with hot-reload and multi-.env scanning
+from app.cors import cors_manager
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins_list,
-    allow_origin_regex=cors_regex,
+    allow_origins=[] if cors_manager._has_wildcard else cors_manager.get_allowed_origins_list(),
+    allow_origin_regex=r"^https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -110,28 +89,24 @@ app.add_middleware(
 @app.middleware("http")
 async def ensure_cors_headers(request: Request, call_next):
     origin = request.headers.get("origin")
-    is_allowed = False
-    if origin:
-        clean_origin = origin.strip().rstrip("/")
-        if (
-            has_wildcard 
-            or clean_origin in allowed_origins_list 
-            or origin in allowed_origins_list
-            or (compiled_cors_regex and compiled_cors_regex.match(clean_origin))
-        ):
-            is_allowed = True
+    is_allowed = cors_manager.is_allowed(origin) if origin else True
 
     # Preflight OPTIONS request interception: ensure 200 OK with all required CORS headers
-    if request.method == "OPTIONS" and is_allowed and origin:
+    if request.method == "OPTIONS" and origin:
         from fastapi.responses import Response
-        res = Response(status_code=200)
-        res.headers["Access-Control-Allow-Origin"] = origin
-        res.headers["Access-Control-Allow-Credentials"] = "true"
-        res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
-        res.headers["Access-Control-Allow-Headers"] = request.headers.get("access-control-request-headers", "*")
-        res.headers["Access-Control-Max-Age"] = "86400"
-        res.headers["Vary"] = "Origin"
-        return res
+        if is_allowed:
+            req_headers = request.headers.get("access-control-request-headers", "*")
+            res = Response(status_code=200)
+            res.headers["Access-Control-Allow-Origin"] = origin
+            res.headers["Access-Control-Allow-Credentials"] = "true"
+            res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"
+            res.headers["Access-Control-Allow-Headers"] = req_headers
+            res.headers["Access-Control-Max-Age"] = "86400"
+            res.headers["Vary"] = "Origin"
+            return res
+        else:
+            print(f"[CORS] Preflight OPTIONS rejected for unauthorized origin: '{origin}'")
+            return Response(status_code=403, content=f"CORS origin '{origin}' not allowed.")
 
     try:
         response = await call_next(request)
@@ -142,12 +117,14 @@ async def ensure_cors_headers(request: Request, call_next):
             content={"detail": "Internal Server Error", "error": str(exc)}
         )
 
+    # Attach CORS headers to response if origin is allowed
     if is_allowed and origin:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"
         response.headers["Access-Control-Expose-Headers"] = "*"
         response.headers["Vary"] = "Origin"
+
     return response
 
 
