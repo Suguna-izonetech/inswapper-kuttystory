@@ -137,6 +137,7 @@ class Settings(BaseSettings):
                 "http://localhost:8000",
                 "http://127.0.0.1:8000",
                 "https://apikuttystory.risingsuntech.in",
+                "https://apikuttystory2.risingsuntech.in",
                 "https://kuttystory.risingsuntech.in",
                 "https://kuttystory2.risingsuntech.in",
                 "https://kuttystory.co.in",
