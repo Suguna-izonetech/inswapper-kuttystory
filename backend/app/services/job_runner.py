@@ -50,8 +50,8 @@ class JobRunner:
             job.current_stage = f"Analyzing {story_title} scenes & preparing character reference"
             db.commit()
 
-            # Prepare clean child reference (removes forehead bindis/blemishes so they don't warp onto eyebrows)
-            norm_ref = cartoon_fusion_engine.prepare_clean_child_reference(job.photo_path)
+            # Normalize child reference photo
+            norm_ref = CharacterConsistencyEngine.normalize_child_reference(job.photo_path)
 
             # Get story pages
             story_pages = db.query(StoryPage).filter(StoryPage.story_id == job.story_id).order_by(StoryPage.page_index).all()
@@ -87,24 +87,7 @@ class JobRunner:
                 expanded = await gemini_provider.expand_prompt(prompt, job.child_name)
 
                 try:
-                    if not page.personalization_required:
-                        # Page is scenery / animal / dinosaur scene without character face - preserve authentic artwork
-                        page_img = page.original_image_path or f"source_pages/{story_slug}/page_{page.page_number:02d}.png"
-                        resolved_path = storage.resolve_path(page_img) if not os.path.exists(page_img) else page_img
-                        img_bytes = b""
-                        if os.path.exists(resolved_path):
-                            with open(resolved_path, "rb") as f:
-                                img_bytes = f.read()
-                        gen_res = GenerationResult(
-                            image_bytes=img_bytes,
-                            format="png",
-                            provider="Original Storybook Illustration",
-                            model="authentic-scene",
-                            prompt=f"Preserved {story_title} Page {page.page_number} scenery",
-                            generation_time_sec=0.01,
-                            cost_estimate_usd=0.00
-                        )
-                    elif settings.ACTIVE_IMAGE_PROVIDER == "huggingface" and settings.HF_TOKEN:
+                    if settings.ACTIVE_IMAGE_PROVIDER == "huggingface" and settings.HF_TOKEN:
                         gen_res = await diffusers_provider.generate_illustration(
                             prompt=expanded,
                             reference_image_path=norm_ref,
@@ -135,8 +118,8 @@ class JobRunner:
                         story_page_id=page.id,
                         page_number=page.page_number,
                         storage_path=asset_path,
-                        provider=(gen_res.provider or "huggingface")[:250],
-                        model=(gen_res.model or "default")[:250],
+                        provider=gen_res.provider,
+                        model=gen_res.model,
                         prompt_used=personalized_text or expanded,
                         generation_status="completed",
                         review_status="approved",
@@ -154,15 +137,9 @@ class JobRunner:
                         "story_text": personalized_text
                     })
                 except Exception as e:
-                    db.rollback()
-                    try:
-                        job = db.query(PersonalizationJob).filter(PersonalizationJob.id == job_id).first()
-                        if job:
-                            job.failed_pages += 1
-                            job.error_details = str(e)[:500]
-                            db.commit()
-                    except Exception:
-                        db.rollback()
+                    job.failed_pages += 1
+                    job.error_details = str(e)
+                    db.commit()
 
             # Assemble Preview PDF
             job.status = "assembling_preview"
@@ -194,15 +171,9 @@ class JobRunner:
             db.commit()
 
         except Exception as ex:
-            db.rollback()
-            try:
-                job = db.query(PersonalizationJob).filter(PersonalizationJob.id == job_id).first()
-                if job:
-                    job.status = "failed"
-                    job.error_details = str(ex)[:500]
-                    db.commit()
-            except Exception:
-                db.rollback()
+            job.status = "failed"
+            job.error_details = str(ex)
+            db.commit()
         finally:
             db.close()
 
@@ -264,8 +235,6 @@ class JobRunner:
 
             asset.storage_path = new_path
             asset.asset_version += 1
-            asset.provider = (gen_res.provider or "huggingface")[:250]
-            asset.model = (gen_res.model or "default")[:250]
             asset.generation_status = "completed"
             asset.review_status = "pending_review"
             asset.prompt_used = personalized_text or expanded
@@ -307,13 +276,19 @@ class JobRunner:
             if not story_pages:
                 raise ValueError("No story pages configured for this story template")
 
-            existing_assets = {
-                a.page_number: a
-                for a in db.query(GeneratedAsset).filter(GeneratedAsset.job_id == job.id).all()
-                if a.storage_path and os.path.exists(a.storage_path)
-            }
+            existing_assets = {}
+            for a in db.query(GeneratedAsset).filter(GeneratedAsset.job_id == job.id, GeneratedAsset.generation_status == "completed").all():
+                is_ai = "hugging" in (a.provider or "").lower() or "ovi054" in (a.model or "").lower() or "tonyassi" in (a.model or "").lower()
+                if is_ai and a.storage_path:
+                    res_p = storage.resolve_path(a.storage_path)
+                    if res_p and os.path.exists(res_p):
+                        existing_assets[a.page_number] = a
 
-            norm_ref = job.photo_path if job.photo_path else None
+            norm_ref = None
+            if job.photo_path:
+                resolved_child_photo = storage.resolve_path(job.photo_path)
+                if resolved_child_photo and os.path.exists(resolved_child_photo):
+                    norm_ref = CharacterConsistencyEngine.normalize_child_reference(resolved_child_photo)
 
             pages_data = []
             for page in story_pages:
@@ -329,15 +304,18 @@ class JobRunner:
                     from app.services.translation_service import translation_service
                     personalized_text = translation_service.translate_text(personalized_text, target_lang, child_name=job.child_name)
 
+                is_page_personalizable = bool(page.personalization_required and page.face_outline_points not in ["[]", "none", "false"])
                 img_path = None
-                if page_num in existing_assets:
+                if page_num in existing_assets and is_page_personalizable:
                     img_path = existing_assets[page_num].storage_path
-                elif page.personalization_required and norm_ref:
-                    page_img = page.original_image_path
+                elif is_page_personalizable and norm_ref:
+                    page_img = storage.resolve_path(page.original_image_path) if page.original_image_path else None
                     if not page_img or not os.path.exists(page_img):
                         cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png"
                         if cand.exists():
                             page_img = str(cand)
+                        else:
+                            page_img = storage.resolve_path(f"source_pages/{story_slug}/page_{page_num:02d}.png")
 
                     try:
                         gen_res = cartoon_fusion_engine.fuse_page(
@@ -360,8 +338,8 @@ class JobRunner:
                             story_page_id=page.id,
                             page_number=page_num,
                             storage_path=asset_path,
-                            provider=(gen_res.provider or "huggingface")[:250],
-                            model=(gen_res.model or "default")[:250],
+                            provider=gen_res.provider,
+                            model=gen_res.model,
                             prompt_used=personalized_text,
                             generation_status="completed",
                             review_status="approved",
@@ -380,15 +358,12 @@ class JobRunner:
                         job.current_stage = f"Rendering HD page {page_num} of {len(story_pages)}..."
                         db.commit()
                     except Exception as fuse_err:
-                        db.rollback()
                         print(f"Notice: Face fusion fallback on full render page {page_num}: {fuse_err}")
-                        img_path = page.original_image_path or str(settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png")
-                else:
-                    img_path = page.original_image_path
-                    if not img_path or not os.path.exists(img_path):
                         cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png"
-                        if cand.exists():
-                            img_path = str(cand)
+                        img_path = (str(cand) if cand.exists() else None) or (storage.resolve_path(page.original_image_path) if page.original_image_path else None) or page.original_image_path
+                else:
+                    cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png"
+                    img_path = (str(cand) if cand.exists() else None) or (storage.resolve_path(page.original_image_path) if page.original_image_path else None) or page.original_image_path
 
                 pages_data.append({
                     "page_number": page_num,

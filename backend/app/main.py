@@ -1,8 +1,8 @@
 import os
-import re
+os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -13,13 +13,18 @@ from app.routers import stories, personalization, books, admin, ai_admin, storag
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. Initialize database tables & schema migrations safely via Alembic
+    # 1. Initialize database tables & schema migrations
+    Base.metadata.create_all(bind=engine)
     try:
-        from app.db_init import run_database_migrations
-        run_database_migrations()
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE personalization_jobs ADD COLUMN IF NOT EXISTS is_paid BOOLEAN DEFAULT FALSE;"))
+            conn.execute(text("ALTER TABLE personalization_jobs ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP;"))
+            conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS razorpay_order_id VARCHAR(100);"))
+            conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS razorpay_payment_id VARCHAR(100);"))
+            conn.commit()
     except Exception as e:
         print(f"Notice during startup schema migration check: {e}")
-        Base.metadata.create_all(bind=engine)
     
     # 2. MinIO storage sync & DB path normalization
     try:
@@ -72,60 +77,30 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS configuration - powered by dynamic CorsManager with hot-reload and multi-.env scanning
-from app.cors import cors_manager
+# CORS configuration - strictly driven by .env (settings.CORS_ORIGINS)
+origins_from_env = settings.CORS_ORIGINS
+has_wildcard = "*" in origins_from_env
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[] if cors_manager._has_wildcard else cors_manager.get_allowed_origins_list(),
-    allow_origin_regex=r"^https?://.*",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=86400,
-)
-
-@app.middleware("http")
-async def ensure_cors_headers(request: Request, call_next):
-    origin = request.headers.get("origin")
-    is_allowed = cors_manager.is_allowed(origin) if origin else True
-
-    # Preflight OPTIONS request interception: ensure 200 OK with all required CORS headers
-    if request.method == "OPTIONS" and origin:
-        from fastapi.responses import Response
-        if is_allowed:
-            req_headers = request.headers.get("access-control-request-headers", "*")
-            res = Response(status_code=200)
-            res.headers["Access-Control-Allow-Origin"] = origin
-            res.headers["Access-Control-Allow-Credentials"] = "true"
-            res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"
-            res.headers["Access-Control-Allow-Headers"] = req_headers
-            res.headers["Access-Control-Max-Age"] = "86400"
-            res.headers["Vary"] = "Origin"
-            return res
-        else:
-            print(f"[CORS] Preflight OPTIONS rejected for unauthorized origin: '{origin}'")
-            return Response(status_code=403, content=f"CORS origin '{origin}' not allowed.")
-
-    try:
-        response = await call_next(request)
-    except Exception as exc:
-        from fastapi.responses import JSONResponse
-        response = JSONResponse(
-            status_code=500,
-            content={"detail": "Internal Server Error", "error": str(exc)}
-        )
-
-    # Attach CORS headers to response if origin is allowed
-    if is_allowed and origin:
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"
-        response.headers["Access-Control-Expose-Headers"] = "*"
-        response.headers["Vary"] = "Origin"
-
-    return response
+if has_wildcard:
+    # When wildcard '*' is configured in .env, permit any origin dynamically while allowing credentials
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"^https?://.*",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
+else:
+    # Strictly enforce the explicit list of allowed origins from .env
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins_from_env,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
 
 
 

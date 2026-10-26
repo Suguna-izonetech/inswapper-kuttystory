@@ -174,13 +174,14 @@ export default function PersonalizePage() {
     return () => clearInterval(interval);
   }, [jobId]);
 
-  // Ensure currentPageIdx stays within preview page bounds (max 3 pages)
+  // Ensure currentPageIdx stays within page bounds (max 3 for unpaid preview, all for paid)
   useEffect(() => {
-    const previewCount = Math.min((job?.assets || []).length, 3);
-    if (currentPageIdx >= previewCount && previewCount > 0) {
-      setCurrentPageIdx(previewCount - 1);
+    const isPaid = Boolean(job?.is_paid || job?.is_purchased);
+    const maxCount = isPaid ? (job?.assets || []).length : Math.min((job?.assets || []).length, 3);
+    if (currentPageIdx >= maxCount && maxCount > 0) {
+      setCurrentPageIdx(maxCount - 1);
     }
-  }, [job?.assets, currentPageIdx]);
+  }, [job?.assets, job?.is_paid, job?.is_purchased, currentPageIdx]);
 
   // Start live webcam stream
   const startCamera = async () => {
@@ -419,7 +420,8 @@ export default function PersonalizePage() {
     );
   }
 
-  const assets: GeneratedAsset[] = (job?.assets || []).slice(0, 3);
+  const isPaidOrPurchased = Boolean(job?.is_paid || job?.is_purchased);
+  const assets: GeneratedAsset[] = isPaidOrPurchased ? (job?.assets || []) : (job?.assets || []).slice(0, 3);
   const currentAsset = assets[currentPageIdx];
 
   return (
@@ -817,7 +819,9 @@ export default function PersonalizePage() {
               <div className="text-right hidden sm:block">
                 <span className="text-xs text-[#695B64] block">Progress</span>
                 <span className="font-editorial-serif text-lg font-bold text-[#2D222A]">
-                  {Math.min(job.completed_pages, assets.length || 3)} of {Math.min(job.total_pages || 3, 3)} Pages
+                  {job.is_paid || job.is_purchased
+                    ? `${job.completed_pages || assets.length} of ${job.total_pages || story?.page_count || assets.length} Pages`
+                    : `${Math.min(job.completed_pages, assets.length || 3)} of ${Math.min(job.total_pages || 3, 3)} Pages`}
                 </span>
               </div>
 
