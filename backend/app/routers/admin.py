@@ -562,6 +562,21 @@ def review_asset(asset_id: str, payload: AssetReviewUpdate, db: Session = Depend
 
 @router.get("/jobs", response_model=List[PersonalizationOut])
 def list_jobs(db: Session = Depends(get_db)):
+    # Auto-cleanup zombie jobs that were interrupted by server reloads (>15 mins stale)
+    try:
+        now = datetime.datetime.utcnow()
+        stale_cutoff = now - datetime.timedelta(minutes=15)
+        stale_jobs = db.query(PersonalizationJob).filter(
+            (PersonalizationJob.updated_at < stale_cutoff) &
+            (PersonalizationJob.status.notin_(["completed", "failed", "interrupted"]))
+        ).all()
+        if stale_jobs:
+            for sj in stale_jobs:
+                sj.status = "interrupted"
+            db.commit()
+    except Exception as e:
+        print(f"Notice during stale jobs cleanup: {e}")
+
     jobs = db.query(PersonalizationJob).order_by(PersonalizationJob.created_at.desc()).all()
     return [enrich_job_urls(j) for j in jobs]
 

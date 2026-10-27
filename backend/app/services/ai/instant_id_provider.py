@@ -14,7 +14,7 @@ class InstantIDEmbeddingProvider:
     """
     Diffrun-Grade Facial Embedding & Character Synthesis Engine:
     Uses InsightFace ArcFace 512-D vector embeddings + InstantID Latent Diffusion
-    via the official Hugging Face InstantX/InstantID space (using HF_TOKEN).
+    via the Hugging Face space configured in HF_INSTANT_ID_SPACE (using HF_TOKEN).
     
     Preserves:
     - 100% of the child's true facial biometric proportions (eyes, nose, smile, jawline)
@@ -26,14 +26,16 @@ class InstantIDEmbeddingProvider:
     @classmethod
     def get_client(cls):
         if cls._client is None:
+            space_name = getattr(settings, "HF_INSTANT_ID_SPACE", "").strip()
+            if not space_name:
+                return None
             token = getattr(settings, "HF_TOKEN", None)
             token = token.strip() if token else None
             try:
                 from gradio_client import Client
-                # Connect to official InstantX/InstantID space
-                cls._client = Client("InstantX/InstantID", token=token)
+                cls._client = Client(space_name, token=token)
             except Exception as e:
-                print(f"Notice: Failed to connect to InstantX/InstantID: {e}")
+                print(f"Notice: Failed to connect to space '{space_name}': {e}")
                 cls._client = None
         return cls._client
 
@@ -50,7 +52,7 @@ class InstantIDEmbeddingProvider:
         enable_lcm: bool = True
     ) -> Optional[str]:
         """
-        Calls InstantX/InstantID space to create a stylized character illustration
+        Calls configured face synthesis space to create a stylized character illustration
         using the child's 512-D face embedding and pose reference.
         Returns local filepath of the generated image or None.
         """
@@ -79,7 +81,7 @@ class InstantIDEmbeddingProvider:
 
             num_steps = 10 if enable_lcm else 25
 
-            # InstantX/InstantID predict endpoint
+            # Predict endpoint for stylized character synthesis
             result = client.predict(
                 face_image_path=src_file,
                 pose_image_path=pose_file,

@@ -161,8 +161,7 @@ Baby story/
 ├── sample-assets/
 │   └── unicorn Story.pdf          # Original 26-page authoritative source PDF (Untouched)
 ├── backend/
-│   ├── storybook.db               # SQLite database (PostgreSQL compatible)
-│   ├── test_backend.py            # Automated end-to-end test suite
+│   ├── alembic/                   # Alembic database schema migrations
 │   ├── requirements.txt           # Python dependencies
 │   ├── storage/                   # Private secured file storage
 │   │   ├── original_pdfs/         # Private copy of original PDF

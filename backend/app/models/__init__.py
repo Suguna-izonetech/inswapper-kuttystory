@@ -146,7 +146,7 @@ class GeneratedAsset(Base):
     asset_version = Column(Integer, default=1)
     storage_path = Column(String(500), nullable=False)
     provider = Column(String(255), default="huggingface")
-    model = Column(String(255), default="stabilityai/stable-diffusion-xl-base-1.0")
+    model = Column(String(255), default="")
     prompt_used = Column(Text, default="")
     generation_status = Column(String(30), default="completed")  # "pending", "completed", "failed"
     review_status = Column(String(30), default="pending_review")  # "pending_review", "approved", "rejected"
@@ -229,7 +229,7 @@ class AISettings(Base):
     id = Column(String(36), primary_key=True, default="default")
     active_story_provider = Column(String(50), default="gemini")
     active_image_provider = Column(String(50), default="huggingface")
-    active_model = Column(String(100), default="stabilityai/stable-diffusion-xl-base-1.0")
+    active_model = Column(String(100), default="")
     preview_page_limit = Column(Integer, default=3)
     max_retries = Column(Integer, default=3)
     concurrency_limit = Column(Integer, default=2)

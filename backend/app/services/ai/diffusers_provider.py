@@ -59,6 +59,11 @@ class HuggingFaceDiffusersProvider(ImageGenerationProvider):
                 "Hugging Face API token (HF_TOKEN) is not configured in backend settings. "
                 "Please configure HF_TOKEN in the admin dashboard or .env to enable live Hugging Face generation."
             )
+        if not self.model_name:
+            raise ValueError(
+                "Hugging Face model name (HF_MODEL_NAME) is not configured in .env. "
+                "Please configure HF_MODEL_NAME in backend .env to enable model inference."
+            )
 
         start_time = time.time()
         headers = {"Authorization": f"Bearer {self.token}"}

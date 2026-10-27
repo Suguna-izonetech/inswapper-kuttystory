@@ -91,9 +91,13 @@ class Settings(BaseSettings):
     FAL_KEY: str = os.getenv("FAL_KEY", "")
     ACTIVE_STORY_PROVIDER: str = os.getenv("ACTIVE_STORY_PROVIDER", "gemini") # gemini, rule_based
     ACTIVE_IMAGE_PROVIDER: str = os.getenv("ACTIVE_IMAGE_PROVIDER", "fal_ai") # fal_ai, huggingface, template_fusion, mock_poc
-    HF_MODEL_NAME: str = os.getenv("HF_MODEL_NAME", "stabilityai/stable-diffusion-xl-base-1.0")
-    HF_FACE_SWAP_SPACE: str = os.getenv("HF_FACE_SWAP_SPACE", "ovi054/face-swap-pro")
-    HF_FACE_SWAP_ENHANCE: bool = os.getenv("HF_FACE_SWAP_ENHANCE", "true").lower() == "true"
+    HF_MODEL_NAME: str = os.getenv("HF_MODEL_NAME", "")
+    HF_FACE_SWAP_SPACE: str = os.getenv("HF_FACE_SWAP_SPACE", "")
+    HF_FACE_ENHANCE_SPACE: str = os.getenv("HF_FACE_ENHANCE_SPACE", "")
+    HF_INSTANT_ID_SPACE: str = os.getenv("HF_INSTANT_ID_SPACE", "")
+    HF_FACE_SWAP_ENHANCE: bool = os.getenv("HF_FACE_SWAP_ENHANCE", "false").lower() == "true"
+    HF_FACE_SWAP_TIMEOUT: float = float(os.getenv("HF_FACE_SWAP_TIMEOUT", "25.0"))
+    PREFER_LOCAL_FUSION: bool = os.getenv("PREFER_LOCAL_FUSION", "false").lower() in ("true", "1", "yes")
     
     # Budgets & Limits
     PER_BOOK_BUDGET_USD: float = 2.50
@@ -139,7 +143,7 @@ class Settings(BaseSettings):
                 "https://apikuttystory.risingsuntech.in",
                 "https://apikuttystory2.risingsuntech.in",
                 "https://kuttystory.risingsuntech.in",
-                "https://kuttystory2.risingsuntech.in",
+                "https://kuttystorytwo.risingsuntech.in",
                 "https://kuttystory.co.in",
             ]
 

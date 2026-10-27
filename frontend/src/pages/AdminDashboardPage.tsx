@@ -397,17 +397,42 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
     loadAllData();
   }, [navigate]);
 
-  // Polling for active background HD rendering jobs
-  useEffect(() => {
-    const hasRendering = jobs.some(j => j.status?.toLowerCase().includes("rendering") || j.status === "in_progress") || Boolean(generatingFullJob);
-    if (!hasRendering) return;
+  // Refs to track active generation state without dependency churn
+  const generatingFullJobRef = useRef<PersonalizationJob | null>(generatingFullJob);
+  generatingFullJobRef.current = generatingFullJob;
 
-    const interval = setInterval(async () => {
+  const selectedJobForPhotosRef = useRef<PersonalizationJob | null>(selectedJobForPhotos);
+  selectedJobForPhotosRef.current = selectedJobForPhotos;
+
+  // Polling for active background HD rendering jobs - sequential without request flooding
+  useEffect(() => {
+    // Only poll if user is actively generating a full job OR has a recently active rendering job (<10 mins old)
+    const hasActiveRendering = Boolean(generatingFullJob) || jobs.some(j => {
+      const isRendering = j.status?.toLowerCase().includes("rendering") || j.status === "in_progress";
+      if (!isRendering) return false;
+      const jobTime = j.updated_at ? new Date(j.updated_at).getTime() : (j.created_at ? new Date(j.created_at).getTime() : 0);
+      return Date.now() - jobTime < 10 * 60 * 1000;
+    });
+
+    if (!hasActiveRendering) return;
+
+    let isMounted = true;
+    let isFetching = false;
+    let timerId: any = null;
+
+    const poll = async () => {
+      if (!isMounted || isFetching) return;
+      isFetching = true;
+
       try {
         const updatedJobs = await api.getJobs();
+        if (!isMounted) return;
+
         setJobs(updatedJobs);
-        if (generatingFullJob) {
-          const match = updatedJobs.find(j => j.id === generatingFullJob.id);
+
+        const activeGen = generatingFullJobRef.current;
+        if (activeGen) {
+          const match = updatedJobs.find(j => j.id === activeGen.id);
           if (match) {
             setGeneratingFullJob(match);
             if (match.completed_pages >= match.total_pages && (match.status === "completed" || !match.status.includes("Rendering"))) {
@@ -415,24 +440,48 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
               const url = api.resolveUrl(rawUrl);
               window.open(url, "_blank");
               setTimeout(() => {
-                setGeneratingFullJob(null);
+                if (isMounted) setGeneratingFullJob(null);
               }, 2500);
             }
           }
         }
-        if (selectedJobForPhotos) {
-          const matchModal = updatedJobs.find(j => j.id === selectedJobForPhotos.id);
+
+        const activeModal = selectedJobForPhotosRef.current;
+        if (activeModal) {
+          const matchModal = updatedJobs.find(j => j.id === activeModal.id);
           if (matchModal) {
             setSelectedJobForPhotos(matchModal);
           }
         }
+
+        // Check if any job is still actively rendering
+        const stillRendering = Boolean(generatingFullJobRef.current) || updatedJobs.some(j => {
+          const isRendering = j.status?.toLowerCase().includes("rendering") || j.status === "in_progress";
+          if (!isRendering) return false;
+          const jobTime = j.updated_at ? new Date(j.updated_at).getTime() : (j.created_at ? new Date(j.created_at).getTime() : 0);
+          return Date.now() - jobTime < 10 * 60 * 1000;
+        });
+
+        if (isMounted && stillRendering) {
+          timerId = setTimeout(poll, 4000);
+        }
       } catch (err) {
         console.error("Polling error:", err);
+        if (isMounted) {
+          timerId = setTimeout(poll, 6000);
+        }
+      } finally {
+        isFetching = false;
       }
-    }, 3500);
+    };
 
-    return () => clearInterval(interval);
-  }, [jobs, generatingFullJob, selectedJobForPhotos]);
+    timerId = setTimeout(poll, 4000);
+
+    return () => {
+      isMounted = false;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [Boolean(generatingFullJob)]);
 
   const fetchPaymentTransactions = async () => {
     setLoadingPayments(true);
@@ -2044,6 +2093,11 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                                     {job.status.includes("%") ? job.status.split("·")[1]?.trim() || "In progress" : (job.completed_pages && job.total_pages ? `${Math.round((job.completed_pages / job.total_pages) * 100)}%` : "In progress")}
                                   </span>
                                   <span className="w-1.5 h-1.5 rounded-full bg-[#8B3DFF] animate-pulse" />
+                                </div>
+                              ) : job.status === "interrupted" ? (
+                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200" title="Generation was paused due to server reload. Click Print PDF to resume and complete all pages.">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                  <span>Incomplete ({job.completed_pages || 0}/{job.total_pages || 26})</span>
                                 </div>
                               ) : (
                                 <span className="text-xs font-medium text-gray-700">

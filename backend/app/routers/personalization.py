@@ -94,14 +94,17 @@ def enrich_job_urls(job: PersonalizationJob) -> dict:
     }
     # Deduplicate assets by page_number, strictly prioritizing Hugging Face Neural AI over Poisson fallback
     best_assets_by_page = {}
+    swap_spaces = [s.strip().lower() for s in getattr(settings, "HF_FACE_SWAP_SPACE", "").split(",") if s.strip()]
     for asset in job.assets:
         p_num = asset.page_number
         if p_num not in best_assets_by_page:
             best_assets_by_page[p_num] = asset
         else:
             existing = best_assets_by_page[p_num]
-            is_new_ai = "hugging" in (asset.provider or "").lower() or "ovi054" in (asset.model or "").lower() or "tonyassi" in (asset.model or "").lower()
-            is_old_ai = "hugging" in (existing.provider or "").lower() or "ovi054" in (existing.model or "").lower() or "tonyassi" in (existing.model or "").lower()
+            new_m, new_p = (asset.model or "").lower(), (asset.provider or "").lower()
+            old_m, old_p = (existing.model or "").lower(), (existing.provider or "").lower()
+            is_new_ai = any(s in new_m for s in swap_spaces if s) or ("hugging" in new_p) or ("swap" in new_m) or ("neural" in new_p)
+            is_old_ai = any(s in old_m for s in swap_spaces if s) or ("hugging" in old_p) or ("swap" in old_m) or ("neural" in old_p)
             if is_new_ai and not is_old_ai:
                 best_assets_by_page[p_num] = asset
             elif is_new_ai == is_old_ai and (asset.created_at or datetime.datetime.min) > (existing.created_at or datetime.datetime.min):
@@ -301,12 +304,16 @@ def get_full_storybook_pages_for_print(
 
     # Pre-load existing generated assets (face-fused plates), strictly prioritizing Hugging Face AI over Poisson
     existing_assets = {}
+    swap_spaces = [s.strip().lower() for s in getattr(settings, "HF_FACE_SWAP_SPACE", "").split(",") if s.strip()]
+    def _asset_priority(a):
+        m = (a.model or "").lower()
+        p = (a.provider or "").lower()
+        tier = 2 if any(s in m for s in swap_spaces if s) else (1 if ("hugging" in p or "swap" in m or "neural" in p) else 0)
+        return (tier, a.created_at or datetime.datetime.min)
+
     sorted_assets = sorted(
         db.query(GeneratedAsset).filter(GeneratedAsset.job_id == job.id, GeneratedAsset.generation_status == "completed").all(),
-        key=lambda a: (
-            1 if ("hugging" in (a.provider or "").lower() or "ovi054" in (a.model or "").lower() or "tonyassi" in (a.model or "").lower()) else 0,
-            a.created_at or datetime.datetime.min
-        )
+        key=_asset_priority
     )
     for a in sorted_assets:
         if a.storage_path:

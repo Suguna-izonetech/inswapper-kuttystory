@@ -141,38 +141,53 @@ export default function PersonalizePage() {
     };
   }, []);
 
-  // Polling job progress when job is active
+  // Polling job progress when job is active (sequential in-flight guard, no request stacking)
   useEffect(() => {
     if (!jobId) return;
 
-    // Immediately fetch current job state
-    api.getPersonalizationJob(jobId)
-      .then((data) => {
-        setJob(data);
-        if (data.story_slug && data.story_slug !== slug) {
-          api.getStory(data.story_slug).then(s => setStory(s)).catch(() => { });
-        }
-      })
-      .catch((err) => console.error("Initial job load error:", err));
+    let isMounted = true;
+    let isFetching = false;
+    let timerId: ReturnType<typeof setTimeout> | null = null;
 
-    const interval = setInterval(async () => {
+    const pollJob = async () => {
+      if (!isMounted || isFetching) return;
+      isFetching = true;
+
       try {
         const updated = await api.getPersonalizationJob(jobId);
+        if (!isMounted) return;
         setJob(updated);
+
         if (updated.story_slug && updated.story_slug !== slug && (!story || story.slug !== updated.story_slug)) {
-          api.getStory(updated.story_slug).then(s => setStory(s)).catch(() => { });
+          api.getStory(updated.story_slug).then((s) => {
+            if (isMounted) setStory(s);
+          }).catch(() => { });
         }
+
         const statusLower = updated.status?.toLowerCase();
-        if (statusLower === "completed" || statusLower === "failed" || statusLower === "done") {
-          clearInterval(interval);
+        const isDone = statusLower === "completed" || statusLower === "failed" || statusLower === "done";
+        if (!isDone && isMounted) {
+          // Schedule next poll ONLY after current response arrives (2.5s interval)
+          timerId = setTimeout(pollJob, 2500);
         }
       } catch (err) {
         console.error("Polling error:", err);
+        if (isMounted) {
+          // Back off on network error
+          timerId = setTimeout(pollJob, 4000);
+        }
+      } finally {
+        isFetching = false;
       }
-    }, 2000);
+    };
 
-    return () => clearInterval(interval);
-  }, [jobId]);
+    pollJob();
+
+    return () => {
+      isMounted = false;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [jobId, slug]);
 
   // Ensure currentPageIdx stays within page bounds (max 3 for unpaid preview, all for paid)
   useEffect(() => {

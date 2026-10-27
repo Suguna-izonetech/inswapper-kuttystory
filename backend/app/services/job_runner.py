@@ -101,7 +101,8 @@ class JobRunner:
                             child_reference_path=norm_ref,
                             story_slug=story_slug,
                             page_image_path=page_img,
-                            face_outline_points=page.face_outline_points
+                            face_outline_points=page.face_outline_points,
+                            prefer_local=getattr(settings, "PREFER_LOCAL_FUSION", False)
                         )
 
                     # Save generated image to MinIO
@@ -277,8 +278,11 @@ class JobRunner:
                 raise ValueError("No story pages configured for this story template")
 
             existing_assets = {}
+            swap_spaces = [s.strip().lower() for s in getattr(settings, "HF_FACE_SWAP_SPACE", "").split(",") if s.strip()]
             for a in db.query(GeneratedAsset).filter(GeneratedAsset.job_id == job.id, GeneratedAsset.generation_status == "completed").all():
-                is_ai = "hugging" in (a.provider or "").lower() or "ovi054" in (a.model or "").lower() or "tonyassi" in (a.model or "").lower()
+                m_lower = (a.model or "").lower()
+                p_lower = (a.provider or "").lower()
+                is_ai = any(s in m_lower for s in swap_spaces if s) or ("hugging" in p_lower) or ("swap" in m_lower) or ("neural" in p_lower)
                 if is_ai and a.storage_path:
                     res_p = storage.resolve_path(a.storage_path)
                     if res_p and os.path.exists(res_p):
@@ -324,7 +328,7 @@ class JobRunner:
                             story_slug=story_slug,
                             page_image_path=page_img,
                             face_outline_points=page.face_outline_points,
-                            prefer_local=False
+                            prefer_local=getattr(settings, "PREFER_LOCAL_FUSION", False)
                         )
                         asset_filename = f"job_{job.id}_p{page_num:02d}_{int(time.time())}.{gen_res.format}"
                         asset_path = storage.save_bytes(
