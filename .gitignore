@@ -56,17 +56,21 @@ ehthumbs.db
 *.swo
 
 # Backend Storage & Uploads
-backend/storage/cache_cmyk/
-backend/storage/child_photos/
-backend/storage/final_books/
-backend/storage/generated_assets/
-backend/storage/original_pdfs/
-backend/storage/previews/
-backend/storage/source_pages/
-backend/storage/temp_upload_*
-backend/storage/*.png
-backend/storage/*.jpg
-backend/storage/*.pdf
+
+backend/storage/
+
+# backend/storage/cache_cmyk/
+# backend/storage/child_photos/
+# backend/storage/feedback_media/
+# backend/storage/final_books/
+# backend/storage/generated_assets/
+# backend/storage/original_pdfs/
+# backend/storage/previews/
+# backend/storage/source_pages/
+# backend/storage/temp_upload_*
+# backend/storage/*.png
+# backend/storage/*.jpg
+# backend/storage/*.pdf
 
 # AI & ML Model Weights
 *.onnx
