@@ -283,12 +283,17 @@ class OrderBase(BaseModel):
     razorpay_order_id: Optional[str] = None
     razorpay_payment_id: Optional[str] = None
     shipping_address: Optional[str] = None
+    tracking_id: Optional[str] = None
+    shipping_carrier: Optional[str] = None
 
 class OrderCreate(OrderBase):
     pass
 
 class OrderStatusUpdate(BaseModel):
     status: str
+    tracking_id: Optional[str] = None
+    shipping_carrier: Optional[str] = None
+    customer_email: Optional[str] = None
 
 class OrderOut(OrderBase):
     id: str

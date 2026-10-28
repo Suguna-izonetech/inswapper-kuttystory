@@ -120,6 +120,10 @@ def create_payment_order(
     if not cust_name:
         cust_name = f"{job.child_name}'s Parent"
 
+    cust_email = payload.customer_email
+    if not cust_email and payload.shipping_address:
+        cust_email = payload.shipping_address.get("email") or payload.shipping_address.get("customer_email")
+
     transaction = PaymentTransaction(
         job_id=job.id,
         razorpay_order_id=razorpay_order_id,
@@ -127,7 +131,7 @@ def create_payment_order(
         currency=currency,
         status="created",
         customer_name=cust_name,
-        customer_email=payload.customer_email,
+        customer_email=cust_email,
         format_type=format_type
     )
     db.add(transaction)
@@ -235,8 +239,12 @@ def verify_payment(
     if not cust_name:
         cust_name = f"{job.child_name}'s Family"
 
+    cust_email = payload.customer_email
+    if not cust_email and payload.shipping_address:
+        cust_email = payload.shipping_address.get("email") or payload.shipping_address.get("customer_email")
+
     txn.customer_name = cust_name
-    txn.customer_email = payload.customer_email
+    txn.customer_email = cust_email
 
     # 2. Mark PersonalizationJob as paid
     job.is_paid = True
@@ -255,7 +263,7 @@ def verify_payment(
         order_number=order_number,
         job_id=job.id,
         customer_name=cust_name,
-        customer_email=payload.customer_email,
+        customer_email=cust_email,
         format_type=format_type,
         amount=amount_in_rupees,
         currency="INR",

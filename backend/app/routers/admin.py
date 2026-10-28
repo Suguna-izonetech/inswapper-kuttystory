@@ -1,9 +1,10 @@
 import os
 import datetime
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
+from app.services.email_service import EmailService
 
 from app.database import get_db
 from app.models import StoryTemplate, StoryPage, PersonalizationJob, GeneratedAsset, Book, AISettings, Order
@@ -671,12 +672,25 @@ def get_order(order_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/orders/{order_id}/status", response_model=OrderOut)
-def update_order_status(order_id: str, payload: OrderStatusUpdate, db: Session = Depends(get_db)):
+def update_order_status(
+    order_id: str,
+    payload: OrderStatusUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    import json
     order = db.query(Order).filter((Order.id == order_id) | (Order.order_number == order_id)).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
     order.status = payload.status
+    if payload.tracking_id is not None:
+        order.tracking_id = payload.tracking_id.strip() if payload.tracking_id else None
+    if payload.shipping_carrier is not None:
+        order.shipping_carrier = payload.shipping_carrier.strip() if payload.shipping_carrier else None
+    if payload.customer_email is not None and payload.customer_email.strip():
+        order.customer_email = payload.customer_email.strip()
+
     if payload.status in ["Paid", "In Production", "Delivered", "Shipped"]:
         order.payment_status = "paid"
     elif payload.status == "Pending":
@@ -684,6 +698,53 @@ def update_order_status(order_id: str, payload: OrderStatusUpdate, db: Session =
 
     db.commit()
     db.refresh(order)
+
+    # Customer Email Resolution
+    target_email = (order.customer_email or "").strip()
+    parsed_address = None
+    if order.shipping_address:
+        try:
+            parsed_address = json.loads(order.shipping_address)
+            if not target_email and isinstance(parsed_address, dict):
+                target_email = (parsed_address.get("email") or parsed_address.get("customer_email") or "").strip()
+        except Exception:
+            pass
+
+    if target_email:
+        # Retrieve child name and story title if linked to job or book
+        child_name = None
+        story_title = None
+        if order.job_id:
+            job = db.query(PersonalizationJob).filter(PersonalizationJob.id == order.job_id).first()
+            if job:
+                child_name = job.child_name
+                if job.story_id:
+                    tmpl = db.query(StoryTemplate).filter(StoryTemplate.id == job.story_id).first()
+                    if tmpl:
+                        story_title = tmpl.title
+        elif order.book_id:
+            b = db.query(Book).filter(Book.id == order.book_id).first()
+            if b:
+                story_title = b.title
+                child_name = b.child_name
+
+        print(f"[Admin] Queueing status email to {target_email} for order {order.order_number} (Status: {order.status})")
+        background_tasks.add_task(
+            EmailService.send_order_status_email,
+            to_email=target_email,
+            customer_name=order.customer_name or "Valued Customer",
+            order_number=order.order_number or order.id,
+            status=order.status,
+            format_type=order.format_type or "print_hardcover",
+            tracking_id=order.tracking_id,
+            shipping_carrier=order.shipping_carrier,
+            story_title=story_title,
+            child_name=child_name,
+            shipping_address=parsed_address,
+        )
+    else:
+        print(f"[Admin Notice] Order {order.order_number} status updated to {order.status}, but no customer email is attached.")
+
     return order
 
 

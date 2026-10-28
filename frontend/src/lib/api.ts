@@ -175,6 +175,8 @@ export interface Order {
   razorpay_order_id?: string;
   razorpay_payment_id?: string;
   shipping_address?: string;
+  tracking_id?: string;
+  shipping_carrier?: string;
   created_at: string;
 }
 
@@ -313,11 +315,20 @@ export const api = {
     return res.json();
   },
 
-  async updateOrderStatus(orderId: string, status: string): Promise<Order> {
+  async updateOrderStatus(
+    orderId: string,
+    status: string,
+    trackingInfo?: { tracking_id?: string; shipping_carrier?: string; customer_email?: string }
+  ): Promise<Order> {
     const res = await fetch(`${API_BASE}/admin/orders/${orderId}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({
+        status,
+        tracking_id: trackingInfo?.tracking_id,
+        shipping_carrier: trackingInfo?.shipping_carrier,
+        customer_email: trackingInfo?.customer_email,
+      }),
     });
     if (!res.ok) throw new Error("Failed to update order status");
     return res.json();

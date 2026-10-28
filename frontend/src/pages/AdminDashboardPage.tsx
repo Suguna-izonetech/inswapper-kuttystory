@@ -41,7 +41,10 @@ import {
   Video,
   Pencil,
   CreditCard,
-  Star
+  Star,
+  Truck,
+  Mail,
+  Edit3
 } from "lucide-react";
 import {
   api,
@@ -100,6 +103,23 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
   const [newStatus, setNewStatus] = useState("Paid");
   const [newFormat, setNewFormat] = useState("print_hardcover");
   const [creatingOrder, setCreatingOrder] = useState(false);
+
+  // Shipping Tracking & Email Modal state
+  const [shippingModal, setShippingModal] = useState<{
+    order: Order;
+    carrier: string;
+    trackingId: string;
+    customerEmail: string;
+  } | null>(null);
+  const [shippingSubmitting, setShippingSubmitting] = useState(false);
+  const [statusToast, setStatusToast] = useState<{ message: string; type: "success" | "info" } | null>(null);
+
+  const showToast = (message: string, type: "success" | "info" = "success") => {
+    setStatusToast({ message, type });
+    setTimeout(() => {
+      setStatusToast(null);
+    }, 4500);
+  };
 
   // Payments & Transactions Data
   const [paymentTransactions, setPaymentTransactions] = useState<PaymentTransaction[]>([]);
@@ -986,13 +1006,81 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
     }
   };
 
-  const handleUpdateStatus = async (orderId: string, status: string) => {
+  const handleStatusSelect = (order: Order, targetStatus: string) => {
+    if (targetStatus === "Shipped") {
+      let email = order.customer_email || "";
+      if (!email && order.shipping_address) {
+        try {
+          const parsed = JSON.parse(order.shipping_address);
+          email = parsed.email || parsed.customer_email || "";
+        } catch (e) {}
+      }
+
+      setShippingModal({
+        order,
+        carrier: order.shipping_carrier || "Delhivery",
+        trackingId: order.tracking_id || "",
+        customerEmail: email,
+      });
+    } else {
+      handleUpdateStatus(order.id, targetStatus);
+    }
+  };
+
+  const handleConfirmShipping = async () => {
+    if (!shippingModal) return;
+    if (!shippingModal.trackingId.trim()) {
+      alert("Please enter a Tracking ID / AWB Number.");
+      return;
+    }
+    setShippingSubmitting(true);
     try {
-      await api.updateOrderStatus(orderId, status);
+      await api.updateOrderStatus(
+        shippingModal.order.id,
+        "Shipped",
+        {
+          tracking_id: shippingModal.trackingId.trim(),
+          shipping_carrier: shippingModal.carrier,
+          customer_email: shippingModal.customerEmail.trim() || undefined,
+        }
+      );
+      await handleRefresh();
+      if (selectedOrder && selectedOrder.id === shippingModal.order.id) {
+        setSelectedOrder({
+          ...selectedOrder,
+          status: "Shipped",
+          tracking_id: shippingModal.trackingId.trim(),
+          shipping_carrier: shippingModal.carrier,
+          customer_email: shippingModal.customerEmail.trim() || selectedOrder.customer_email,
+        });
+      }
+      showToast(
+        `Order #${shippingModal.order.order_number || shippingModal.order.id} marked as Shipped! Notification email dispatched${shippingModal.customerEmail ? ` to ${shippingModal.customerEmail}` : ""}.`
+      );
+      setShippingModal(null);
+    } catch (err: any) {
+      alert("Failed to update shipping status: " + err.message);
+    } finally {
+      setShippingSubmitting(false);
+    }
+  };
+
+  const handleUpdateStatus = async (
+    orderId: string,
+    status: string,
+    extra?: { tracking_id?: string; shipping_carrier?: string; customer_email?: string }
+  ) => {
+    try {
+      await api.updateOrderStatus(orderId, status, extra);
       await handleRefresh();
       if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder({ ...selectedOrder, status });
+        setSelectedOrder({ ...selectedOrder, status, ...extra });
       }
+      const targetOrder = orders.find(o => o.id === orderId);
+      const recipient = extra?.customer_email || targetOrder?.customer_email;
+      showToast(
+        `Order status updated to "${status}". Notification email sent${recipient ? ` to ${recipient}` : ""}.`
+      );
     } catch (err: any) {
       alert("Failed to update status: " + err.message);
     }
@@ -1673,7 +1761,7 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                           <td className="py-4 px-6">
                             <select
                               value={order.status}
-                              onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
+                              onChange={(e) => handleStatusSelect(order, e.target.value)}
                               className={`px-3 py-1 rounded-full text-xs font-semibold cursor-pointer border-0 outline-none ${getStatusBadgeClass(
                                 order.status
                               )}`}
@@ -1684,6 +1772,12 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                               <option value="Shipped">Shipped</option>
                               <option value="Pending">Pending</option>
                             </select>
+                            {order.status === "Shipped" && (
+                              <div className="mt-1 text-[10px] text-purple-700 font-medium flex items-center gap-1 max-w-[150px]">
+                                <Truck className="w-2.5 h-2.5 shrink-0 text-[#8B3DFF]" />
+                                <span className="truncate">{order.shipping_carrier || "Shipped"}: {order.tracking_id || "Pending ID"}</span>
+                              </div>
+                            )}
                           </td>
                           <td className="py-4 px-6 text-right">
                             <button
@@ -4058,10 +4152,10 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                   {["In Production", "Paid", "Delivered", "Shipped", "Pending"].map((st) => (
                     <button
                       key={st}
-                      onClick={() => handleUpdateStatus(selectedOrder.id, st)}
+                      onClick={() => handleStatusSelect(selectedOrder, st)}
                       className={`py-2 px-3 rounded-xl font-semibold transition text-xs ${selectedOrder.status === st
                           ? "bg-[#8B3DFF] text-white shadow-xs"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200 cursor-pointer"
                         }`}
                     >
                       {st}
@@ -4069,6 +4163,35 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
                   ))}
                 </div>
               </div>
+
+              {/* Shipped & Tracking Details Card */}
+              {(selectedOrder.status === "Shipped" || selectedOrder.tracking_id) && (
+                <div className="p-4 rounded-2xl bg-purple-50/80 border border-purple-200 text-gray-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-purple-900 flex items-center gap-1.5">
+                      <Truck className="w-4 h-4 text-[#8B3DFF]" />
+                      <span>Shipment & Tracking Details</span>
+                    </span>
+                    <button
+                      onClick={() => handleStatusSelect(selectedOrder, "Shipped")}
+                      className="text-[11px] font-semibold text-[#8B3DFF] hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      <span>Edit Tracking</span>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                    <div>
+                      <span className="text-gray-500 block text-[11px]">Shipping Carrier</span>
+                      <strong className="text-gray-900 font-semibold">{selectedOrder.shipping_carrier || "Delhivery"}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block text-[11px]">Tracking / AWB No.</span>
+                      <span className="font-mono text-[#8B3DFF] font-bold text-xs">{selectedOrder.tracking_id || "N/A"}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="p-3.5 rounded-2xl bg-gray-50 text-gray-600">
                 <span className="font-semibold text-gray-900 block mb-1">Format Specification</span>
@@ -4177,6 +4300,139 @@ export default function AdminDashboardPage({ initialTab }: { initialTab?: TabTyp
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal: Mark Order as Shipped (Tracking ID & Carrier Dropdown) */}
+      {shippingModal && (
+        <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-gray-100 space-y-5 animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-100 text-[#8B3DFF] flex items-center justify-center shrink-0">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-base">Ship Order & Add Tracking</h3>
+                  <p className="text-xs text-gray-500 font-mono">
+                    {shippingModal.order.order_number || shippingModal.order.id} • {shippingModal.order.customer_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShippingModal(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Customer Email for Notification */}
+            <div className="p-3.5 rounded-2xl bg-purple-50/70 border border-purple-100 space-y-1.5">
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-purple-900">
+                <Mail className="w-3.5 h-3.5 text-[#8B3DFF]" />
+                <span>Customer Email (Status will be sent here) *</span>
+              </label>
+              <input
+                type="email"
+                placeholder="customer@example.com"
+                value={shippingModal.customerEmail}
+                onChange={(e) => setShippingModal({ ...shippingModal, customerEmail: e.target.value })}
+                className="w-full p-2.5 rounded-xl border border-purple-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#8B3DFF]"
+              />
+              <p className="text-[11px] text-purple-700/80">
+                An official Kutty Story dispatch notification email with tracking information will be delivered to this address.
+              </p>
+            </div>
+
+            {/* The 2 Fields: Shipping Carrier Dropdown & Tracking ID */}
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="font-semibold text-gray-700 block mb-1">
+                  Shipping Carrier *
+                </label>
+                <select
+                  value={shippingModal.carrier}
+                  onChange={(e) => setShippingModal({ ...shippingModal, carrier: e.target.value })}
+                  className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 font-medium focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#8B3DFF] cursor-pointer"
+                >
+                  <option value="Delhivery">Delhivery</option>
+                  <option value="Blue Dart">Blue Dart</option>
+                  <option value="DTDC">DTDC Express</option>
+                  <option value="India Post (Speed Post)">India Post (Speed Post)</option>
+                  <option value="Shadowfax">Shadowfax</option>
+                  <option value="Xpressbees">Xpressbees</option>
+                  <option value="Ekart Logistics">Ekart Logistics</option>
+                  <option value="Professional Couriers">The Professional Couriers</option>
+                  <option value="DHL Express">DHL Express</option>
+                  <option value="FedEx">FedEx</option>
+                  <option value="Other Courier">Other Courier</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-gray-700 block mb-1">
+                  Tracking ID / AWB Number *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. DEL789421098 or 1489201"
+                  value={shippingModal.trackingId}
+                  onChange={(e) => setShippingModal({ ...shippingModal, trackingId: e.target.value })}
+                  className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#8B3DFF] font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShippingModal(null)}
+                className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-50 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmShipping}
+                disabled={shippingSubmitting}
+                className="px-6 py-2.5 rounded-xl bg-[#8B3DFF] hover:bg-[#7828f7] text-white text-xs font-semibold shadow-md shadow-[#8B3DFF]/25 hover:shadow-lg transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {shippingSubmitting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Updating & Sending Email...</span>
+                  </>
+                ) : (
+                  <>
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>Save & Notify Customer</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Status Update Notification Toast */}
+      {statusToast && (
+        <div className="fixed bottom-6 right-6 z-[70] bg-gray-900/95 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-gray-700/60 backdrop-blur-md flex items-center gap-3 animate-in slide-in-from-bottom-5 duration-200 max-w-md">
+          <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <CheckCircle className="w-4 h-4" />
+          </div>
+          <div className="text-xs font-medium leading-relaxed">
+            {statusToast.message}
+          </div>
+          <button
+            onClick={() => setStatusToast(null)}
+            className="text-gray-400 hover:text-white transition ml-2 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 

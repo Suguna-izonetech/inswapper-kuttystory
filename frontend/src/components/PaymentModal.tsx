@@ -15,7 +15,8 @@ import {
   Lock,
   CheckCircle2,
   AlertCircle,
-  PartyPopper
+  PartyPopper,
+  Mail
 } from "lucide-react";
 import { api, StoryTemplate, PersonalizationJob } from "@/lib/api";
 import PdfDownloadModal from "./PdfDownloadModal";
@@ -83,6 +84,7 @@ export default function PaymentModal({
 
   // Shipping form fields
   const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [landmark, setLandmark] = useState("");
@@ -112,9 +114,20 @@ export default function PaymentModal({
   const printPrice = story?.price_print || 1399;
   const childName = job.child_name || "Your Child";
 
+  const isValidEmail = (emailStr: string) => {
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+    return emailRegex.test(emailStr.trim());
+  };
+
   // Validate shipping details for physical book
   const validateShipping = () => {
     if (!fullName.trim()) return "Please enter your full name.";
+    if (!email.trim()) {
+      return "Please enter your email address for order confirmation & tracking updates.";
+    }
+    if (!isValidEmail(email)) {
+      return "Please enter a valid email address (e.g. name@example.com).";
+    }
     if (!phoneNumber.trim() || phoneNumber.replace(/\D/g, "").length < 10) {
       return "Please enter a valid 10-digit mobile number.";
     }
@@ -136,6 +149,13 @@ export default function PaymentModal({
       return;
     }
 
+    if (selectedFormat === "digital") {
+      if (email.trim() && !isValidEmail(email)) {
+        setErrorMessage("Please enter a valid email address (e.g. name@example.com).");
+        return;
+      }
+    }
+
     let shippingData = null;
     if (selectedFormat === "print_hardcover") {
       const valError = validateShipping();
@@ -146,6 +166,8 @@ export default function PaymentModal({
       const stObj = INDIAN_STATES.find((s) => s.id === stateId);
       shippingData = {
         full_name: fullName.trim(),
+        email: email.trim(),
+        customer_email: email.trim(),
         phone: phoneNumber.trim(),
         street_address: streetAddress.trim(),
         landmark: landmark.trim(),
@@ -165,6 +187,7 @@ export default function PaymentModal({
         format_type: selectedFormat,
         shipping_address: shippingData,
         customer_name: fullName || `${childName}'s Family`,
+        customer_email: email.trim() || undefined,
         customer_phone: phoneNumber,
       });
 
@@ -191,6 +214,7 @@ export default function PaymentModal({
                 razorpay_signature: response.razorpay_signature || `simulated_sig_${Date.now()}`,
                 shipping_address: shippingData,
                 customer_name: fullName || `${childName}'s Family`,
+                customer_email: email.trim() || undefined,
                 customer_phone: phoneNumber,
               });
 
@@ -213,6 +237,7 @@ export default function PaymentModal({
           },
           prefill: {
             name: fullName || `${childName}'s Family`,
+            email: email.trim() || undefined,
             contact: phoneNumber || "9876543210",
           },
           theme: {
@@ -248,6 +273,7 @@ export default function PaymentModal({
         razorpay_signature: `simulated_sig_${Date.now()}`,
         shipping_address: shippingData,
         customer_name: fullName || `${childName}'s Family`,
+        customer_email: email.trim() || undefined,
         customer_phone: phoneNumber,
       });
 
@@ -511,6 +537,35 @@ export default function PaymentModal({
                       onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
                       className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#8B3DFF]"
                     />
+                  </div>
+                </div>
+
+                {/* Email Address Field (Image 3) */}
+                <div>
+                  <label className="font-semibold text-gray-700 block mb-1 flex items-center justify-between">
+                    <span>Email Address (For Order Status & Tracking Updates) *</span>
+                    {email.trim() && !isValidEmail(email) && (
+                      <span className="text-red-500 text-[10px] font-normal">Invalid email address (e.g. name@example.com)</span>
+                    )}
+                    {email.trim() && isValidEmail(email) && (
+                      <span className="text-emerald-600 text-[10px] font-semibold flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Valid email
+                      </span>
+                    )}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      placeholder="e.g. narmadha@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={`w-full p-3 pl-10 rounded-xl border bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 ${
+                        email.trim() && !isValidEmail(email)
+                          ? "border-red-300 focus:ring-red-400"
+                          : "border-gray-200 focus:ring-[#8B3DFF]"
+                      }`}
+                    />
+                    <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5 pointer-events-none" />
                   </div>
                 </div>
 

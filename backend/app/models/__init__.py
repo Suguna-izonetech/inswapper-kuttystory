@@ -195,6 +195,8 @@ class Order(Base):
     razorpay_order_id = Column(String(100), nullable=True)
     razorpay_payment_id = Column(String(100), nullable=True)
     shipping_address = Column(Text, nullable=True)
+    tracking_id = Column(String(100), nullable=True)
+    shipping_carrier = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="orders")
