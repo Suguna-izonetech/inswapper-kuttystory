@@ -78,10 +78,11 @@ Both backend and frontend can be started with simple commands:
 cd backend
 pip install -r requirements.txt
 alembic upgrade head
-python seed_admin.py     # Seeds default admin accounts
-python seed_stories.py   # Ingests & configures story catalog
-# Or seed everything at once:
-# python seed.py
+python seed.py           # Seeds admin accounts and story catalog
+# Options:
+# python seed.py --admin    (Admin accounts only)
+# python seed.py --stories  (Story catalog only)
+# python seed.py --list     (List existing admins)
 uvicorn app.main:app --reload
 ```
 - API Health Check: `http://127.0.0.1:8000/api/health`
@@ -96,11 +97,11 @@ uvicorn app.main:app --reload
 
 *To seed a custom admin:*
 ```powershell
-python seed_admin.py --email custom@admin.com --password YourPassword123 --name "Custom Admin"
+python seed.py --email custom@admin.com --password YourPassword123 --name "Custom Admin"
 ```
 *To list all existing admin users in database:*
 ```powershell
-python seed_admin.py --list
+python seed.py --list
 ```
 
 #### 🪣 MinIO Object Storage Setup

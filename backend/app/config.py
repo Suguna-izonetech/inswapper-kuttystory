@@ -115,37 +115,28 @@ class Settings(BaseSettings):
     PRINT_BLEED_MM: float = 3.0
     PRINT_SAFE_MARGIN_MM: float = 10.0
     
-    # CORS Allowed Origins - Strictly retrieved from .env
-    CORS_ORIGINS: Union[str, List[str]] = os.getenv("CORS_ORIGINS", "")
-    CORS_ORIGIN_REGEX: str = os.getenv(
-        "CORS_ORIGIN_REGEX", 
-        r"^https?://([a-zA-Z0-9-]+\.)*(risingsuntech\.in|localhost|127\.0\.0\.1)(:\d+)?$"
-    )
+    # CORS Allowed Origins - Strictly retrieved only from .env
+    CORS_ORIGINS: Union[List[str], str] = []
+    CORS_ORIGIN_REGEX: Optional[str] = os.getenv("CORS_ORIGIN_REGEX", None)
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):
-        try:
-            from app.cors import cors_manager
-            cors_manager.reload()
-            return cors_manager.get_allowed_origins_list()
-        except Exception as e:
-            print(f"[CORS] Notice during cors_manager resolution in settings: {e}")
-            return [
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-                "http://localhost:5174",
-                "http://127.0.0.1:5174",
-                "http://localhost:3000",
-                "http://127.0.0.1:3000",
-                "http://localhost:8000",
-                "http://127.0.0.1:8000",
-                "https://apikuttystory.risingsuntech.in",
-                "https://apikuttystory2.risingsuntech.in",
-                "https://kuttystory.risingsuntech.in",
-                "https://kuttystorytwo.risingsuntech.in",
-                "https://kuttystory.co.in",
-            ]
+        raw = v if v is not None and v != "" else os.getenv("CORS_ORIGINS", "")
+        if isinstance(raw, str):
+            raw_str = raw.strip()
+            if raw_str.startswith("[") and raw_str.endswith("]"):
+                try:
+                    import json
+                    parsed = json.loads(raw_str)
+                    if isinstance(parsed, list):
+                        return [str(item).strip().strip("\"'") for item in parsed if str(item).strip()]
+                except Exception:
+                    pass
+            return [item.strip().strip("\"'") for item in raw_str.split(",") if item.strip()]
+        elif isinstance(raw, (list, tuple, set)):
+            return [str(item).strip().strip("\"'") for item in raw if str(item).strip()]
+        return []
 
     model_config = SettingsConfigDict(
         env_file=ACTIVE_ENV_FILE if ACTIVE_ENV_FILE else ".env",
@@ -156,17 +147,6 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Ensure directories exist safely
-for folder in [
-    settings.STORAGE_DIR,
-    settings.ORIGINAL_PDFS_DIR,
-    settings.SOURCE_PAGES_DIR,
-    settings.CHILD_PHOTOS_DIR,
-    settings.GENERATED_ASSETS_DIR,
-    settings.PREVIEWS_DIR,
-    settings.FINAL_BOOKS_DIR,
-]:
-    try:
-        folder.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
-        print(f"[Config] Notice: Could not create folder {folder} ({e}).")
+# All files are stored exclusively in MinIO object storage.
+# Local filesystem directories are not required.
+

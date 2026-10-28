@@ -183,9 +183,7 @@ class CartoonCharacterFusionEngine:
                 client = cls._get_hf_client(enhance_space)
                 if client:
                     from gradio_client import handle_file
-                    temp_dir = Path(tempfile.gettempdir()) / "kuttystory_cache" / "face_enhance"
-                    temp_dir.mkdir(parents=True, exist_ok=True)
-                    temp_path = temp_dir / f"enf_in_{os.getpid()}_{int(time.time()*1000)}.png"
+                    temp_path = Path(tempfile.gettempdir()) / f"enf_in_{os.getpid()}_{int(time.time()*1000)}.png"
                     image_pil.save(str(temp_path), format="PNG")
                     try:
                         # Inspect available endpoints dynamically
@@ -536,9 +534,7 @@ class CartoonCharacterFusionEngine:
             if not effective_prefer_local and candidate_spaces:
                 use_enhancer = getattr(settings, "HF_FACE_SWAP_ENHANCE", False)
 
-                temp_dir = Path(tempfile.gettempdir()) / "kuttystory_cache" / "hf_upload"
-                temp_dir.mkdir(parents=True, exist_ok=True)
-                temp_dest = temp_dir / f"temp_{story_slug}_p{page_number:02d}_{os.getpid()}_{int(time.time() * 1000)}.jpg"
+                temp_dest = Path(tempfile.gettempdir()) / f"temp_{story_slug}_p{page_number:02d}_{os.getpid()}_{int(time.time() * 1000)}.jpg"
                 base_page.save(str(temp_dest), format="JPEG", quality=95)
 
                 for space_candidate in candidate_spaces:

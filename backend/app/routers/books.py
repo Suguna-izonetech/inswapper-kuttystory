@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from pathlib import Path
 
@@ -32,28 +32,35 @@ def get_book(book_id: str, db: Session = Depends(get_db)):
 @router.get("/{book_id}/download")
 def download_book_pdf(book_id: str, db: Session = Depends(get_db)):
     book = db.query(Book).filter(Book.id == book_id).first()
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
+    if not book or not book.pdf_storage_path:
+        raise HTTPException(status_code=404, detail="Book or PDF not found")
     
-    category = "previews" if getattr(book, "book_type", "preview") == "preview" else "final_books"
-    filename = Path(book.pdf_storage_path).name
-
-    try:
-        pdf_path = storage.get_file_path(category, filename)
-    except Exception:
-        resolved = storage.resolve_path(book.pdf_storage_path)
-        pdf_path = Path(resolved) if resolved else None
-
-    if not pdf_path or not pdf_path.exists():
-        raise HTTPException(status_code=404, detail="PDF file missing from storage")
+    category, filename = storage._parse_category_and_filename(book.pdf_storage_path)
+    if not category or not filename:
+        category = "previews" if getattr(book, "book_type", "preview") == "preview" else "final_books"
+        filename = Path(book.pdf_storage_path).name
 
     job = db.query(PersonalizationJob).filter(PersonalizationJob.id == book.job_id).first()
     child_name = job.child_name.replace(" ", "_") if job else "Custom"
     download_filename = f"{child_name}_and_the_Magical_Unicorn_{book.book_type}.pdf"
 
-    return FileResponse(
-        path=pdf_path,
-        filename=download_filename,
-        media_type="application/pdf"
+    stream, media_type, content_length = storage.get_object_stream(category, filename)
+
+    def iterfile():
+        try:
+            for chunk in stream.stream(32768):
+                yield chunk
+        finally:
+            stream.close()
+            stream.release_conn()
+
+    return StreamingResponse(
+        iterfile(),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{download_filename}"',
+            "Content-Length": str(content_length)
+        }
     )
+
 

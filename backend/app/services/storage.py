@@ -1,20 +1,16 @@
 """
-MinIO Object Storage & Local Filesystem Storage Service for Kutty Story Application.
+MinIO Object Storage Service for Kutty Story Application.
 
-Features:
-- Primary support for MinIO object storage when available.
-- Seamless automatic fallback to local disk storage (backend/storage/) when MinIO is offline.
-- Provides streaming file access, presigned/direct URLs, and local path resolution.
-- Dynamic socket check prevents connection hangs or crashes during local development.
+All uploaded PDFs, extracted story pages, images, and generated assets
+are stored exclusively in MinIO object storage. Local filesystem storage
+and /tmp/kuttystory_cache fallback logic have been completely removed.
 """
 
 import io
 import os
+import json
 import mimetypes
-import tempfile
 import uuid
-import shutil
-import socket
 from pathlib import Path
 from typing import Optional, Tuple, Any
 from fastapi import UploadFile, HTTPException
@@ -25,44 +21,10 @@ from minio.error import S3Error
 from app.config import settings
 
 
-class LocalFileStream:
-    """
-    File stream wrapper compatible with MinIO's HTTPResponse object.
-    Provides stream(), read(), close(), and release_conn() methods.
-    """
-    def __init__(self, file_path: Path):
-        self.file_path = file_path
-        self._f = open(file_path, "rb")
-
-    def stream(self, amt: int = 32768):
-        try:
-            while True:
-                chunk = self._f.read(amt)
-                if not chunk:
-                    break
-                yield chunk
-        finally:
-            self.close()
-
-    def read(self, amt: int = -1) -> bytes:
-        return self._f.read(amt)
-
-    def close(self):
-        try:
-            if not self._f.closed:
-                self._f.close()
-        except Exception:
-            pass
-
-    def release_conn(self):
-        self.close()
-
-
 class StorageManager:
     """
-    Object Storage Manager with dual support:
-    - MinIO S3-compatible Object Storage when MinIO service is active.
-    - Automatic local disk storage fallback (backend/storage/) when MinIO is offline.
+    MinIO Object Storage Manager.
+    All files are stored exclusively in the configured MinIO bucket.
     """
 
     CATEGORIES = {
@@ -79,62 +41,10 @@ class StorageManager:
     def __init__(self):
         self.bucket = settings.MINIO_BUCKET or "kuttystory"
         self._client: Optional[Minio] = None
-        self._temp_cache_dir = Path(tempfile.gettempdir()) / "kuttystory_cache"
-        self._temp_cache_dir.mkdir(parents=True, exist_ok=True)
         self._bucket_initialized = False
-        self._minio_available: Optional[bool] = None
-
-        # Safely ensure local storage directories exist without crashing on restricted permissions
-        for cat in self.CATEGORIES:
-            try:
-                (settings.STORAGE_DIR / cat).mkdir(parents=True, exist_ok=True)
-            except Exception as e:
-                print(f"[Storage] Notice: Could not create folder '{cat}' in storage dir ({e}). Will use fallback cache when needed.")
-
-    def _is_minio_reachable(self) -> bool:
-        """Fast check to determine if MinIO server is listening on the configured endpoint."""
-        if getattr(settings, "STORAGE_BACKEND", "minio") == "local":
-            return False
-        if self._minio_available is not None:
-            return self._minio_available
-
-        raw_endpoint = (settings.MINIO_ENDPOINT or "127.0.0.1:9000").strip()
-        host_port = raw_endpoint.replace("https://", "").replace("http://", "").split("/")[0]
-        if ":" in host_port:
-            host, port_str = host_port.split(":", 1)
-            try:
-                port = int(port_str)
-            except ValueError:
-                port = 9000
-        else:
-            host = host_port
-            port = 443 if settings.MINIO_SECURE else 80
-
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(0.5)
-        try:
-            sock.connect((host, port))
-            sock.close()
-            self._minio_available = True
-            print(f"[Storage] MinIO server connected at {host}:{port}.")
-            return True
-        except Exception as e:
-            self._minio_available = False
-            print(f"[Storage] MinIO not reachable at {host}:{port} ({e}). Serving assets from local disk ({settings.STORAGE_DIR}).")
-            return False
-
-    @property
-    def client(self) -> Optional[Minio]:
-        if not self._is_minio_reachable():
-            return None
-        if self._client is None:
-            self._init_minio_client()
-        return self._client
 
     def _init_minio_client(self):
-        """Initialize MinIO client and ensure bucket exists."""
-        if not self._is_minio_reachable():
-            return
+        """Initialize MinIO client from application settings."""
         raw_endpoint = (settings.MINIO_ENDPOINT or "127.0.0.1:9000").strip()
         secure = settings.MINIO_SECURE
 
@@ -156,41 +66,63 @@ class StorageManager:
                 secret_key=secret_key,
                 secure=secure,
             )
-            self._ensure_bucket()
         except Exception as e:
-            print(f"[MinIO] Notice during client initialization ({endpoint}): {e}")
+            print(f"[MinIO] Error initializing client for endpoint '{endpoint}': {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to connect to MinIO object storage: {str(e)}"
+            )
+
+    @property
+    def client(self) -> Minio:
+        """Returns active MinIO client, initializing if necessary."""
+        if self._client is None:
+            self._init_minio_client()
+        return self._client
 
     def _ensure_bucket(self):
-        """Ensure the MinIO bucket exists; create it and configure public read policy if missing."""
-        if self._bucket_initialized or not self._is_minio_reachable() or self._client is None:
+        """Ensure the MinIO bucket exists and set public read policy for GET."""
+        if self._bucket_initialized:
             return
+
+        client = self.client
         try:
-            if not self._client.bucket_exists(self.bucket):
-                self._client.make_bucket(self.bucket)
+            if not client.bucket_exists(self.bucket):
+                client.make_bucket(self.bucket)
                 print(f"[MinIO] Bucket '{self.bucket}' created successfully.")
             else:
                 print(f"[MinIO] Bucket '{self.bucket}' verified.")
 
+            # Configure public read policy so browser can load assets directly
+            policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"AWS": ["*"]},
+                        "Action": ["s3:GetObject"],
+                        "Resource": [f"arn:aws:s3:::{self.bucket}/*"]
+                    }
+                ]
+            }
             try:
-                import json
-                policy = {
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Principal": {"AWS": ["*"]},
-                            "Action": ["s3:GetObject"],
-                            "Resource": [f"arn:aws:s3:::{self.bucket}/*"]
-                        }
-                    ]
-                }
-                self._client.set_bucket_policy(self.bucket, json.dumps(policy))
+                client.set_bucket_policy(self.bucket, json.dumps(policy))
             except Exception as pe:
                 print(f"[MinIO] Notice configuring bucket policy: {pe}")
 
             self._bucket_initialized = True
+        except S3Error as e:
+            print(f"[MinIO] S3 error ensuring bucket '{self.bucket}': {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"MinIO bucket error for '{self.bucket}': {str(e)}"
+            )
         except Exception as e:
-            print(f"[MinIO] Notice while checking bucket '{self.bucket}': {e}")
+            print(f"[MinIO] Error ensuring bucket '{self.bucket}': {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"MinIO storage error: {str(e)}"
+            )
 
     @staticmethod
     def _normalize_object_key(category: str, filename: str) -> str:
@@ -203,6 +135,7 @@ class StorageManager:
 
     @staticmethod
     def _get_content_type(filename_or_ext: str) -> str:
+        """Detect accurate MIME content type for storage objects."""
         guess, _ = mimetypes.guess_type(filename_or_ext)
         if guess:
             return guess
@@ -220,7 +153,7 @@ class StorageManager:
         return mapping.get(suffix, "application/octet-stream")
 
     # --------------------------------------------------------------------------
-    # Core Storage Operations
+    # Core MinIO Storage Operations (Exclusively MinIO, No Local Storage Writes)
     # --------------------------------------------------------------------------
 
     async def save_upload_file(
@@ -230,9 +163,9 @@ class StorageManager:
         allowed_extensions: Tuple[str, ...] = (".png", ".jpg", ".jpeg", ".pdf", ".webp", ".mp4", ".webm", ".mov")
     ) -> str:
         """
-        Store an uploaded file into storage (local disk and MinIO if available).
-        Validates extension and image integrity before storing.
-        Returns normalized object key (e.g. 'child_photos/abc1234.jpg').
+        Store an uploaded file directly into MinIO object storage.
+        Validates extension and image integrity in-memory before storing.
+        Returns normalized MinIO object key (e.g. 'child_photos/abc1234.jpg').
         """
         ext = Path(upload_file.filename or "file.tmp").suffix.lower()
         if allowed_extensions and ext not in allowed_extensions:
@@ -243,6 +176,7 @@ class StorageManager:
 
         data = await upload_file.read()
 
+        # Validate image data integrity in memory
         if ext in (".png", ".jpg", ".jpeg", ".webp"):
             try:
                 with Image.open(io.BytesIO(data)) as img:
@@ -253,33 +187,31 @@ class StorageManager:
         file_id = f"{uuid.uuid4().hex}{ext}"
         object_key = self._normalize_object_key(category, file_id)
 
-        # 1. Save to local storage
-        local_dest = settings.STORAGE_DIR / object_key
         try:
-            local_dest.parent.mkdir(parents=True, exist_ok=True)
-            local_dest.write_bytes(data)
+            self._ensure_bucket()
+            content_type = self._get_content_type(ext)
+            self.client.put_object(
+                bucket_name=self.bucket,
+                object_name=object_key,
+                data=io.BytesIO(data),
+                length=len(data),
+                content_type=content_type,
+            )
+            return object_key
+        except HTTPException:
+            raise
+        except S3Error as e:
+            print(f"[MinIO] S3 error putting object '{object_key}': {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"MinIO storage error uploading '{object_key}': {str(e)}"
+            )
         except Exception as e:
-            fallback = self._temp_cache_dir / object_key
-            fallback.parent.mkdir(parents=True, exist_ok=True)
-            fallback.write_bytes(data)
-            print(f"[Storage] Notice: Could not write {object_key} to storage dir ({e}), saved to cache.")
-
-        # 2. Upload to MinIO if available
-        if self._is_minio_reachable() and self.client:
-            try:
-                self._ensure_bucket()
-                content_type = self._get_content_type(ext)
-                self.client.put_object(
-                    bucket_name=self.bucket,
-                    object_name=object_key,
-                    data=io.BytesIO(data),
-                    length=len(data),
-                    content_type=content_type,
-                )
-            except Exception as e:
-                print(f"[Storage] Warning: Failed to put {object_key} to MinIO ({e}). Saved locally.")
-
-        return object_key
+            print(f"[MinIO] Failed to upload '{object_key}' to MinIO: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"MinIO upload error for '{object_key}': {str(e)}"
+            )
 
     def save_bytes(
         self,
@@ -289,40 +221,38 @@ class StorageManager:
         custom_name: Optional[str] = None
     ) -> str:
         """
-        Store raw bytes into storage (local disk and MinIO if available).
-        Returns normalized object key (e.g. 'source_pages/unicorn-story/page_01.png').
+        Store raw bytes directly into MinIO object storage.
+        Returns normalized MinIO object key (e.g. 'source_pages/unicorn-story/page_01.png').
         """
         ext = extension if extension.startswith(".") else f".{extension}"
         name = custom_name or f"{uuid.uuid4().hex}{ext}"
         object_key = self._normalize_object_key(category, name)
 
-        # 1. Save to local storage
-        local_dest = settings.STORAGE_DIR / object_key
         try:
-            local_dest.parent.mkdir(parents=True, exist_ok=True)
-            local_dest.write_bytes(data)
+            self._ensure_bucket()
+            content_type = self._get_content_type(object_key)
+            self.client.put_object(
+                bucket_name=self.bucket,
+                object_name=object_key,
+                data=io.BytesIO(data),
+                length=len(data),
+                content_type=content_type,
+            )
+            return object_key
+        except HTTPException:
+            raise
+        except S3Error as e:
+            print(f"[MinIO] S3 error saving bytes to '{object_key}': {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"MinIO storage error saving bytes to '{object_key}': {str(e)}"
+            )
         except Exception as e:
-            fallback = self._temp_cache_dir / object_key
-            fallback.parent.mkdir(parents=True, exist_ok=True)
-            fallback.write_bytes(data)
-            print(f"[Storage] Notice: Could not write bytes {object_key} to storage dir ({e}), saved to cache.")
-
-        # 2. Upload to MinIO if available
-        if self._is_minio_reachable() and self.client:
-            try:
-                self._ensure_bucket()
-                content_type = self._get_content_type(object_key)
-                self.client.put_object(
-                    bucket_name=self.bucket,
-                    object_name=object_key,
-                    data=io.BytesIO(data),
-                    length=len(data),
-                    content_type=content_type,
-                )
-            except Exception as e:
-                print(f"[Storage] Warning: Failed to put bytes {object_key} to MinIO ({e}). Saved locally.")
-
-        return object_key
+            print(f"[MinIO] Failed to put bytes for '{object_key}': {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"MinIO storage error for '{object_key}': {str(e)}"
+            )
 
     def save_file(
         self,
@@ -331,190 +261,113 @@ class StorageManager:
         object_name: Optional[str] = None
     ) -> str:
         """
-        Save an existing file into storage (local disk and MinIO if available).
-        Returns the normalized object key.
+        Upload a file directly into MinIO object storage.
+        Returns the normalized MinIO object key.
         """
         path_obj = Path(local_path)
         if not path_obj.exists():
-            raise FileNotFoundError(f"Local file not found to upload: {local_path}")
+            raise FileNotFoundError(f"Source file not found to upload: {local_path}")
 
         name = object_name or path_obj.name
         object_key = self._normalize_object_key(category, name)
 
-        # 1. Save to local storage directory
-        local_dest = settings.STORAGE_DIR / object_key
         try:
-            if local_dest.resolve() != path_obj.resolve():
-                local_dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(path_obj, local_dest)
+            self._ensure_bucket()
+            content_type = self._get_content_type(object_key)
+            self.client.fput_object(
+                bucket_name=self.bucket,
+                object_name=object_key,
+                file_path=str(path_obj),
+                content_type=content_type,
+            )
+            return object_key
+        except HTTPException:
+            raise
+        except S3Error as e:
+            print(f"[MinIO] S3 error saving file '{object_key}': {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"MinIO storage error saving file '{object_key}': {str(e)}"
+            )
         except Exception as e:
-            fallback = self._temp_cache_dir / object_key
-            fallback.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(path_obj, fallback)
-            print(f"[Storage] Notice: Could not copy {object_key} to storage dir ({e}), copied to cache.")
-
-        # 2. Upload to MinIO if available
-        if self._is_minio_reachable() and self.client:
-            try:
-                self._ensure_bucket()
-                content_type = self._get_content_type(object_key)
-                self.client.fput_object(
-                    bucket_name=self.bucket,
-                    object_name=object_key,
-                    file_path=str(path_obj),
-                    content_type=content_type,
-                )
-            except Exception as e:
-                print(f"[Storage] Warning: Failed to put file {object_key} to MinIO ({e}). Saved locally.")
-
-        return object_key
+            print(f"[MinIO] Failed to save file '{object_key}': {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"MinIO error uploading file '{object_key}': {str(e)}"
+            )
 
     def get_object_stream(self, category: str, filename: str) -> Tuple[Any, str, int]:
         """
-        Retrieve an object stream directly from MinIO or fallback to local disk.
+        Retrieve an object stream directly from MinIO.
         Returns (stream_response, content_type, content_length).
         """
         object_key = self._normalize_object_key(category, filename)
 
-        # 1. Try MinIO if available
-        if self._is_minio_reachable() and self.client:
-            try:
-                self._ensure_bucket()
-                stat = self.client.stat_object(self.bucket, object_key)
-                obj = self.client.get_object(self.bucket, object_key)
-                return obj, stat.content_type or self._get_content_type(object_key), stat.size
-            except Exception:
-                pass
-
-        # 2. Try local storage file
-        local_dest = settings.STORAGE_DIR / object_key
-        if local_dest.exists() and local_dest.is_file():
-            content_type = self._get_content_type(str(local_dest))
-            return LocalFileStream(local_dest), content_type, local_dest.stat().st_size
-
-        # 3. Check legacy or sample assets
-        cand_path = self._find_legacy_file(category, filename)
-        if cand_path and cand_path.exists() and cand_path.is_file():
-            content_type = self._get_content_type(str(cand_path))
-            return LocalFileStream(cand_path), content_type, cand_path.stat().st_size
-
-        # 4. Check cache dir
-        cache_dest = self._temp_cache_dir / object_key
-        if cache_dest.exists() and cache_dest.is_file():
-            content_type = self._get_content_type(str(cache_dest))
-            return LocalFileStream(cache_dest), content_type, cache_dest.stat().st_size
-
-        raise HTTPException(status_code=404, detail=f"File '{object_key}' not found in storage.")
+        try:
+            self._ensure_bucket()
+            stat = self.client.stat_object(self.bucket, object_key)
+            obj = self.client.get_object(self.bucket, object_key)
+            content_type = stat.content_type or self._get_content_type(object_key)
+            return obj, content_type, stat.size
+        except S3Error as e:
+            if e.code in ("NoSuchKey", "NoSuchBucket"):
+                raise HTTPException(status_code=404, detail=f"File '{object_key}' not found in MinIO storage.")
+            raise HTTPException(status_code=500, detail=f"MinIO storage error for '{object_key}': {str(e)}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=f"File '{object_key}' not found in MinIO storage: {str(e)}")
 
     def get_bytes(self, object_key_or_path: str) -> bytes:
-        """Fetch raw bytes of an object directly from local disk or MinIO."""
+        """Fetch raw bytes of an object directly from MinIO."""
         category, filename = self._parse_category_and_filename(object_key_or_path)
-        if not category or not filename:
-            p = Path(object_key_or_path)
-            if p.exists() and p.is_file():
-                return p.read_bytes()
-            raise HTTPException(status_code=404, detail=f"Invalid storage path or key: {object_key_or_path}")
+        if category and filename:
+            object_key = self._normalize_object_key(category, filename)
+        else:
+            object_key = object_key_or_path.replace("\\", "/").strip("/")
 
-        object_key = self._normalize_object_key(category, filename)
-
-        # 1. Check local disk first (fastest)
-        local_dest = settings.STORAGE_DIR / object_key
-        if local_dest.exists() and local_dest.is_file():
-            return local_dest.read_bytes()
-
-        cand = self._find_legacy_file(category, filename)
-        if cand and cand.exists() and cand.is_file():
-            return cand.read_bytes()
-
-        # 2. Try MinIO if available
-        if self._is_minio_reachable() and self.client:
+        try:
+            self._ensure_bucket()
+            resp = self.client.get_object(self.bucket, object_key)
             try:
-                stream, _, _ = self.get_object_stream(category, filename)
-                try:
-                    return stream.read()
-                finally:
-                    stream.close()
-                    stream.release_conn()
-            except Exception:
-                pass
-
-        raise HTTPException(status_code=404, detail=f"File '{object_key}' not found in storage.")
+                return resp.read()
+            finally:
+                resp.close()
+                resp.release_conn()
+        except S3Error as e:
+            if e.code in ("NoSuchKey", "NoSuchBucket"):
+                raise HTTPException(status_code=404, detail=f"File '{object_key}' not found in MinIO storage.")
+            raise HTTPException(status_code=500, detail=f"MinIO storage error for '{object_key}': {str(e)}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=f"File '{object_key}' not found in MinIO storage: {str(e)}")
 
     def get_file_path(self, category: str, filename: str) -> Path:
-        """
-        Returns a local filesystem Path (for libraries like ReportLab or OpenCV).
-        """
+        """Returns normalized Path for object key reference."""
         object_key = self._normalize_object_key(category, filename)
-
-        # 1. Local storage dir
-        local_dest = settings.STORAGE_DIR / object_key
-        if local_dest.exists() and local_dest.is_file():
-            return local_dest
-
-        # 2. Legacy / sample assets
-        legacy = self._find_legacy_file(category, filename)
-        if legacy and legacy.exists() and legacy.is_file():
-            return legacy
-
-        # 3. Cache directory
-        cache_dest = self._temp_cache_dir / object_key
-        if cache_dest.exists() and cache_dest.is_file() and cache_dest.stat().st_size > 0:
-            return cache_dest
-
-        # 4. If MinIO reachable, download to cache
-        if self._is_minio_reachable() and self.client:
-            cache_dest.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                self._ensure_bucket()
-                self.client.fget_object(self.bucket, object_key, str(cache_dest))
-                return cache_dest
-            except Exception as e:
-                raise HTTPException(status_code=404, detail=f"File '{object_key}' not found in MinIO: {e}")
-
-        raise HTTPException(status_code=404, detail=f"File '{object_key}' not found in storage.")
+        return Path(object_key)
 
     def delete_file(self, category: str, filename: str) -> bool:
-        """Delete an object from local disk and MinIO."""
+        """Delete an object directly from MinIO."""
         object_key = self._normalize_object_key(category, filename)
-        deleted = False
-
-        local_dest = settings.STORAGE_DIR / object_key
-        if local_dest.exists():
-            try:
-                local_dest.unlink()
-                deleted = True
-            except Exception:
-                pass
-
-        if self._is_minio_reachable() and self.client:
-            try:
-                self._ensure_bucket()
-                self.client.remove_object(self.bucket, object_key)
-                deleted = True
-            except Exception as e:
-                print(f"[MinIO] Notice on remove_object '{object_key}': {e}")
-
-        return deleted
+        try:
+            self._ensure_bucket()
+            self.client.remove_object(self.bucket, object_key)
+            return True
+        except Exception as e:
+            print(f"[MinIO] Failed to remove object '{object_key}': {e}")
+            return False
 
     def file_exists(self, category: str, filename: str) -> bool:
-        """Check if an object exists in storage."""
+        """Check if an object exists in MinIO."""
         object_key = self._normalize_object_key(category, filename)
-        local_dest = settings.STORAGE_DIR / object_key
-        if local_dest.exists() and local_dest.is_file():
+        try:
+            self._ensure_bucket()
+            self.client.stat_object(self.bucket, object_key)
             return True
-
-        legacy = self._find_legacy_file(category, filename)
-        if legacy and legacy.exists():
-            return True
-
-        if self._is_minio_reachable() and self.client:
-            try:
-                self.client.stat_object(self.bucket, object_key)
-                return True
-            except Exception:
-                pass
-
-        return False
+        except Exception:
+            return False
 
     # --------------------------------------------------------------------------
     # URL & Path Helpers
@@ -523,7 +376,7 @@ class StorageManager:
     @property
     def dynamic_minio_base_url(self) -> str:
         """
-        Dynamically generate the MinIO base URL strictly from MINIO_ENDPOINT, MINIO_BUCKET, and MINIO_SECURE from .env.
+        Dynamically generate the MinIO base URL strictly from MINIO_ENDPOINT, MINIO_BUCKET, and MINIO_SECURE from settings.
         """
         if settings.MINIO_PUBLIC_URL:
             return settings.MINIO_PUBLIC_URL.rstrip("/")
@@ -545,10 +398,8 @@ class StorageManager:
 
     def get_public_url(self, abs_path_or_key: Optional[str]) -> Optional[str]:
         """
-        Generate public web-accessible URL for an asset.
-        - When MinIO is online, returns MinIO public URL.
-        - When MinIO is offline, returns FastAPI storage URL (/storage/{category}/{filename})
-          which is resolved to http://127.0.0.1:8000/storage/... by frontend.
+        Generate public web-accessible URL for an asset stored in MinIO.
+        Returns the MinIO public URL or direct MinIO bucket URL.
         """
         if not abs_path_or_key:
             return None
@@ -557,50 +408,35 @@ class StorageManager:
         if abs_path_or_key.startswith("data:") or abs_path_or_key.startswith("blob:"):
             return abs_path_or_key
 
-        category, filename = self._parse_category_and_filename(abs_path_or_key)
-        if not category or not filename:
-            if abs_path_or_key.startswith("http://") or abs_path_or_key.startswith("https://"):
-                return abs_path_or_key
+        if abs_path_or_key.startswith("http://") or abs_path_or_key.startswith("https://"):
             return abs_path_or_key
 
-        # If MinIO is reachable, return the MinIO URL
-        if self._is_minio_reachable():
-            if settings.MINIO_PUBLIC_URL:
-                return f"{settings.MINIO_PUBLIC_URL.rstrip('/')}/{category}/{filename}"
-            base = self.dynamic_minio_base_url
-            if abs_path_or_key.startswith(f"{base}/"):
-                return abs_path_or_key
-            return f"{base}/{category}/{filename}"
+        category, filename = self._parse_category_and_filename(abs_path_or_key)
+        if not category or not filename:
+            clean_key = abs_path_or_key.replace("\\", "/").strip("/")
+            base = settings.MINIO_PUBLIC_URL.rstrip("/") if settings.MINIO_PUBLIC_URL else self.dynamic_minio_base_url
+            return f"{base}/{clean_key}"
 
-        # Otherwise, return local FastAPI storage proxy URL
-        return f"/storage/{category}/{filename}"
+        object_key = self._normalize_object_key(category, filename)
+        if settings.MINIO_PUBLIC_URL:
+            return f"{settings.MINIO_PUBLIC_URL.rstrip('/')}/{object_key}"
+
+        base = self.dynamic_minio_base_url
+        return f"{base}/{object_key}"
 
     def resolve_path(self, path_str: Optional[str]) -> Optional[str]:
         """
-        Resolves an object key or path to a local temporary or permanent cached file path.
+        Returns path_str directly (either existing file path on disk or MinIO object key).
         """
         if not path_str:
             return None
 
-        # If already a cached or existing file, return it
         try:
             p_obj = Path(path_str)
-            if p_obj.exists() and p_obj.stat().st_size > 0:
+            if p_obj.exists() and p_obj.is_file():
                 return str(p_obj)
         except Exception:
             pass
-
-        # Try resolving by category/filename
-        category, filename = self._parse_category_and_filename(path_str)
-        if category and filename:
-            try:
-                local_path = self.get_file_path(category, filename)
-                return str(local_path)
-            except Exception:
-                pass
-
-        if os.path.exists(path_str) and "storage" not in str(path_str).lower():
-            return path_str
 
         return path_str
 
@@ -620,58 +456,45 @@ class StorageManager:
             return parts[0], "/".join(parts[1:])
         return None, None
 
-    def _find_legacy_file(self, category: str, filename: str) -> Optional[Path]:
-        """Check if file exists in legacy storage directory on disk or sample-assets."""
-        legacy_dir = settings.STORAGE_DIR / category
-        cand = (legacy_dir / filename).resolve()
-        if cand.exists() and cand.is_file():
-            return cand
-
-        sample_assets = settings.STORAGE_DIR.parent.parent / "sample-assets"
-        sample_cand = sample_assets / filename
-        if sample_cand.exists() and sample_cand.is_file():
-            return sample_cand
-
-        return None
-
     def sync_local_to_minio(self):
         """
-        Syncs any existing legacy files from `backend/storage/` and `sample-assets/`
-        into the MinIO bucket when MinIO is available.
+        Syncs existing legacy files from `backend/storage/` and `sample-assets/`
+        into the MinIO bucket when present on disk. Never writes to local storage.
         """
-        if not self._is_minio_reachable() or self.client is None:
-            print("[Storage] MinIO service is offline or disabled; serving assets from local storage.")
+        try:
+            self._ensure_bucket()
+        except Exception as e:
+            print(f"[Storage] Notice: MinIO not available during sync check ({e}).")
             return
 
-        self._ensure_bucket()
         storage_dir = settings.STORAGE_DIR
-        if not storage_dir.exists():
-            return
-
         synced = 0
-        for cat in self.CATEGORIES:
-            cat_dir = storage_dir / cat
-            if not cat_dir.exists():
-                continue
-            for file_path in cat_dir.rglob("*"):
-                if file_path.is_file():
-                    rel = file_path.relative_to(cat_dir)
-                    clean_rel = str(rel).replace("\\", "/")
-                    object_key = f"{cat}/{clean_rel}"
-                    try:
-                        self.client.stat_object(self.bucket, object_key)
-                    except Exception:
+
+        # Sync existing storage_dir files if present
+        if storage_dir.exists():
+            for cat in self.CATEGORIES:
+                cat_dir = storage_dir / cat
+                if not cat_dir.exists():
+                    continue
+                for file_path in cat_dir.rglob("*"):
+                    if file_path.is_file():
+                        rel = file_path.relative_to(cat_dir)
+                        clean_rel = str(rel).replace("\\", "/")
+                        object_key = f"{cat}/{clean_rel}"
                         try:
-                            content_type = self._get_content_type(str(file_path))
-                            self.client.fput_object(
-                                self.bucket,
-                                object_key,
-                                str(file_path),
-                                content_type=content_type
-                            )
-                            synced += 1
-                        except Exception as fe:
-                            print(f"[MinIO] Failed to sync {file_path}: {fe}")
+                            self.client.stat_object(self.bucket, object_key)
+                        except Exception:
+                            try:
+                                content_type = self._get_content_type(str(file_path))
+                                self.client.fput_object(
+                                    self.bucket,
+                                    object_key,
+                                    str(file_path),
+                                    content_type=content_type
+                                )
+                                synced += 1
+                            except Exception as fe:
+                                print(f"[MinIO] Failed to sync {file_path}: {fe}")
 
         if synced > 0:
             print(f"[MinIO] Successfully synced {synced} legacy files into MinIO bucket '{self.bucket}'.")

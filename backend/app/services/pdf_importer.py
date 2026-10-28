@@ -305,11 +305,11 @@ class PDFImporterService:
         pdf_bytes = None
         source_storage_path = None
 
-        # 1. Resolve PDF data (from local file or from MinIO)
+        # 1. Resolve PDF data (from local file or directly from MinIO)
         if os.path.exists(str(pdf_path)):
             with open(str(pdf_path), "rb") as f:
                 pdf_bytes = f.read()
-            # Store original PDF in MinIO object storage if not already there
+            # Store original PDF directly in MinIO object storage
             stored_pdf_name = f"{slug}-original.pdf"
             source_storage_path = storage.save_bytes(
                 data=pdf_bytes,
@@ -318,18 +318,12 @@ class PDFImporterService:
                 custom_name=stored_pdf_name
             )
         else:
-            # Check if it's already an object in MinIO storage
+            # Fetch directly from MinIO object storage
             try:
                 pdf_bytes = storage.get_bytes(str(pdf_path))
                 source_storage_path = str(pdf_path)
-            except Exception:
-                resolved = storage.resolve_path(str(pdf_path))
-                if resolved and os.path.exists(resolved):
-                    with open(resolved, "rb") as f:
-                        pdf_bytes = f.read()
-                    source_storage_path = str(pdf_path)
-                else:
-                    raise FileNotFoundError(f"Source PDF not found on disk or in MinIO storage: {pdf_path}")
+            except Exception as e:
+                raise FileNotFoundError(f"Source PDF '{pdf_path}' not found in MinIO storage: {e}")
             
         # Check if story already exists
         existing_story = db.query(StoryTemplate).filter(StoryTemplate.slug == slug).first()

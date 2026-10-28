@@ -1,3 +1,4 @@
+import io
 import os
 import uuid
 import json
@@ -73,9 +74,8 @@ class PDFComposerService:
         - "rgb": Vibrant high-fidelity RGB (DeviceRGB color space, matching screen preview and modern photo printing)
         - "cmyk": Commercial print CMYK (DeviceCMYK color space with 4-channel image separation)
         """
-        temp_output_dir = Path(tempfile.gettempdir()) / "kuttystory_cache" / ("previews" if book_type == "preview" else "final_books")
-        temp_output_dir.mkdir(parents=True, exist_ok=True)
-        pdf_path = temp_output_dir / output_filename
+        # In-memory PDF buffer; no local filesystem cache required
+        pdf_buffer = io.BytesIO()
 
         # 1. Resolve Page Geometry (8x8 inches = 203.2 x 203.2 mm = 576 x 576 pt)
         normalized_size = str(page_size).lower().strip().replace(" ", "")
@@ -94,8 +94,8 @@ class PDFComposerService:
 
         is_cmyk = (str(color_mode).lower().strip() == "cmyk")
 
-        # ReportLab Canvas
-        c = canvas.Canvas(str(pdf_path), pagesize=(page_w_pt, page_h_pt))
+        # ReportLab Canvas targeting in-memory BytesIO
+        c = canvas.Canvas(pdf_buffer, pagesize=(page_w_pt, page_h_pt))
 
         # Color definitions for CMYK vs RGB
         if is_cmyk:
@@ -125,11 +125,6 @@ class PDFComposerService:
             "validation_passed": True
         }
 
-        # Cache folder for CMYK converted images in temp directory
-        cmyk_cache_dir = Path(tempfile.gettempdir()) / "kuttystory_cache" / "cache_cmyk"
-        if is_cmyk:
-            cmyk_cache_dir.mkdir(parents=True, exist_ok=True)
-
         # Strictly limit free preview PDF to max 3 personalized pages
         if book_type == "preview":
             pages_data = pages_data[:3]
@@ -139,14 +134,28 @@ class PDFComposerService:
         for idx, page_info in enumerate(pages_data):
             page_num = page_info.get("page_number", idx + 1)
             raw_img_path = page_info.get("image_path")
-            resolved_img_path = storage.resolve_path(raw_img_path) if raw_img_path else None
-            img_path = resolved_img_path if (resolved_img_path and os.path.exists(resolved_img_path)) else None
             story_text = page_info.get("story_text", "")
             for tag in ["[Name]", "[name]", "{name}", "[child_name]", "{child_name}"]:
                 story_text = story_text.replace(tag, child_name)
 
+            # Retrieve image from MinIO storage directly in-memory
+            pil_img = None
+            if raw_img_path:
+                if os.path.exists(str(raw_img_path)):
+                    try:
+                        pil_img = Image.open(str(raw_img_path))
+                    except Exception:
+                        pil_img = None
+                else:
+                    try:
+                        img_bytes = storage.get_bytes(str(raw_img_path))
+                        pil_img = Image.open(io.BytesIO(img_bytes))
+                    except Exception as e:
+                        print(f"Notice: Could not load image from MinIO ({raw_img_path}): {e}")
+                        pil_img = None
+
             # NOTE: For preview PDFs, NEVER draw empty template / blank pages!
-            if not img_path or not os.path.exists(img_path):
+            if pil_img is None:
                 if book_type == "preview":
                     continue  # Strictly omit missing images; never show empty template
                 preflight_validation["has_missing_images"] = True
@@ -162,28 +171,23 @@ class PDFComposerService:
             c.saveState()
 
             # 2. Draw Illustration Artwork (Full Bleed)
-            draw_img_path = img_path
             image_drawn = False
             try:
-                with Image.open(img_path) as pil_img:
-                    w, h = pil_img.size
-                    dpi_x = (w / (page_w_pt / 72.0))
-                    preflight_validation["dpi_check"].append({
-                        "page": page_num,
-                        "resolution_px": f"{w}x{h}",
-                        "effective_dpi": round(dpi_x, 1)
-                    })
+                from reportlab.lib.utils import ImageReader
+                w, h = pil_img.size
+                dpi_x = (w / (page_w_pt / 72.0))
+                preflight_validation["dpi_check"].append({
+                    "page": page_num,
+                    "resolution_px": f"{w}x{h}",
+                    "effective_dpi": round(dpi_x, 1)
+                })
 
-                    if is_cmyk:
-                        # Convert to true 4-channel CMYK for print
-                        cmyk_filename = f"cmyk_{Path(img_path).stem}_{w}x{h}.jpg"
-                        cached_cmyk_path = cmyk_cache_dir / cmyk_filename
-                        if not cached_cmyk_path.exists() or os.path.getmtime(img_path) > os.path.getmtime(cached_cmyk_path):
-                            cmyk_img = pil_img.convert("CMYK")
-                            cmyk_img.save(str(cached_cmyk_path), format="JPEG", quality=96)
-                        draw_img_path = str(cached_cmyk_path)
+                if is_cmyk:
+                    draw_img = pil_img.convert("CMYK")
+                else:
+                    draw_img = pil_img.convert("RGB")
 
-                c.drawImage(draw_img_path, 0, 0, width=page_w_pt, height=page_h_pt, preserveAspectRatio=True)
+                c.drawImage(ImageReader(draw_img), 0, 0, width=page_w_pt, height=page_h_pt, preserveAspectRatio=True)
                 image_drawn = True
             except Exception as e:
                 print(f"Notice: Error drawing image on page {page_num}: {e}")
@@ -214,8 +218,17 @@ class PDFComposerService:
 
         preflight_validation["page_count"] = pages_rendered
         c.save()
+
+        # Save composed PDF directly to MinIO
         category = "previews" if book_type == "preview" else "final_books"
-        object_key = storage.save_file(pdf_path, category=category, object_name=output_filename)
+        pdf_bytes = pdf_buffer.getvalue()
+        object_key = storage.save_bytes(
+            data=pdf_bytes,
+            category=category,
+            custom_name=output_filename,
+            extension=".pdf"
+        )
         return object_key, preflight_validation
+
 
 

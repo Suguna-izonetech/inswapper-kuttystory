@@ -31,18 +31,11 @@ class CharacterConsistencyEngine:
         else:
             try:
                 img_bytes = storage.get_bytes(image_path)
-            except Exception:
-                resolved = storage.resolve_path(image_path)
-                if resolved and os.path.exists(resolved):
-                    with open(resolved, "rb") as f:
-                        img_bytes = f.read()
-                else:
-                    raise FileNotFoundError(f"Reference image not found in MinIO storage or local cache: {image_path}")
+            except Exception as e:
+                raise FileNotFoundError(f"Reference image not found in MinIO storage: {image_path} ({e})")
 
-        temp_cache_dir = Path(tempfile.gettempdir()) / "kuttystory_cache" / "normalized"
-        temp_cache_dir.mkdir(parents=True, exist_ok=True)
         filename = Path(image_path).name
-        dest = output_path or str(temp_cache_dir / f"norm_{filename}")
+        dest = output_path or str(Path(tempfile.gettempdir()) / f"norm_{filename}")
 
         with Image.open(io.BytesIO(img_bytes)) as img:
             img = ImageOps.exif_transpose(img)
