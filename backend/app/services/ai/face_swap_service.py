@@ -129,18 +129,54 @@ class InsightFaceSwapService:
             return ["CUDAExecutionProvider", "CPUExecutionProvider"]
         return [provider]
 
+    @staticmethod
+    def _ensure_directory_permissions(path: Path):
+        """
+        Ensure the model directory and files have proper read/write permissions
+        for the systemd service user (e.g., www-data) and current process.
+        """
+        try:
+            import stat
+            mode = path.stat().st_mode | stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH | stat.S_IXOTH
+            path.chmod(mode)
+            if os.name != "nt":
+                import pwd, grp
+                try:
+                    uid = pwd.getpwnam("www-data").pw_uid
+                    gid = grp.getgrnam("www-data").gr_gid
+                    for root_dir, dirs, files in os.walk(path):
+                        os.chown(root_dir, uid, gid)
+                        os.chmod(root_dir, 0o775)
+                        for f in files:
+                            fp = os.path.join(root_dir, f)
+                            os.chown(fp, uid, gid)
+                            os.chmod(fp, 0o664)
+                except Exception:
+                    pass
+        except Exception as e_perm:
+            logger.debug(f"Notice ensuring permissions on {path}: {e_perm}")
+
     def _get_detector(self):
-        """Lazily initialize the InsightFace FaceAnalysis detector."""
+        """Lazily initialize the InsightFace FaceAnalysis detector with project-local root."""
         if self._app is None:
             with self._load_lock:
                 if self._app is None:
                     try:
                         from insightface.app import FaceAnalysis
                         providers = self._get_providers()
-                        logger.info(f"Loading InsightFace FaceAnalysis (buffalo_l) with providers={providers}...")
-                        app = FaceAnalysis(name="buffalo_l", providers=providers)
+                        
+                        # Project-local InsightFace model root: backend/models/insightface/
+                        insightface_root = getattr(settings, "INSIGHTFACE_ROOT", settings.BACKEND_DIR / "models" / "insightface")
+                        insightface_root = Path(insightface_root).resolve()
+                        insightface_root.mkdir(parents=True, exist_ok=True)
+                        (insightface_root / "models").mkdir(parents=True, exist_ok=True)
+                        self._ensure_directory_permissions(insightface_root)
+
+                        logger.info(f"Loading InsightFace FaceAnalysis (buffalo_l, root={insightface_root}) with providers={providers}...")
+                        app = FaceAnalysis(name="buffalo_l", root=str(insightface_root), providers=providers)
                         ctx_id = 0 if "CUDAExecutionProvider" in providers else -1
-                        app.prepare(ctx_id=ctx_id, det_size=self.det_size, det_thresh=self.det_thresh)
+                        det_size = (self.det_size, self.det_size) if isinstance(self.det_size, int) else self.det_size
+                        app.prepare(ctx_id=ctx_id, det_size=det_size, det_thresh=self.det_thresh)
                         self._app = app
                         logger.info("InsightFace FaceAnalysis detector ready.")
                     except Exception as e:
@@ -157,8 +193,9 @@ class InsightFaceSwapService:
                     try:
                         import insightface.model_zoo as mz
                         providers = self._get_providers()
+                        insightface_root = getattr(settings, "INSIGHTFACE_ROOT", settings.BACKEND_DIR / "models" / "insightface")
                         logger.info(f"Loading INSwapper-128 from '{model_file}' with providers={providers}...")
-                        swapper = mz.get_model(str(model_file), providers=providers)
+                        swapper = mz.get_model(str(model_file), root=str(insightface_root), providers=providers)
                         if swapper is None:
                             raise ModelLoadError(f"ModelRouter could not instantiate INSwapper from '{model_file}'")
                         self._swapper = swapper
@@ -194,18 +231,29 @@ class InsightFaceSwapService:
 
         elif isinstance(img_input, (str, Path)):
             fpath = str(img_input)
-            if not os.path.exists(fpath):
-                raise InvalidImageError(f"Image file does not exist: {fpath}")
-            if os.path.getsize(fpath) == 0:
-                raise InvalidImageError(f"Image file is empty: {fpath}")
-            img_bgr = cv2.imread(fpath, cv2.IMREAD_COLOR)
-            if img_bgr is None:
-                # Attempt PIL fallback for obscure image encodings
+            if os.path.exists(fpath):
+                if os.path.getsize(fpath) == 0:
+                    raise InvalidImageError(f"Image file is empty: {fpath}")
+                img_bgr = cv2.imread(fpath, cv2.IMREAD_COLOR)
+                if img_bgr is None:
+                    # Attempt PIL fallback for obscure image encodings
+                    try:
+                        with Image.open(fpath) as pil_img:
+                            img_bgr = cv2.cvtColor(np.array(pil_img.convert("RGB")), cv2.COLOR_RGB2BGR)
+                    except Exception as e_pil:
+                        raise InvalidImageError(f"Could not decode image at '{fpath}': {e_pil}") from e_pil
+            else:
+                # Fetch directly from MinIO object storage
                 try:
-                    with Image.open(fpath) as pil_img:
-                        img_bgr = cv2.cvtColor(np.array(pil_img.convert("RGB")), cv2.COLOR_RGB2BGR)
-                except Exception as e_pil:
-                    raise InvalidImageError(f"Could not decode image at '{fpath}': {e_pil}") from e_pil
+                    from app.services.storage import storage
+                    img_bytes = storage.get_bytes(fpath)
+                    nparr = np.frombuffer(img_bytes, np.uint8)
+                    img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                    if img_bgr is None:
+                        with Image.open(io.BytesIO(img_bytes)) as pil_img:
+                            img_bgr = cv2.cvtColor(np.array(pil_img.convert("RGB")), cv2.COLOR_RGB2BGR)
+                except Exception as e_minio:
+                    raise InvalidImageError(f"Could not load image from MinIO storage for '{fpath}': {e_minio}") from e_minio
 
         elif isinstance(img_input, (bytes, bytearray)):
             if len(img_input) == 0:

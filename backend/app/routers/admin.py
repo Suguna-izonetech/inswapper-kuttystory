@@ -262,17 +262,22 @@ def delete_story(story_id: str, db: Session = Depends(get_db)):
     jobs = db.query(PersonalizationJob).filter(PersonalizationJob.story_id == story_id).all()
     job_ids = [j.id for j in jobs]
 
-    # 3. Clean up transactions, books and orders referencing these jobs
+    # 3. Clean up transactions, books and orders referencing these jobs (with MinIO file cleanup)
     if job_ids:
         db.query(PaymentTransaction).filter(PaymentTransaction.job_id.in_(job_ids)).update({PaymentTransaction.job_id: None}, synchronize_session=False)
         books = db.query(Book).filter(Book.job_id.in_(job_ids)).all()
+        for b in books:
+            if b.pdf_storage_path:
+                cat, fn = storage._parse_category_and_filename(b.pdf_storage_path)
+                if cat and fn:
+                    storage.delete_file(cat, fn)
         book_ids = [b.id for b in books]
         if book_ids:
             db.query(Order).filter(Order.book_id.in_(book_ids)).update({Order.book_id: None}, synchronize_session=False)
         db.query(Order).filter(Order.job_id.in_(job_ids)).update({Order.job_id: None}, synchronize_session=False)
         db.query(Book).filter(Book.job_id.in_(job_ids)).delete(synchronize_session=False)
 
-    # 4. Clean up generated assets linked to these jobs or these pages
+    # 4. Clean up generated assets linked to these jobs or these pages (with MinIO file cleanup)
     if page_ids or job_ids:
         conditions = []
         if page_ids:
@@ -280,17 +285,36 @@ def delete_story(story_id: str, db: Session = Depends(get_db)):
         if job_ids:
             conditions.append(GeneratedAsset.job_id.in_(job_ids))
         from sqlalchemy import or_
+        assets_to_del = db.query(GeneratedAsset).filter(or_(*conditions)).all()
+        for a in assets_to_del:
+            if a.storage_path:
+                cat, fn = storage._parse_category_and_filename(a.storage_path)
+                if cat and fn:
+                    storage.delete_file(cat, fn)
         db.query(GeneratedAsset).filter(or_(*conditions)).delete(synchronize_session=False)
 
     # 5. Delete personalization jobs
     if job_ids:
         db.query(PersonalizationJob).filter(PersonalizationJob.id.in_(job_ids)).delete(synchronize_session=False)
 
-    # 6. Delete all pages
+    # 6. Delete all pages (with MinIO file cleanup)
     if page_ids:
+        for p in pages:
+            if p.original_image_path:
+                cat, fn = storage._parse_category_and_filename(p.original_image_path)
+                if cat and fn:
+                    storage.delete_file(cat, fn)
         db.query(StoryPage).filter(StoryPage.id.in_(page_ids)).delete(synchronize_session=False)
 
-    # 7. Delete the story
+    # 7. Delete the story (with MinIO cover/source PDF cleanup)
+    if story.cover_image_path:
+        cat, fn = storage._parse_category_and_filename(story.cover_image_path)
+        if cat and fn:
+            storage.delete_file(cat, fn)
+    if story.source_pdf_path:
+        cat, fn = storage._parse_category_and_filename(story.source_pdf_path)
+        if cat and fn:
+            storage.delete_file(cat, fn)
     db.delete(story)
     db.commit()
     return {"status": "success", "message": f"Story '{story_title}' deleted successfully"}
@@ -494,7 +518,17 @@ def delete_page(page_id: str, db: Session = Depends(get_db)):
     if not page:
         raise HTTPException(status_code=404, detail="Story page not found")
     story_id = page.story_id
-    # Clean up any generated assets referencing this page first
+    # Clean up page image and generated assets referencing this page from MinIO
+    if page.original_image_path:
+        cat, fn = storage._parse_category_and_filename(page.original_image_path)
+        if cat and fn:
+            storage.delete_file(cat, fn)
+    assets_to_del = db.query(GeneratedAsset).filter(GeneratedAsset.story_page_id == page_id).all()
+    for a in assets_to_del:
+        if a.storage_path:
+            cat, fn = storage._parse_category_and_filename(a.storage_path)
+            if cat and fn:
+                storage.delete_file(cat, fn)
     db.query(GeneratedAsset).filter(GeneratedAsset.story_page_id == page_id).delete(synchronize_session=False)
     db.delete(page)
     story = db.query(StoryTemplate).filter(StoryTemplate.id == story_id).first()

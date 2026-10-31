@@ -222,18 +222,15 @@ class StorageManager:
         data: Any,
         custom_name: str,
         extension: str = ".png",
-        save_local: bool = True
+        save_local: bool = False
     ) -> Tuple[str, Optional[Path]]:
         """
         Store pristine original AI-generated image or base illustration BEFORE face swapping
-        or image enhancement.
-        
-        Saves to MinIO object storage ('raw_generated' category) and locally to
-        backend/storage/raw_generated/ so original images are strictly preserved and separated
-        from processed assets for side-by-side comparison.
+        or image enhancement directly into MinIO ('raw_generated' category).
+        No local filesystem storage is used.
         
         Returns:
-            Tuple[str, Optional[Path]]: (minio_object_key, local_file_path)
+            Tuple[str, Optional[Path]]: (minio_object_key, None)
         """
         raw_bytes: bytes
         if isinstance(data, (bytes, bytearray)):
@@ -261,19 +258,7 @@ class StorageManager:
             custom_name=clean_name
         )
 
-        local_path: Optional[Path] = None
-        if save_local:
-            try:
-                raw_dir = getattr(settings, "RAW_GENERATED_DIR", settings.STORAGE_DIR / "raw_generated")
-                dest_path = (raw_dir / clean_name).resolve()
-                dest_path.parent.mkdir(parents=True, exist_ok=True)
-                if not dest_path.exists():
-                    dest_path.write_bytes(raw_bytes)
-                local_path = dest_path
-            except Exception as e_loc:
-                print(f"[Storage] Notice: Failed to write local raw original to {clean_name}: {e_loc}")
-
-        return minio_key, local_path
+        return minio_key, None
 
     def save_bytes(
         self,
@@ -520,46 +505,13 @@ class StorageManager:
 
     def sync_local_to_minio(self):
         """
-        Syncs existing legacy files from `backend/storage/` and `sample-assets/`
-        into the MinIO bucket when present on disk. Never writes to local storage.
+        Ensure MinIO bucket exists and is properly initialized.
+        Local filesystem storage is not used.
         """
         try:
             self._ensure_bucket()
         except Exception as e:
-            print(f"[Storage] Notice: MinIO not available during sync check ({e}).")
-            return
-
-        storage_dir = settings.STORAGE_DIR
-        synced = 0
-
-        # Sync existing storage_dir files if present
-        if storage_dir.exists():
-            for cat in self.CATEGORIES:
-                cat_dir = storage_dir / cat
-                if not cat_dir.exists():
-                    continue
-                for file_path in cat_dir.rglob("*"):
-                    if file_path.is_file():
-                        rel = file_path.relative_to(cat_dir)
-                        clean_rel = str(rel).replace("\\", "/")
-                        object_key = f"{cat}/{clean_rel}"
-                        try:
-                            self.client.stat_object(self.bucket, object_key)
-                        except Exception:
-                            try:
-                                content_type = self._get_content_type(str(file_path))
-                                self.client.fput_object(
-                                    self.bucket,
-                                    object_key,
-                                    str(file_path),
-                                    content_type=content_type
-                                )
-                                synced += 1
-                            except Exception as fe:
-                                print(f"[MinIO] Failed to sync {file_path}: {fe}")
-
-        if synced > 0:
-            print(f"[MinIO] Successfully synced {synced} legacy files into MinIO bucket '{self.bucket}'.")
+            print(f"[Storage] Notice: MinIO not available during initialization check ({e}).")
 
     def migrate_database_to_minio_keys(self, db):
         """

@@ -38,8 +38,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Notice during MinIO storage initialization: {e}")
 
-    # 3. Idempotent import of the Unicorn Story PDF from sample-assets
-    sample_pdf = settings.STORAGE_DIR.parent.parent / "sample-assets" / "unicorn Story.pdf"
+    # 3. Ensure InsightFace model directory exists
+    try:
+        settings.INSIGHTFACE_ROOT.mkdir(parents=True, exist_ok=True)
+        (settings.INSIGHTFACE_ROOT / "models").mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        print(f"Notice creating InsightFace root directory: {e}")
+
+    # 4. Idempotent import of the Unicorn Story PDF from sample-assets
+    sample_pdf = settings.BASE_DIR / "sample-assets" / "unicorn Story.pdf"
     if sample_pdf.exists():
         db = SessionLocal()
         try:

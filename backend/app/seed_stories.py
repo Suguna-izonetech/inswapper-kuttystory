@@ -23,7 +23,7 @@ def seed():
             db.commit()
             print(f"Unicorn story '{unicorn.title}' verified and updated successfully!")
         else:
-            sample_pdf = settings.STORAGE_DIR.parent.parent / "sample-assets" / "unicorn Story.pdf"
+            sample_pdf = settings.BASE_DIR / "sample-assets" / "unicorn Story.pdf"
             if sample_pdf.exists():
                 PDFImporterService.import_story_from_pdf(
                     pdf_path=str(sample_pdf),

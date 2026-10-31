@@ -208,13 +208,12 @@ def delete_feedback(
     if not feedback:
         raise HTTPException(status_code=404, detail="Feedback submission not found")
 
-    # Clean up media file if present
-    if feedback.media_url and "/storage/feedback_media/" in feedback.media_url:
+    # Clean up media file directly from MinIO if present
+    if feedback.media_url:
         try:
-            filename = feedback.media_url.split("/storage/feedback_media/")[-1]
-            filepath = StorageManager.get_category_dir("feedback_media") / filename
-            if filepath.exists():
-                filepath.unlink()
+            cat, fn = storage._parse_category_and_filename(feedback.media_url)
+            if cat and fn:
+                storage.delete_file(cat, fn)
         except Exception:
             pass
 

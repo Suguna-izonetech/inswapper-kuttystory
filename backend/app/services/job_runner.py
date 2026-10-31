@@ -227,11 +227,7 @@ class JobRunner:
                     height=1024
                 )
             else:
-                page_img = page.original_image_path
-                if not page_img or not os.path.exists(page_img):
-                    cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page.page_number:02d}.png"
-                    if cand.exists():
-                        page_img = str(cand)
+                page_img = page.original_image_path or f"source_pages/{story_slug}/page_{page.page_number:02d}.png"
                 gen_res = await cartoon_fusion_engine.fuse_page_async(
                     page_number=page.page_number,
                     child_reference_path=job.photo_path,
@@ -360,17 +356,7 @@ class JobRunner:
                     if not norm_ref:
                         raise RuntimeError(f"Customer reference photo is required to personalize page {page_num}.")
 
-                    page_img = None
-                    if page.original_image_path:
-                        cat, fn = storage._parse_category_and_filename(page.original_image_path)
-                        if cat and fn and storage.file_exists(cat, fn):
-                            page_img = storage.resolve_path(page.original_image_path)
-                    if not page_img or not os.path.exists(page_img):
-                        cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png"
-                        if cand.exists():
-                            page_img = str(cand)
-                        else:
-                            page_img = storage.resolve_path(f"source_pages/{story_slug}/page_{page_num:02d}.png")
+                    page_img = page.original_image_path or f"source_pages/{story_slug}/page_{page_num:02d}.png"
 
                     max_retries = 3
                     gen_res = None
@@ -439,8 +425,7 @@ class JobRunner:
                     gc.collect()
                 else:
                     # Non-personalizable decorative / title page
-                    cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png"
-                    img_path = (str(cand) if cand.exists() else None) or (storage.resolve_path(page.original_image_path) if page.original_image_path else None) or page.original_image_path
+                    img_path = page.original_image_path or f"source_pages/{story_slug}/page_{page_num:02d}.png"
 
                 pages_data.append({
                     "page_number": page_num,

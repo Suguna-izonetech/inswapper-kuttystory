@@ -110,7 +110,7 @@ class HuggingFaceDiffusersProvider(ImageGenerationProvider):
                         data=image_bytes,
                         custom_name=save_name,
                         extension=".jpg",
-                        save_local=True
+                        save_local=False
                     )
                 except Exception as e_raw:
                     print(f"Notice: Failed to save raw generated image to storage: {e_raw}")

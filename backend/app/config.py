@@ -7,8 +7,7 @@ from typing import List, Union, Optional
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 BACKEND_DIR = Path(__file__).resolve().parent.parent
-STORAGE_BASE = BACKEND_DIR / "storage"
-RAW_GENERATED_DIR = STORAGE_BASE / "raw_generated"
+INSIGHTFACE_ROOT = BACKEND_DIR / "models" / "insightface" 
 
 # Search and load .env file reliably from all likely locations
 def find_and_load_env():
@@ -77,17 +76,18 @@ class Settings(BaseSettings):
     MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "false").lower() in ("true", "1", "yes")
     MINIO_PUBLIC_URL: Optional[str] = os.getenv("MINIO_PUBLIC_URL", None)
 
-    # Storage directories (Cache / Scratch for temporary file processing)
-    STORAGE_DIR: Path = STORAGE_BASE
+    # Project Paths (All assets are stored exclusively in MinIO object storage)
     BASE_DIR: Path = BASE_DIR
     BACKEND_DIR: Path = BACKEND_DIR
-    ORIGINAL_PDFS_DIR: Path = STORAGE_BASE / "original_pdfs"
-    SOURCE_PAGES_DIR: Path = STORAGE_BASE / "source_pages"
-    CHILD_PHOTOS_DIR: Path = STORAGE_BASE / "child_photos"
-    GENERATED_ASSETS_DIR: Path = STORAGE_BASE / "generated_assets"
-    PREVIEWS_DIR: Path = STORAGE_BASE / "previews"
-    FINAL_BOOKS_DIR: Path = STORAGE_BASE / "final_books"
-    RAW_GENERATED_DIR: Path = STORAGE_BASE / "raw_generated"
+    STORAGE_DIR: Path = BACKEND_DIR
+    INSIGHTFACE_ROOT: Path = INSIGHTFACE_ROOT
+
+    @field_validator("INSIGHTFACE_ROOT", mode="after")
+    @classmethod
+    def resolve_insightface_root(cls, v: Path) -> Path:
+        if not v.is_absolute():
+            return (BACKEND_DIR / v).resolve()
+        return v.resolve()
     
     # Image & Story Providers Configuration
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")

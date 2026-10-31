@@ -498,7 +498,7 @@ class CartoonCharacterFusionEngine:
                 raw_original_key, raw_original_local = storage.save_raw_original(
                     data=base_page,
                     custom_name=raw_name,
-                    save_local=True
+                    save_local=False
                 )
             except Exception as e_raw:
                 print(f"Notice: Failed to store raw original plate for page {page_number}: {e_raw}")
@@ -586,7 +586,7 @@ class CartoonCharacterFusionEngine:
         raw_spaces = getattr(settings, "HF_FACE_SWAP_SPACE", "").strip()
         candidate_spaces = [s.strip() for s in raw_spaces.split(",") if s.strip()]
 
-        if resolved_child_ref and os.path.exists(resolved_child_ref):
+        if resolved_child_ref:
             # Tier 1: InsightFace INSwapper-128 Local/GPU Service (Always prioritized when provider is insightface)
             if use_insightface:
                 try:
