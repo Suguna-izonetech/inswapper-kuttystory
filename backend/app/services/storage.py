@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Optional, Tuple, Any
 from fastapi import UploadFile, HTTPException
 from PIL import Image
+import numpy as np
+import cv2
 from minio import Minio
 from minio.error import S3Error
 
@@ -32,6 +34,8 @@ class StorageManager:
         "source_pages",
         "child_photos",
         "generated_assets",
+        "raw_generated",
+        "generated_originals",
         "previews",
         "final_books",
         "feedback_media",
@@ -212,6 +216,64 @@ class StorageManager:
                 status_code=500,
                 detail=f"MinIO upload error for '{object_key}': {str(e)}"
             )
+
+    def save_raw_original(
+        self,
+        data: Any,
+        custom_name: str,
+        extension: str = ".png",
+        save_local: bool = True
+    ) -> Tuple[str, Optional[Path]]:
+        """
+        Store pristine original AI-generated image or base illustration BEFORE face swapping
+        or image enhancement.
+        
+        Saves to MinIO object storage ('raw_generated' category) and locally to
+        backend/storage/raw_generated/ so original images are strictly preserved and separated
+        from processed assets for side-by-side comparison.
+        
+        Returns:
+            Tuple[str, Optional[Path]]: (minio_object_key, local_file_path)
+        """
+        raw_bytes: bytes
+        if isinstance(data, (bytes, bytearray)):
+            raw_bytes = bytes(data)
+        elif isinstance(data, Image.Image):
+            buf = io.BytesIO()
+            ext_fmt = "PNG" if extension.lower() in (".png", "png") else "JPEG"
+            data.save(buf, format=ext_fmt)
+            raw_bytes = buf.getvalue()
+        elif isinstance(data, np.ndarray):
+            import cv2
+            ext = extension if extension.startswith(".") else f".{extension}"
+            success, enc = cv2.imencode(ext, data)
+            if not success:
+                raise ValueError(f"Could not encode numpy array to {ext}")
+            raw_bytes = enc.tobytes()
+        else:
+            raise TypeError(f"Unsupported data type for save_raw_original: {type(data)}")
+
+        clean_name = custom_name.replace("\\", "/").lstrip("/")
+        minio_key = self.save_bytes(
+            data=raw_bytes,
+            category="raw_generated",
+            extension=extension,
+            custom_name=clean_name
+        )
+
+        local_path: Optional[Path] = None
+        if save_local:
+            try:
+                raw_dir = getattr(settings, "RAW_GENERATED_DIR", settings.STORAGE_DIR / "raw_generated")
+                dest_path = (raw_dir / clean_name).resolve()
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
+                if not dest_path.exists():
+                    dest_path.write_bytes(raw_bytes)
+                local_path = dest_path
+            except Exception as e_loc:
+                print(f"[Storage] Notice: Failed to write local raw original to {clean_name}: {e_loc}")
+
+        return minio_key, local_path
 
     def save_bytes(
         self,

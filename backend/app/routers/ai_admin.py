@@ -71,3 +71,9 @@ def update_ai_settings(payload: AISettingsUpdate, db: Session = Depends(get_db))
         "is_paid_enabled": ai_conf.is_paid_enabled,
         "hardware_acceleration": hw_str
     }
+
+@router.get("/face-swap/status")
+def get_face_swap_status():
+    """Retrieve InsightFace INSwapper-128 service health, model path, and provider metadata."""
+    from app.services.ai.face_swap_service import face_swap_service
+    return face_swap_service.get_status()

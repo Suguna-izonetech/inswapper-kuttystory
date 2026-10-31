@@ -20,7 +20,7 @@ class CartoonCharacterFusionEngine:
     Preserves authentic storybook artwork and illustrations across all pages
     while personalizing the character using the uploaded child/person photograph.
     
-    1. Primary Tier: High-Definition Neural Face Swap via space configured in .env (HF_FACE_SWAP_SPACE)
+    1. Primary Tier: InsightFace INSwapper-128 (inswapper_128.onnx) ONNX engine
        for hyper-accurate, high-clarity 3D character identity preservation.
     2. Fallback Tier: Local YuNet Deep Face Detection + Reinhard LAB 3D Color Harmonization
        and Bilateral Texture Smoothing (cv2.seamlessClone) for offline reliability.
@@ -108,15 +108,24 @@ class CartoonCharacterFusionEngine:
         """
         Lazily initialize local ONNX GFPGAN face restoration session.
         """
-        if cls._ort_session is None and cls.GFPGAN_MODEL_PATH.exists():
-            try:
-                import onnxruntime as ort
-                opts = ort.SessionOptions()
-                opts.intra_op_num_threads = 4
-                cls._ort_session = ort.InferenceSession(str(cls.GFPGAN_MODEL_PATH), sess_options=opts, providers=["CPUExecutionProvider"])
-            except Exception as e:
-                print(f"Notice: Could not initialize local ONNX restorer: {e}")
-                cls._ort_session = None
+        if cls._ort_session is None:
+            candidates = [
+                cls.GFPGAN_MODEL_PATH,
+                Path(settings.BACKEND_DIR) / "models" / "GFPGANv1.4.onnx",
+                Path(settings.BASE_DIR) / "models" / "GFPGANv1.4.onnx",
+                Path(__file__).resolve().parent / "GFPGANv1.4.onnx",
+            ]
+            for cand in candidates:
+                if cand.is_file():
+                    try:
+                        import onnxruntime as ort
+                        opts = ort.SessionOptions()
+                        opts.intra_op_num_threads = 4
+                        cls._ort_session = ort.InferenceSession(str(cand), sess_options=opts, providers=["CPUExecutionProvider"])
+                        break
+                    except Exception as e:
+                        print(f"Notice: Could not initialize local ONNX restorer from {cand}: {e}")
+                        cls._ort_session = None
         return cls._ort_session
 
     @classmethod
@@ -127,7 +136,22 @@ class CartoonCharacterFusionEngine:
         """
         sess = cls._get_onnx_restorer()
         if not sess:
-            return image_pil
+            try:
+                from app.services.ai.face_swap_service import face_swap_service
+                img_bgr = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
+                box = cls.detect_face_yunet(img_bgr, score_threshold=0.20)
+                target_bbox = (box["x"], box["y"], box["x"] + box["w"], box["y"] + box["h"]) if box else None
+                enhanced_bgr = face_swap_service.enhance_image_quality(
+                    image_bgr=img_bgr,
+                    target_face_bbox=target_bbox,
+                    sharpness=1.35,
+                    contrast_clahe=True,
+                    skin_bilateral=True
+                )
+                return Image.fromarray(cv2.cvtColor(enhanced_bgr, cv2.COLOR_BGR2RGB))
+            except Exception as e_enh:
+                print(f"Notice during local detail enhancement: {e_enh}")
+                return image_pil
         try:
             img_bgr = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
             h, w = img_bgr.shape[:2]
@@ -165,6 +189,20 @@ class CartoonCharacterFusionEngine:
 
             blended = (restored_crop * mask_3d + img_bgr[y1:y2, x1:x2] * (1.0 - mask_3d)).astype(np.uint8)
             img_bgr[y1:y2, x1:x2] = blended
+
+            # Apply subtle post-restoration sharpening to match 1241x1241 canvas acuity
+            try:
+                from app.services.ai.face_swap_service import face_swap_service
+                img_bgr = face_swap_service.enhance_image_quality(
+                    image_bgr=img_bgr,
+                    target_face_bbox=(x1, y1, x2, y2),
+                    sharpness=1.25,
+                    contrast_clahe=True,
+                    skin_bilateral=True
+                )
+            except Exception:
+                pass
+
             return Image.fromarray(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
         except Exception as e_onnx:
             print(f"Notice during local ONNX face enhancement: {e_onnx}")
@@ -400,7 +438,9 @@ class CartoonCharacterFusionEngine:
         story_slug: str = "unicorn-story",
         page_image_path: Optional[str] = None,
         face_outline_points: Optional[str] = None,
-        prefer_local: bool = False
+        prefer_local: bool = False,
+        job_id: Optional[str] = None,
+        save_raw_original: bool = True
     ) -> GenerationResult:
         """
         Personalizes a storybook page by replacing the character's face with the child's real face:
@@ -449,6 +489,20 @@ class CartoonCharacterFusionEngine:
         base_page = Image.open(io.BytesIO(page_bytes)).convert("RGB")
         base_w, base_h = base_page.size
 
+        # Preserve pristine original AI-generated/storybook plate BEFORE face swap or enhancement
+        raw_original_key = None
+        raw_original_local = None
+        if save_raw_original:
+            try:
+                raw_name = f"{job_id}/p{page_number:02d}_original.png" if job_id else f"{story_slug}/p{page_number:02d}_original.png"
+                raw_original_key, raw_original_local = storage.save_raw_original(
+                    data=base_page,
+                    custom_name=raw_name,
+                    save_local=True
+                )
+            except Exception as e_raw:
+                print(f"Notice: Failed to store raw original plate for page {page_number}: {e_raw}")
+
         # If face_outline_points was explicitly cleared ('[]' or 'none'), there is NO character face on this page.
         # Preserve the original base illustration untouched without any face swapping.
         if face_outline_points in ["[]", "none", "false", "no_face"]:
@@ -464,7 +518,7 @@ class CartoonCharacterFusionEngine:
                 generation_time_sec=0.01,
                 cost_estimate_usd=0.00,
                 is_simulated=False,
-                metadata={"fused_page": page_number, "character_fused": False, "ai_swapped": False}
+                metadata={"fused_page": page_number, "character_fused": False, "ai_swapped": False, "raw_original_path": raw_original_key, "raw_original_local_path": str(raw_original_local) if raw_original_local else None}
             )
 
         # Resolve anchor from face outline points or dynamic detection
@@ -526,12 +580,66 @@ class CartoonCharacterFusionEngine:
         if child_reference_path and not os.path.exists(child_reference_path):
             resolved_child_ref = storage.resolve_path(child_reference_path)
 
+        face_swap_provider = getattr(settings, "FACE_SWAP_PROVIDER", "insightface").lower()
+        use_insightface = (face_swap_provider == "insightface")
         effective_prefer_local = prefer_local or getattr(settings, "PREFER_LOCAL_FUSION", False)
         raw_spaces = getattr(settings, "HF_FACE_SWAP_SPACE", "").strip()
         candidate_spaces = [s.strip() for s in raw_spaces.split(",") if s.strip()]
 
         if resolved_child_ref and os.path.exists(resolved_child_ref):
-            if not effective_prefer_local and candidate_spaces:
+            # Tier 1: InsightFace INSwapper-128 Local/GPU Service (Always prioritized when provider is insightface)
+            if use_insightface:
+                try:
+                    from app.services.ai.face_swap_service import (
+                        face_swap_service,
+                        NoFaceDetectedError,
+                        FaceSwapError,
+                        InvalidImageError,
+                    )
+                    swapped_pil = face_swap_service.swap_faces(
+                        target_image=base_page,
+                        source_image=resolved_child_ref,
+                        anchor=anchor,
+                        return_format="pil"
+                    )
+
+                    use_enhancer = getattr(settings, "FACE_SWAP_ENHANCE", False)
+                    if use_enhancer:
+                        base_page = cls.enhance_face_clarity(swapped_pil, fidelity=0.90)
+                    else:
+                        base_page = swapped_pil
+
+                    provider_name = "InsightFace INSwapper-128"
+                    model_name = "inswapper_128.onnx"
+                    swapped_with_ai = True
+                except NoFaceDetectedError as e_noface:
+                    err_msg = str(e_noface).lower()
+                    if "target" in err_msg:
+                        # Target story page does not have a character face (scenic / animal page)
+                        print(f"Info: Page {page_number} has no character face to swap. Preserving authentic illustration.")
+                        buf = io.BytesIO()
+                        base_page.save(buf, format="PNG", optimize=True)
+                        return GenerationResult(
+                            image_bytes=buf.getvalue(),
+                            format="png",
+                            provider="Preserved Base Artwork",
+                            model="original-plate-preserved",
+                            prompt=f"Preserved {story_slug} Page {page_number} authentic artwork",
+                            generation_time_sec=round(time.time() - start_time, 3),
+                            cost_estimate_usd=0.00,
+                            is_simulated=False,
+                            metadata={"fused_page": page_number, "character_fused": False, "ai_swapped": False, "raw_original_path": raw_original_key, "raw_original_local_path": str(raw_original_local) if raw_original_local else None}
+                        )
+                    else:
+                        # Error in child photo: raise clearly rather than silently returning original
+                        print(f"Error during face swap on {story_slug} Page {page_number}: {e_noface}")
+                        raise
+                except Exception as e_swap:
+                    print(f"Error during InsightFace INSwapper face swap on {story_slug} Page {page_number}: {e_swap}")
+                    raise
+
+            # Tier 2: Legacy Cloud Hugging Face Space (Only if spaces configured and not swapped yet)
+            if not swapped_with_ai and not effective_prefer_local and candidate_spaces:
                 use_enhancer = getattr(settings, "HF_FACE_SWAP_ENHANCE", False)
 
                 temp_dest = Path(tempfile.gettempdir()) / f"temp_{story_slug}_p{page_number:02d}_{os.getpid()}_{int(time.time() * 1000)}.jpg"
@@ -599,7 +707,7 @@ class CartoonCharacterFusionEngine:
                                 generation_time_sec=round(time.time() - start_time, 3),
                                 cost_estimate_usd=0.00,
                                 is_simulated=False,
-                                metadata={"fused_page": page_number, "character_fused": False, "ai_swapped": False}
+                                metadata={"fused_page": page_number, "character_fused": False, "ai_swapped": False, "raw_original_path": raw_original_key, "raw_original_local_path": str(raw_original_local) if raw_original_local else None}
                             )
 
                 if temp_dest.exists():
@@ -608,8 +716,8 @@ class CartoonCharacterFusionEngine:
                     except Exception:
                         pass
 
-            # 3. Tier 3: High-Fidelity Local Poisson Face Fusion (Guaranteed 100% Real Face likeness)
-            if not swapped_with_ai:
+            # 3. Tier 3: Legacy Poisson Fallback (Only used if insightface is explicitly disabled)
+            if not swapped_with_ai and not use_insightface:
                 base_page = cls.smart_local_seamless_fusion(
                     child_reference_path=resolved_child_ref,
                     base_page_img=base_page,
@@ -634,7 +742,37 @@ class CartoonCharacterFusionEngine:
             generation_time_sec=duration,
             cost_estimate_usd=0.00,
             is_simulated=False,
-            metadata={"fused_page": page_number, "character_fused": bool(anchor or swapped_with_ai), "ai_swapped": swapped_with_ai}
+            metadata={"fused_page": page_number, "character_fused": bool(anchor or swapped_with_ai), "ai_swapped": swapped_with_ai, "raw_original_path": raw_original_key, "raw_original_local_path": str(raw_original_local) if raw_original_local else None}
+        )
+
+    @classmethod
+    async def fuse_page_async(
+        cls,
+        page_number: int,
+        child_reference_path: Optional[str] = None,
+        story_slug: str = "unicorn-story",
+        page_image_path: Optional[str] = None,
+        face_outline_points: Optional[str] = None,
+        prefer_local: bool = False,
+        job_id: Optional[str] = None,
+        save_raw_original: bool = True
+    ) -> GenerationResult:
+        """
+        Asynchronously personalizes a storybook page by executing CPU-intensive
+        face swap and image processing in a background worker thread.
+        Prevents blocking FastAPI's async event loop.
+        """
+        import asyncio
+        return await asyncio.to_thread(
+            cls.fuse_page,
+            page_number=page_number,
+            child_reference_path=child_reference_path,
+            story_slug=story_slug,
+            page_image_path=page_image_path,
+            face_outline_points=face_outline_points,
+            prefer_local=prefer_local,
+            job_id=job_id,
+            save_raw_original=save_raw_original
         )
 
 cartoon_fusion_engine = CartoonCharacterFusionEngine()

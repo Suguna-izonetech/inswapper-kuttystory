@@ -103,8 +103,8 @@ def enrich_job_urls(job: PersonalizationJob) -> dict:
             existing = best_assets_by_page[p_num]
             new_m, new_p = (asset.model or "").lower(), (asset.provider or "").lower()
             old_m, old_p = (existing.model or "").lower(), (existing.provider or "").lower()
-            is_new_ai = any(s in new_m for s in swap_spaces if s) or ("hugging" in new_p) or ("swap" in new_m) or ("neural" in new_p)
-            is_old_ai = any(s in old_m for s in swap_spaces if s) or ("hugging" in old_p) or ("swap" in old_m) or ("neural" in old_p)
+            is_new_ai = ("inswapper" in new_m) or ("insightface" in new_p) or any(s in new_m for s in swap_spaces if s) or ("hugging" in new_p) or ("swap" in new_m) or ("neural" in new_p)
+            is_old_ai = ("inswapper" in old_m) or ("insightface" in old_p) or any(s in old_m for s in swap_spaces if s) or ("hugging" in old_p) or ("swap" in old_m) or ("neural" in old_p)
             if is_new_ai and not is_old_ai:
                 best_assets_by_page[p_num] = asset
             elif is_new_ai == is_old_ai and (asset.created_at or datetime.datetime.min) > (existing.created_at or datetime.datetime.min):
@@ -294,113 +294,8 @@ def get_full_storybook_pages_for_print(
     target_lang: str = "english",
     db: Session = None
 ) -> List[Dict[str, Any]]:
-    story_slug = story.slug or "unicorn-story"
-    child_name = job.child_name or "Little Explorer"
-
-    # Query all story pages ordered by page_number
-    story_pages = db.query(StoryPage).filter(
-        StoryPage.story_id == story.id
-    ).order_by(StoryPage.page_number).all()
-
-    # Pre-load existing generated assets (face-fused plates), strictly prioritizing Hugging Face AI over Poisson
-    existing_assets = {}
-    swap_spaces = [s.strip().lower() for s in getattr(settings, "HF_FACE_SWAP_SPACE", "").split(",") if s.strip()]
-    def _asset_priority(a):
-        m = (a.model or "").lower()
-        p = (a.provider or "").lower()
-        tier = 2 if any(s in m for s in swap_spaces if s) else (1 if ("hugging" in p or "swap" in m or "neural" in p) else 0)
-        return (tier, a.created_at or datetime.datetime.min)
-
-    sorted_assets = sorted(
-        db.query(GeneratedAsset).filter(GeneratedAsset.job_id == job.id, GeneratedAsset.generation_status == "completed").all(),
-        key=_asset_priority
-    )
-    for a in sorted_assets:
-        if a.storage_path:
-            resolved_p = storage.resolve_path(a.storage_path)
-            if resolved_p and os.path.exists(resolved_p):
-                existing_assets[a.page_number] = resolved_p
-            else:
-                existing_assets[a.page_number] = a.storage_path
-
-    # Resolve child reference photo for dynamic face fusion on uncompleted pages
-    resolved_child_photo = storage.resolve_path(job.photo_path) if job.photo_path else None
-    from app.services.ai.cartoon_fusion import cartoon_fusion_engine
-    import time
-
-    pages_data = []
-    for page in story_pages:
-        page_num = page.page_number
-        page_type = page.page_type or ("cover" if page_num == 1 else "story")
-
-        # 1. Personalize narrative text
-        raw_text = page.story_text or page.extracted_text or f"Scene for page {page_num}."
-        personalized_text = raw_text
-        for tag in ["[Name]", "[name]", "{name}", "[child_name]", "{child_name}"]:
-            personalized_text = personalized_text.replace(tag, child_name)
-
-        if target_lang.lower() not in ["english", "en"]:
-            from app.services.translation_service import translation_service
-            personalized_text = translation_service.translate_text(personalized_text, target_lang, child_name=child_name)
-
-        # 2. Resolve image: use personalized face-swapped plate if ready, else generate it with AI Neural Face Swap
-        is_page_personalizable = bool(page.personalization_required and page.face_outline_points not in ["[]", "none", "false"])
-        img_path = None
-        if page_num in existing_assets and is_page_personalizable:
-            img_path = existing_assets[page_num]
-        elif is_page_personalizable and resolved_child_photo and os.path.exists(resolved_child_photo):
-            cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png"
-            page_img = (str(cand) if cand.exists() else None) or (storage.resolve_path(page.original_image_path) if page.original_image_path else None) or f"source_pages/{story_slug}/page_{page_num:02d}.png"
-            try:
-                gen_res = cartoon_fusion_engine.fuse_page(
-                    page_number=page_num,
-                    child_reference_path=resolved_child_photo,
-                    story_slug=story_slug,
-                    page_image_path=page_img,
-                    face_outline_points=page.face_outline_points,
-                    prefer_local=False
-                )
-                asset_filename = f"job_{job.id}_p{page_num:02d}_{int(time.time())}.{gen_res.format}"
-                asset_path = storage.save_bytes(
-                    data=gen_res.image_bytes,
-                    category="generated_assets",
-                    custom_name=f"{job.id}/{asset_filename}"
-                )
-                if db:
-                    new_asset = GeneratedAsset(
-                        job_id=job.id,
-                        story_page_id=page.id,
-                        page_number=page_num,
-                        storage_path=asset_path,
-                        provider=gen_res.provider,
-                        model=gen_res.model,
-                        prompt_used=personalized_text,
-                        generation_status="completed",
-                        review_status="approved",
-                        cost_estimate=gen_res.cost_estimate_usd,
-                        generation_time_sec=gen_res.generation_time_sec
-                    )
-                    db.add(new_asset)
-                    db.commit()
-                res_local = storage.resolve_path(asset_path)
-                existing_assets[page_num] = res_local or asset_path
-                img_path = res_local or asset_path
-            except Exception as e:
-                print(f"Notice: Face fusion error on page {page_num}: {e}")
-                cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png"
-                img_path = (str(cand) if cand.exists() else None) or (storage.resolve_path(page.original_image_path) if page.original_image_path else None) or page.original_image_path
-        else:
-            cand = settings.SOURCE_PAGES_DIR / story_slug / f"page_{page_num:02d}.png"
-            img_path = (str(cand) if cand.exists() else None) or (storage.resolve_path(page.original_image_path) if page.original_image_path else None) or page.original_image_path
-
-        pages_data.append({
-            "page_number": page_num,
-            "page_type": page_type,
-            "image_path": img_path,
-            "story_text": personalized_text
-        })
-
-    return pages_data
+    from app.services.job_runner import job_runner
+    return job_runner.get_or_generate_full_storybook_pages(str(job.id), target_lang=target_lang)
 
 @router.get("/{job_id}/print-pdf")
 def download_full_print_pdf(
@@ -425,12 +320,16 @@ def download_full_print_pdf(
 
     referer_str = referer if isinstance(referer, str) else ""
     auth_str = authorization if isinstance(authorization, str) else ""
+    mode_str = mode if isinstance(mode, str) else ""
+    lang_str = lang if isinstance(lang, str) else "english"
+    size_str = size if isinstance(size, str) else "8x8"
+    color_str = color if isinstance(color, str) else "rgb"
 
     is_admin = (
         admin is True or
-        str(admin).lower() in ["true", "1", "yes"] or
-        color in ["admin", "admin_preview"] or
-        (mode and mode.lower() in ["admin", "admin_preview"]) or
+        (isinstance(admin, str) and admin.lower() in ["true", "1", "yes"]) or
+        color_str in ["admin", "admin_preview"] or
+        mode_str.lower() in ["admin", "admin_preview"] or
         bool(referer_str and any(path in referer_str.lower() for path in ["/admin", "/admin_dashboard", "dashboard"]))
     )
 
@@ -457,28 +356,63 @@ def download_full_print_pdf(
     story_title = story.title if story else "Personalized Story"
 
     from app.services.pdf_composer import PDFComposerService
+    from fastapi.responses import StreamingResponse
 
-    print_filename = f"final_book_{job.id}_{lang}_{size}_{color}.pdf"
-    pdf_bytes = None
-    candidate_keys = [
-        f"final_books/{print_filename}",
-        f"final_books/final_book_{job.id}_{lang}_{size}_rgb.pdf",
-        f"final_books/final_book_{job.id}_{lang}_{size}_admin_preview.pdf"
-    ]
-    for key in candidate_keys:
-        try:
-            pdf_bytes = storage.get_bytes(key)
-            if pdf_bytes:
+    expected_page_count = (story.page_count or len(story.pages)) if story else 24
+    print_filename = f"final_book_{job.id}_{lang_str}_{size_str}_{color_str}.pdf"
+    target_key = None
+
+    # Check for existing completed Book record or pre-composed PDF in MinIO
+    from app.models import Book
+    existing_book = db.query(Book).filter(
+        Book.job_id == job.id,
+        Book.book_type == "final",
+        Book.page_count == expected_page_count
+    ).first()
+
+    if existing_book and existing_book.pdf_storage_path:
+        cat, fn = storage._parse_category_and_filename(existing_book.pdf_storage_path)
+        if cat and fn and storage.file_exists(cat, fn):
+            target_key = (cat, fn)
+
+    if not target_key:
+        candidate_keys = [
+            f"final_books/{print_filename}",
+            f"final_books/final_book_{job.id}_{lang_str}_{size_str}_rgb.pdf",
+            f"final_books/final_book_{job.id}_{lang_str}_8x8_rgb.pdf",
+            f"final_books/final_book_{job.id}_english_8x8_rgb.pdf"
+        ]
+        for key in candidate_keys:
+            cat, fn = storage._parse_category_and_filename(key)
+            if cat and fn and storage.file_exists(cat, fn):
+                target_key = (cat, fn)
                 break
-        except Exception:
-            pdf_bytes = None
 
-    if not pdf_bytes:
-        # Fetch all pages with personalized face-fused character plates:
-        all_pages_data = get_full_storybook_pages_for_print(job=job, story=story, target_lang=lang, db=db)
+    if not target_key:
+        job_status = (job.status or "").lower()
+        if job_status != "completed":
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": job.status,
+                    "stage": job.current_stage,
+                    "completed_pages": job.completed_pages,
+                    "total_pages": expected_page_count,
+                    "message": "Personalized storybook PDF is currently being composed. Please wait for completion."
+                }
+            )
+        # Generate full storybook pages with all personalizable pages face-fused
+        all_pages_data = get_full_storybook_pages_for_print(job=job, story=story, target_lang=lang_str, db=db)
 
         if not all_pages_data:
             raise HTTPException(status_code=400, detail="No printable pages found for this storybook.")
+
+        if len(all_pages_data) != expected_page_count:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Page count mismatch: expected {expected_page_count} pages but got {len(all_pages_data)}."
+            )
 
         storage_key, validation = PDFComposerService.compose_storybook_pdf(
             pages_data=all_pages_data,
@@ -486,21 +420,33 @@ def download_full_print_pdf(
             book_type="final",
             child_name=child_name,
             story_title=story_title,
-            page_size=size,
-            color_mode=color
+            page_size=size_str,
+            color_mode=color_str
         )
+        cat, fn = storage._parse_category_and_filename(storage_key)
+        target_key = (cat or "final_books", fn or print_filename)
+
+    stream, media_type, content_length = storage.get_object_stream(target_key[0], target_key[1])
+
+    def iterfile():
         try:
-            pdf_bytes = storage.get_bytes(storage_key)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to retrieve composed print PDF: {e}")
+            for chunk in stream.stream(1048576):
+                yield chunk
+        finally:
+            stream.close()
+            stream.release_conn()
 
     safe_child = child_name.replace(" ", "_")
     safe_title = story_title.replace(" ", "_")
-    return Response(
-        content=pdf_bytes,
+    download_filename = f"{safe_child}_{safe_title}_Full_Print_{size_str}.pdf"
+
+    return StreamingResponse(
+        iterfile(),
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'attachment; filename="{safe_child}_{safe_title}_Full_Print_{size}.pdf"'
+            "Content-Disposition": f'attachment; filename="{download_filename}"',
+            "Content-Length": str(content_length),
+            "Access-Control-Expose-Headers": "Content-Disposition, Content-Length"
         }
     )
 
@@ -522,12 +468,16 @@ def download_preview_pdf(
 
     referer_str = referer if isinstance(referer, str) else ""
     auth_str = authorization if isinstance(authorization, str) else ""
+    mode_str = mode if isinstance(mode, str) else "preview"
+    lang_str = lang if isinstance(lang, str) else "english"
+    size_str = size if isinstance(size, str) else "8x8"
+    color_str = color if isinstance(color, str) else "rgb"
 
     is_admin = (
         admin is True or
-        str(admin).lower() in ["true", "1", "yes"] or
-        color in ["admin", "admin_preview"] or
-        (mode and mode.lower() == "admin") or
+        (isinstance(admin, str) and admin.lower() in ["true", "1", "yes"]) or
+        color_str in ["admin", "admin_preview"] or
+        mode_str.lower() in ["admin", "admin_preview"] or
         bool(referer_str and any(path in referer_str.lower() for path in ["/admin", "/admin_dashboard", "dashboard"]))
     )
 
@@ -545,7 +495,7 @@ def download_preview_pdf(
     is_paid = bool(getattr(job, "is_paid", False))
 
     # If customer has paid, OR if mode is full/print/admin, OR if user is admin:
-    if is_paid or is_admin or mode.lower() in ["full", "print", "admin"]:
+    if is_paid or is_admin or mode_str.lower() in ["full", "print", "admin"]:
         if not is_paid and not is_admin:
             raise HTTPException(
                 status_code=402,
@@ -553,9 +503,9 @@ def download_preview_pdf(
             )
         return download_full_print_pdf(
             job_id=job_id,
-            lang=lang,
-            size=size,
-            color="admin_preview" if is_admin else color,
+            lang=lang_str,
+            size=size_str,
+            color="admin_preview" if is_admin else color_str,
             admin=is_admin,
             mode="full",
             authorization=auth_str,
@@ -576,14 +526,29 @@ def download_preview_pdf(
         ).order_by(Book.created_at.desc()).first()
         if preview_book and preview_book.pdf_storage_path:
             try:
-                pdf_bytes = storage.get_bytes(preview_book.pdf_storage_path)
-                return Response(
-                    content=pdf_bytes,
-                    media_type="application/pdf",
-                    headers={
-                        "Content-Disposition": f'inline; filename="{child_name}_{story_title}_preview.pdf"'
-                    }
-                )
+                cat, fn = storage._parse_category_and_filename(preview_book.pdf_storage_path)
+                if not cat or not fn:
+                    cat = "previews"
+                    fn = os.path.basename(preview_book.pdf_storage_path)
+                if storage.file_exists(cat, fn):
+                    from fastapi.responses import StreamingResponse
+                    stream, media_type, content_length = storage.get_object_stream(cat, fn)
+                    def iter_preview():
+                        try:
+                            for chunk in stream.stream(1048576):
+                                yield chunk
+                        finally:
+                            stream.close()
+                            stream.release_conn()
+                    return StreamingResponse(
+                        iter_preview(),
+                        media_type="application/pdf",
+                        headers={
+                            "Content-Disposition": f'inline; filename="{child_name}_{story_title}_preview.pdf"',
+                            "Content-Length": str(content_length),
+                            "Access-Control-Expose-Headers": "Content-Disposition, Content-Length"
+                        }
+                    )
             except Exception as e:
                 print(f"[MinIO] Notice fetching preview PDF: {e}")
 

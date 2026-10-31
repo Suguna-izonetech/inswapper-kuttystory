@@ -73,6 +73,8 @@ export default function PdfDownloadModal({
   const [fileSizeMb, setFileSizeMb] = useState<string | null>(null);
   const [downloadBlobUrl, setDownloadBlobUrl] = useState<string | null>(null);
   const [downloadFilename, setDownloadFilename] = useState<string>("");
+  const [currentActionLabel, setCurrentActionLabel] = useState<string>("Preparing storybook...");
+  const [currentStageDetail, setCurrentStageDetail] = useState<string>("");
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -90,10 +92,12 @@ export default function PdfDownloadModal({
     if (!downloadUrl) return;
 
     setStatus("downloading");
-    setProgress(12);
+    setProgress(15);
     setActiveStageIdx(0);
     setErrorMessage(null);
     setDownloadBlobUrl(null);
+    setCurrentActionLabel("Checking storybook status...");
+    setCurrentStageDetail("Verifying personalized character spreads...");
 
     const targetFilename = getEffectiveFilename();
     setDownloadFilename(targetFilename);
@@ -105,33 +109,102 @@ export default function PdfDownloadModal({
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    // Simulated progress incrementing smoothly while waiting for server generation
-    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-    
-    let currentProg = 12;
-    progressTimerRef.current = setInterval(() => {
-      currentProg += Math.random() * 4 + 2;
-      if (currentProg > 92) {
-        currentProg = 92; // Wait for actual blob to finish
-      }
-      setProgress(Math.round(currentProg));
+    // Check if download URL contains a job ID to poll live rendering progress
+    const match = downloadUrl.match(/\/personalization\/([a-zA-Z0-9-]+)/);
+    const jobId = match ? match[1] : null;
 
-      if (currentProg < 35) {
-        setActiveStageIdx(0);
-      } else if (currentProg < 65) {
-        setActiveStageIdx(1);
-      } else if (currentProg < 88) {
-        setActiveStageIdx(2);
-      } else {
-        setActiveStageIdx(3);
+    if (jobId) {
+      let isReady = false;
+      let pollCount = 0;
+      const maxPolls = 600; // Up to 15 minutes
+
+      while (!isReady && pollCount < maxPolls) {
+        if (controller.signal.aborted) return;
+        pollCount++;
+
+        try {
+          const statusRes = await fetch(resolveBackendUrl(`/api/v1/personalization/${jobId}`), {
+            signal: controller.signal
+          });
+          if (statusRes.ok) {
+            const jobData = await statusRes.json();
+            const jobStatus = (jobData.status || "").toLowerCase();
+            const completedP = Number(jobData.completed_pages) || 0;
+            const totalP = Number(jobData.total_pages) || 24;
+
+            if (jobStatus === "completed") {
+              isReady = true;
+              setProgress(95);
+              setActiveStageIdx(3);
+              setCurrentActionLabel("Finalizing Document Package...");
+              setCurrentStageDetail("Delivering verified keepsake file to your device...");
+              break;
+            } else if (jobStatus === "failed") {
+              throw new Error(jobData.error_details || "Personalization encountered an issue. Please try again.");
+            } else if (jobStatus === "compiling_pdf") {
+              setProgress(88);
+              setActiveStageIdx(2);
+              setCurrentActionLabel("Archival PDF Compilation...");
+              setCurrentStageDetail(jobData.current_stage || "Compiling 300 DPI print-grade PDF stream...");
+            } else {
+              // Live background rendering progress
+              const pct = Math.min(85, Math.max(18, Math.round((completedP / totalP) * 85)));
+              setProgress(pct);
+
+              if (pct < 40) {
+                setActiveStageIdx(0);
+              } else if (pct < 70) {
+                setActiveStageIdx(1);
+              } else {
+                setActiveStageIdx(2);
+              }
+
+              setCurrentActionLabel(`Personalizing page ${completedP} of ${totalP}...`);
+              setCurrentStageDetail(jobData.current_stage || `Fusing HD portrait on page ${completedP} of ${totalP}...`);
+            }
+          }
+        } catch (pollErr: any) {
+          if (pollErr.name === "AbortError") return;
+          console.warn("Notice checking job status:", pollErr);
+        }
+
+        // Wait 1.4 seconds before checking again
+        await new Promise((r) => setTimeout(r, 1400));
       }
-    }, 450);
+
+      if (!isReady) {
+        setStatus("error");
+        setErrorMessage("Crafting all personalized spreads is taking a little extra time on the atelier server. Please click 'Try Again' to continue downloading.");
+        return;
+      }
+    }
+
+    // Now stream the ready PDF from backend
+    setCurrentActionLabel("Finalizing Document Package...");
+    setActiveStageIdx(3);
+    setProgress((prev) => Math.max(prev, 92));
+
+    let fetchTimedOut = false;
+    const fetchTimer = setTimeout(() => {
+      fetchTimedOut = true;
+      controller.abort();
+    }, 180000);
 
     try {
       const effectiveUrl = resolveBackendUrl(downloadUrl);
       const response = await fetch(effectiveUrl, {
         signal: controller.signal
       });
+      clearTimeout(fetchTimer);
+
+      if (response.status === 202) {
+        // Server still compiling PDF in background, retry in 3 seconds
+        setCurrentActionLabel("Compiling 300 DPI archival PDF stream...");
+        setCurrentStageDetail("Almost ready! Packaging print-grade volume...");
+        setProgress(92);
+        await new Promise((r) => setTimeout(r, 3000));
+        return startDownload();
+      }
 
       if (!response.ok) {
         if (response.status === 402) {
@@ -160,8 +233,6 @@ export default function PdfDownloadModal({
       setDownloadFilename(extractedFilename);
 
       const blob = await response.blob();
-      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-
       const mb = (blob.size / (1024 * 1024)).toFixed(1);
       setFileSizeMb(`${mb} MB`);
       setProgress(100);
@@ -180,14 +251,18 @@ export default function PdfDownloadModal({
       document.body.removeChild(link);
     } catch (err: any) {
       if (err.name === "AbortError") {
-        return; // User cancelled
+        if (fetchTimedOut) {
+          setStatus("error");
+          setErrorMessage("The download connection was interrupted or timed out. Please click 'Try Again' to download your ready PDF.");
+        }
+        return;
       }
-      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
       console.error("PDF download failed:", err);
       setStatus("error");
       setErrorMessage(err.message || "Failed to generate or download the storybook PDF.");
     }
   };
+
 
   useEffect(() => {
     if (isOpen && downloadUrl) {
@@ -274,7 +349,7 @@ export default function PdfDownloadModal({
                 <div className="flex justify-between items-center text-xs font-semibold text-[#695B64]">
                   <span className="flex items-center gap-1.5 text-[#8B3DFF]">
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Binding pages...</span>
+                    <span>{currentActionLabel}</span>
                   </span>
                   <span className="font-mono text-sm text-[#2D222A] font-bold">
                     {progress}%
@@ -335,7 +410,7 @@ export default function PdfDownloadModal({
                           </p>
                           {isCurrent && (
                             <p className="text-[11px] text-[#695B64] mt-0.5 animate-fadeIn">
-                              {stg.detail}
+                              {currentStageDetail || stg.detail}
                             </p>
                           )}
                         </div>

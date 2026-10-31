@@ -7,7 +7,7 @@ from typing import List, Optional, Dict, Any
 from app.services.email_service import EmailService
 
 from app.database import get_db
-from app.models import StoryTemplate, StoryPage, PersonalizationJob, GeneratedAsset, Book, AISettings, Order
+from app.models import StoryTemplate, StoryPage, PersonalizationJob, GeneratedAsset, Book, AISettings, Order, PaymentTransaction
 import re
 from app.schemas import (
     StoryTemplateOut, StoryTemplateCreate, StoryPageOut, StoryTemplateUpdate, StoryPageUpdate, 
@@ -262,8 +262,9 @@ def delete_story(story_id: str, db: Session = Depends(get_db)):
     jobs = db.query(PersonalizationJob).filter(PersonalizationJob.story_id == story_id).all()
     job_ids = [j.id for j in jobs]
 
-    # 3. Clean up books and orders referencing these jobs
+    # 3. Clean up transactions, books and orders referencing these jobs
     if job_ids:
+        db.query(PaymentTransaction).filter(PaymentTransaction.job_id.in_(job_ids)).update({PaymentTransaction.job_id: None}, synchronize_session=False)
         books = db.query(Book).filter(Book.job_id.in_(job_ids)).all()
         book_ids = [b.id for b in books]
         if book_ids:

@@ -49,10 +49,15 @@ class HuggingFaceDiffusersProvider(ImageGenerationProvider):
         negative_prompt: Optional[str] = None,
         seed: Optional[int] = None,
         width: int = 1024,
-        height: int = 1024
+        height: int = 1024,
+        save_raw: bool = True,
+        raw_name: Optional[str] = None,
+        enhance_quality: bool = True
     ) -> GenerationResult:
         """
-        Generate image via Hugging Face Inference API.
+        Generate high-resolution storybook illustration via Hugging Face Inference API.
+        Applies prompt sharpening, micro-contrast enhancement, and preserves the pristine
+        original in storage/raw_generated/ before face swapping or downstream modifications.
         """
         if not self.token:
             raise ValueError(
@@ -67,14 +72,22 @@ class HuggingFaceDiffusersProvider(ImageGenerationProvider):
 
         start_time = time.time()
         headers = {"Authorization": f"Bearer {self.token}"}
+
+        # Enhanced negative prompt targeting high sharpness, clear anatomy, and artifact reduction
+        enhanced_neg = negative_prompt or (
+            "blurry, soft focus, out of focus, low resolution, compression artifacts, "
+            "jpeg artifacts, oversaturated, deformed, bad anatomy, poorly drawn face, "
+            "poorly drawn hands, duplicate, watermark, signature, grainy, low quality"
+        )
+
         payload = {
             "inputs": prompt,
             "parameters": {
-                "negative_prompt": negative_prompt or "blurry, low quality, deformed, mutated, extra limbs, ugly, text, watermark",
+                "negative_prompt": enhanced_neg,
                 "width": width,
                 "height": height,
                 "guidance_scale": 7.5,
-                "num_inference_steps": 30
+                "num_inference_steps": 35
             }
         }
 
@@ -86,16 +99,61 @@ class HuggingFaceDiffusersProvider(ImageGenerationProvider):
             image_bytes = response.content
             duration = time.time() - start_time
 
+            # 1. Preserve original unenhanced AI image in storage/raw_generated/
+            raw_key = None
+            raw_local = None
+            if save_raw or raw_name:
+                try:
+                    from app.services.storage import storage
+                    save_name = raw_name or f"ai_gen_{int(time.time()*1000)}.jpg"
+                    raw_key, raw_local = storage.save_raw_original(
+                        data=image_bytes,
+                        custom_name=save_name,
+                        extension=".jpg",
+                        save_local=True
+                    )
+                except Exception as e_raw:
+                    print(f"Notice: Failed to save raw generated image to storage: {e_raw}")
+
+            # 2. Quality & Sharpness Enhancement pass (LAB CLAHE & unsharp masking)
+            processed_bytes = image_bytes
+            if enhance_quality:
+                try:
+                    from app.services.ai.face_swap_service import face_swap_service
+                    import cv2
+                    import numpy as np
+
+                    nparr = np.frombuffer(image_bytes, np.uint8)
+                    img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                    if img_bgr is not None:
+                        enhanced_bgr = face_swap_service.enhance_image_quality(
+                            image_bgr=img_bgr,
+                            target_face_bbox=None,
+                            sharpness=1.30,
+                            contrast_clahe=True,
+                            skin_bilateral=False
+                        )
+                        success, enc = cv2.imencode(".jpg", enhanced_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 96])
+                        if success:
+                            processed_bytes = enc.tobytes()
+                except Exception as e_enh:
+                    print(f"Notice during diffusers post-generation enhancement: {e_enh}")
+
             return GenerationResult(
-                image_bytes=image_bytes,
+                image_bytes=processed_bytes,
                 format="jpeg",
                 provider="HuggingFace Diffusers (Hosted API)",
                 model=self.model_name,
                 prompt=prompt,
                 generation_time_sec=round(duration, 2),
-                cost_estimate_usd=0.005,  # Estimated serverless inference cost
+                cost_estimate_usd=0.005,
                 is_simulated=False,
-                metadata={"seed": seed, "dimensions": f"{width}x{height}"}
+                metadata={
+                    "seed": seed,
+                    "dimensions": f"{width}x{height}",
+                    "raw_original_path": raw_key,
+                    "raw_original_local_path": str(raw_local) if raw_local else None,
+                }
             )
 
 diffusers_provider = HuggingFaceDiffusersProvider()

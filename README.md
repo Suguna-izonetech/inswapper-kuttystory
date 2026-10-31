@@ -136,9 +136,53 @@ npm run dev
 ### 3. Run the Automated Backend Test Suite
 ```powershell
 cd backend
-python test_backend.py
+python test_insightface_swap.py
 ```
-*Verifies PDF import, ReportLab deterministic PDF composer, and hardware diagnostics.*
+*Validates InsightFace Buffalo_L detection, INSwapper-128 ONNX neural face swap, anchor matching, error handling, async execution, and PDF assembly.*
+
+#### 🎭 InsightFace INSwapper-128 Setup (CPU / GPU)
+1. **Model Weights Location**:
+   The model is located at `backend/models/inswapper_128.onnx`.
+   Download from verified sources (e.g. Hugging Face ModelsLab or DeepInsight release):
+   ```powershell
+   # Using Python huggingface_hub
+   python -c "from huggingface_hub import hf_hub_download; hf_hub_download(repo_id='ModelsLab/inswapper', filename='inswapper_128.onnx', local_dir='models')"
+   ```
+   *License Notice: InsightFace models are intended for academic research and authorized non-commercial evaluation.*
+
+2. **CPU Execution (Default)**:
+   - Configured in `.env`:
+     `FACE_SWAP_PROVIDER=insightface`
+     `INSWAPPER_MODEL_PATH=models/inswapper_128.onnx`
+     `FACE_SWAP_EXECUTION_PROVIDER=CPUExecutionProvider`
+     `FACE_SWAP_DET_SIZE=640`
+     `FACE_SWAP_ENHANCE=true`
+   - Installed package: `onnxruntime`
+
+3. **High-Definition Image Detail Enhancement & Storage Separation**:
+   - **Original Image Preservation**: The raw AI-generated illustrations and base plates are automatically saved in `storage/raw_generated/` (and MinIO `raw_generated` category) **before** face swapping or enhancement.
+   - **Strict Asset Separation**: Original and processed images are maintained in distinct directories (`raw_generated/` vs `generated_assets/`) ensuring originals are never overwritten and can be directly compared side-by-side.
+   - **Sharpness & Realism Pipeline**:
+     - *LAB Color Space CLAHE*: Micro-contrast on the Lightness channel brings out 3D facial depth without shifting artistic palette or lighting.
+     - *Multi-Scale Unsharp Masking*: Fine-frequency Gaussian filtering enhances eyes, eyelashes, lips, and facial hair contours.
+     - *Edge-Preserving Bilateral Smoothing*: Gently smooths skin transitions while locking sharp facial edges.
+     - *Lanczos-4 Reconstruction*: Crisp interpolation preserving high-resolution canvas detail (1241x1241 standard).
+
+4. **Running the Automated Test Suite**:
+   ```powershell
+   cd backend
+   .\venv\Scripts\python.exe test_insightface_swap.py
+   ```
+   Executes 15 comprehensive tests validating model loading, formats, error handling, anchor matching, asynchronous non-blocking inference, raw image storage isolation, detail enhancement, and ReportLab PDF composition.
+
+5. **Optional NVIDIA GPU Acceleration**:
+   - If an NVIDIA CUDA GPU is available, install `onnxruntime-gpu` (uninstall standard `onnxruntime` first to avoid library collision):
+     ```powershell
+     pip uninstall -y onnxruntime
+     pip install onnxruntime-gpu
+     ```
+   - In `.env`, set:
+     `FACE_SWAP_EXECUTION_PROVIDER=CUDAExecutionProvider`
 
 ---
 
@@ -168,7 +212,8 @@ Baby story/
 │   │   ├── original_pdfs/         # Private copy of original PDF
 │   │   ├── source_pages/          # Sliced 150 DPI PNG page illustrations (Pages 1-26)
 │   │   ├── child_photos/          # Protected, normalized parent-uploaded photos
-│   │   ├── generated_assets/      # Versioned AI-generated illustrations
+│   │   ├── raw_generated/         # Pristine original AI illustrations (pre-swap, pre-enhancement)
+│   │   ├── generated_assets/      # Versioned AI-generated & face-swapped illustrations
 │   │   ├── previews/              # ReportLab composed preview PDFs
 │   │   └── final_books/           # Print-ready final PDFs
 │   └── app/

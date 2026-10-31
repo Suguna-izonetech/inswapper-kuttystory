@@ -76,6 +76,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+App = app  # Alias for case-insensitive uvicorn app.main:App
 
 # CORS configuration - strictly driven by .env (settings.CORS_ORIGINS)
 origins_from_env = settings.CORS_ORIGINS

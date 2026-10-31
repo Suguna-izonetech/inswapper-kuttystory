@@ -59,7 +59,8 @@ def download_book_pdf(book_id: str, db: Session = Depends(get_db)):
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'attachment; filename="{download_filename}"',
-            "Content-Length": str(content_length)
+            "Content-Length": str(content_length),
+            "Access-Control-Expose-Headers": "Content-Disposition, Content-Length"
         }
     )
 

@@ -8,6 +8,7 @@ from typing import List, Union, Optional
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 STORAGE_BASE = BACKEND_DIR / "storage"
+RAW_GENERATED_DIR = STORAGE_BASE / "raw_generated"
 
 # Search and load .env file reliably from all likely locations
 def find_and_load_env():
@@ -78,12 +79,15 @@ class Settings(BaseSettings):
 
     # Storage directories (Cache / Scratch for temporary file processing)
     STORAGE_DIR: Path = STORAGE_BASE
+    BASE_DIR: Path = BASE_DIR
+    BACKEND_DIR: Path = BACKEND_DIR
     ORIGINAL_PDFS_DIR: Path = STORAGE_BASE / "original_pdfs"
     SOURCE_PAGES_DIR: Path = STORAGE_BASE / "source_pages"
     CHILD_PHOTOS_DIR: Path = STORAGE_BASE / "child_photos"
     GENERATED_ASSETS_DIR: Path = STORAGE_BASE / "generated_assets"
     PREVIEWS_DIR: Path = STORAGE_BASE / "previews"
     FINAL_BOOKS_DIR: Path = STORAGE_BASE / "final_books"
+    RAW_GENERATED_DIR: Path = STORAGE_BASE / "raw_generated"
     
     # Image & Story Providers Configuration
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
@@ -92,6 +96,13 @@ class Settings(BaseSettings):
     ACTIVE_STORY_PROVIDER: str = os.getenv("ACTIVE_STORY_PROVIDER", "gemini") # gemini, rule_based
     ACTIVE_IMAGE_PROVIDER: str = os.getenv("ACTIVE_IMAGE_PROVIDER", "fal_ai") # fal_ai, huggingface, template_fusion, mock_poc
     HF_MODEL_NAME: str = os.getenv("HF_MODEL_NAME", "")
+
+    # Dedicated Face Swap Service Configuration (InsightFace INSwapper-128)
+    FACE_SWAP_PROVIDER: str = os.getenv("FACE_SWAP_PROVIDER", "insightface") # insightface, local_poisson
+    INSWAPPER_MODEL_PATH: str = os.getenv("INSWAPPER_MODEL_PATH", "models/inswapper_128.onnx")
+    FACE_SWAP_EXECUTION_PROVIDER: str = os.getenv("FACE_SWAP_EXECUTION_PROVIDER", "CPUExecutionProvider") # CPUExecutionProvider, CUDAExecutionProvider
+    FACE_SWAP_DET_SIZE: int = int(os.getenv("FACE_SWAP_DET_SIZE", "640"))
+    FACE_SWAP_ENHANCE: bool = os.getenv("FACE_SWAP_ENHANCE", "false").lower() in ("true", "1", "yes")
     HF_FACE_SWAP_SPACE: str = os.getenv("HF_FACE_SWAP_SPACE", "")
     HF_FACE_ENHANCE_SPACE: str = os.getenv("HF_FACE_ENHANCE_SPACE", "")
     HF_INSTANT_ID_SPACE: str = os.getenv("HF_INSTANT_ID_SPACE", "")

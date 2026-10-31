@@ -72,7 +72,7 @@ class StoryPage(Base):
     __tablename__ = "story_pages"
 
     id = Column(String(36), primary_key=True, default=gen_uuid)
-    story_id = Column(String(36), ForeignKey("story_templates.id"), nullable=False)
+    story_id = Column(String(36), ForeignKey("story_templates.id", ondelete="CASCADE"), nullable=False)
     page_index = Column(Integer, nullable=False)  # 0 to 25
     page_number = Column(Integer, nullable=False)  # 1 to 26
     page_type = Column(String(30), default="story")  # "cover", "story", "ending", "dedication", "other"
@@ -111,7 +111,7 @@ class PersonalizationJob(Base):
 
     id = Column(String(36), primary_key=True, default=gen_uuid)
     user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
-    story_id = Column(String(36), ForeignKey("story_templates.id"), nullable=False)
+    story_id = Column(String(36), ForeignKey("story_templates.id", ondelete="CASCADE"), nullable=False)
     child_profile_id = Column(String(36), ForeignKey("child_profiles.id"), nullable=True)
     child_name = Column(String(100), nullable=False)
     photo_path = Column(String(500), nullable=False)
@@ -140,8 +140,8 @@ class GeneratedAsset(Base):
     __tablename__ = "generated_assets"
 
     id = Column(String(36), primary_key=True, default=gen_uuid)
-    job_id = Column(String(36), ForeignKey("personalization_jobs.id"), nullable=False)
-    story_page_id = Column(String(36), ForeignKey("story_pages.id"), nullable=False)
+    job_id = Column(String(36), ForeignKey("personalization_jobs.id", ondelete="CASCADE"), nullable=False)
+    story_page_id = Column(String(36), ForeignKey("story_pages.id", ondelete="CASCADE"), nullable=False)
     page_number = Column(Integer, nullable=False)
     asset_version = Column(Integer, default=1)
     storage_path = Column(String(500), nullable=False)
@@ -163,7 +163,7 @@ class Book(Base):
     __tablename__ = "books"
 
     id = Column(String(36), primary_key=True, default=gen_uuid)
-    job_id = Column(String(36), ForeignKey("personalization_jobs.id"), nullable=False)
+    job_id = Column(String(36), ForeignKey("personalization_jobs.id", ondelete="CASCADE"), nullable=False)
     book_type = Column(String(20), default="preview")  # "preview", "final"
     version = Column(Integer, default=1)
     pdf_storage_path = Column(String(500), nullable=False)
@@ -184,8 +184,8 @@ class Order(Base):
     user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     customer_name = Column(String(100), default="Valued Customer")
     customer_email = Column(String(150), nullable=True)
-    book_id = Column(String(36), ForeignKey("books.id"), nullable=True)
-    job_id = Column(String(36), ForeignKey("personalization_jobs.id"), nullable=True)
+    book_id = Column(String(36), ForeignKey("books.id", ondelete="SET NULL"), nullable=True)
+    job_id = Column(String(36), ForeignKey("personalization_jobs.id", ondelete="SET NULL"), nullable=True)
     format_type = Column(String(30), default="print_hardcover")  # "digital", "print_hardcover", "print_softcover"
     amount = Column(Float, default=1299.0)
     currency = Column(String(10), default="INR")
@@ -207,8 +207,8 @@ class PaymentTransaction(Base):
     __tablename__ = "payment_transactions"
 
     id = Column(String(36), primary_key=True, default=gen_uuid)
-    order_id = Column(String(36), ForeignKey("orders.id"), nullable=True)
-    job_id = Column(String(36), ForeignKey("personalization_jobs.id"), nullable=True)
+    order_id = Column(String(36), ForeignKey("orders.id", ondelete="SET NULL"), nullable=True)
+    job_id = Column(String(36), ForeignKey("personalization_jobs.id", ondelete="SET NULL"), nullable=True)
     razorpay_order_id = Column(String(100), nullable=True, index=True)
     razorpay_payment_id = Column(String(100), nullable=True, index=True)
     amount = Column(Float, nullable=False)
