@@ -321,11 +321,22 @@ class JobRunner:
                     if exists:
                         existing_assets[a.page_number] = a
 
-            # 2. Normalize child reference photo directly from MinIO
+            # 2. Normalize child reference photo directly from MinIO and pre-extract face embedding
             norm_ref = None
+            cached_source_face = None
             if job.photo_path:
                 try:
                     norm_ref = CharacterConsistencyEngine.normalize_child_reference(job.photo_path)
+                    try:
+                        from app.services.ai.face_swap_service import face_swap_service
+                        det = face_swap_service._get_detector()
+                        src_bgr = face_swap_service._load_image(norm_ref)
+                        src_faces = det.get(src_bgr)
+                        cached_source_face = face_swap_service.select_source_face(src_faces, context_desc="source child photo")
+                        logger.info(f"Pre-extracted child source face embedding successfully for job {job.id}")
+                    except Exception as preface_err:
+                        logger.warning(f"Notice during source face pre-extraction: {preface_err}")
+                        cached_source_face = None
                 except Exception as norm_err:
                     logger.error(f"Failed to normalize child photo {job.photo_path}: {norm_err}")
                     raise RuntimeError(f"Customer reference photo could not be loaded: {norm_err}")
@@ -347,6 +358,7 @@ class JobRunner:
 
                 is_page_personalizable = bool(page.personalization_required and page.face_outline_points not in ["[]", "none", "false"])
                 img_path = None
+                cached_img_bytes = None
 
                 if page_num in existing_assets and is_page_personalizable:
                     # Use existing validated high-quality swap
@@ -366,6 +378,7 @@ class JobRunner:
                             gen_res = cartoon_fusion_engine.fuse_page(
                                 page_number=page_num,
                                 child_reference_path=norm_ref,
+                                source_face=cached_source_face,
                                 story_slug=story_slug,
                                 page_image_path=page_img,
                                 face_outline_points=page.face_outline_points,
@@ -411,6 +424,7 @@ class JobRunner:
                     db.add(asset)
                     existing_assets[page_num] = asset
                     img_path = asset_path
+                    cached_img_bytes = gen_res.image_bytes
 
                     # Update live job progress in database
                     job.completed_pages = len(existing_assets)
@@ -421,16 +435,16 @@ class JobRunner:
                     db.commit()
 
                     newly_rendered += 1
-                    del gen_res
-                    gc.collect()
                 else:
                     # Non-personalizable decorative / title page
                     img_path = page.original_image_path or f"source_pages/{story_slug}/page_{page_num:02d}.png"
+                    cached_img_bytes = None
 
                 pages_data.append({
                     "page_number": page_num,
                     "page_type": page_type,
                     "image_path": img_path,
+                    "image_bytes": cached_img_bytes,
                     "story_text": personalized_text
                 })
 

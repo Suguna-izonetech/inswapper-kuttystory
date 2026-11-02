@@ -440,7 +440,8 @@ class CartoonCharacterFusionEngine:
         face_outline_points: Optional[str] = None,
         prefer_local: bool = False,
         job_id: Optional[str] = None,
-        save_raw_original: bool = True
+        save_raw_original: bool = True,
+        source_face: Optional[Any] = None
     ) -> GenerationResult:
         """
         Personalizes a storybook page by replacing the character's face with the child's real face:
@@ -599,7 +600,9 @@ class CartoonCharacterFusionEngine:
                     swapped_pil = face_swap_service.swap_faces(
                         target_image=base_page,
                         source_image=resolved_child_ref,
+                        source_face=source_face,
                         anchor=anchor,
+                        target_cache_key=page_image_path or f"{story_slug}_p{page_number:02d}",
                         return_format="pil"
                     )
 
@@ -755,7 +758,8 @@ class CartoonCharacterFusionEngine:
         face_outline_points: Optional[str] = None,
         prefer_local: bool = False,
         job_id: Optional[str] = None,
-        save_raw_original: bool = True
+        save_raw_original: bool = True,
+        source_face: Optional[Any] = None
     ) -> GenerationResult:
         """
         Asynchronously personalizes a storybook page by executing CPU-intensive
@@ -772,7 +776,8 @@ class CartoonCharacterFusionEngine:
             face_outline_points=face_outline_points,
             prefer_local=prefer_local,
             job_id=job_id,
-            save_raw_original=save_raw_original
+            save_raw_original=save_raw_original,
+            source_face=source_face
         )
 
 cartoon_fusion_engine = CartoonCharacterFusionEngine()

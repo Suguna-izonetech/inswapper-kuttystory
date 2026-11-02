@@ -93,6 +93,8 @@ class InsightFaceSwapService:
         self._app = None
         self._swapper = None
         self._gfpgan_session = None
+        self._target_face_cache: Dict[str, Any] = {}
+        self._source_face_cache: Dict[str, Any] = {}
         self._load_lock = threading.Lock()
         self._initialized = True
         logger.info(
@@ -191,11 +193,17 @@ class InsightFaceSwapService:
                 if self._swapper is None:
                     model_file = self._resolve_model_path()
                     try:
-                        import insightface.model_zoo as mz
+                        import onnxruntime as ort
+                        from insightface.model_zoo.inswapper import INSwapper
                         providers = self._get_providers()
-                        insightface_root = getattr(settings, "INSIGHTFACE_ROOT", settings.BACKEND_DIR / "models" / "insightface")
-                        logger.info(f"Loading INSwapper-128 from '{model_file}' with providers={providers}...")
-                        swapper = mz.get_model(str(model_file), root=str(insightface_root), providers=providers)
+                        sess_opts = ort.SessionOptions()
+                        sess_opts.intra_op_num_threads = min(8, os.cpu_count() or 4)
+                        sess_opts.inter_op_num_threads = 2
+                        sess_opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+                        sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+                        logger.info(f"Loading INSwapper-128 from '{model_file}' with providers={providers} (intra_op={sess_opts.intra_op_num_threads})...")
+                        sess = ort.InferenceSession(str(model_file), sess_options=sess_opts, providers=providers)
+                        swapper = INSwapper(model_file=str(model_file), session=sess)
                         if swapper is None:
                             raise ModelLoadError(f"ModelRouter could not instantiate INSwapper from '{model_file}'")
                         self._swapper = swapper
@@ -911,24 +919,25 @@ class InsightFaceSwapService:
     def swap_faces(
         self,
         target_image: Union[np.ndarray, Image.Image, str, Path, bytes],
-        source_image: Union[np.ndarray, Image.Image, str, Path, bytes],
+        source_image: Optional[Union[np.ndarray, Image.Image, str, Path, bytes]] = None,
+        source_face: Optional[Any] = None,
         anchor: Optional[Dict[str, Any]] = None,
         return_format: str = "pil",  # "pil", "bgr", "bytes"
         save_original: bool = False,
         original_name: Optional[str] = None,
         job_id: Optional[str] = None,
-        enhance: Optional[bool] = None
+        enhance: Optional[bool] = None,
+        target_cache_key: Optional[str] = None
     ) -> Union[Image.Image, np.ndarray, bytes]:
         """
         Synchronously performs face swap using INSwapper-128:
         1. Validates and loads source and target images.
-        2. Detects facial landmarks and identity embeddings with FaceAnalysis.
+        2. Detects facial landmarks and identity embeddings with FaceAnalysis (or reuses pre-extracted source_face / cached target_face).
         3. Identifies the intended target character face (via anchor or bounding area).
         4. Injects customer identity embedding into the target character canvas.
         5. Returns the composite in requested format.
         """
         target_bgr = self._load_image(target_image)
-        source_bgr = self._load_image(source_image)
 
         if save_original or original_name:
             try:
@@ -941,20 +950,50 @@ class InsightFaceSwapService:
         detector = self._get_detector()
         swapper = self._get_swapper()
 
-        # Suppress upstream scikit-image FutureWarning from insightface face_align
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=FutureWarning)
-            target_faces = detector.get(target_bgr)
-            source_faces = detector.get(source_bgr)
+        # 1. Resolve source child face (use pre-extracted if provided to eliminate redundant RetinaFace runs)
+        if source_face is None:
+            if source_image is None:
+                raise InvalidImageError("Either source_image or pre-extracted source_face must be provided.")
+            source_bgr = self._load_image(source_image)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=FutureWarning)
+                source_faces = detector.get(source_bgr)
+            source_face = self.select_source_face(source_faces, context_desc="source child photo")
 
-        if not target_faces:
-            logger.info("RetinaFace detected 0 faces on target; trying YuNet fallback detector...")
-            target_faces = self._detect_faces_yunet(target_bgr, anchor=anchor)
+        # 2. Resolve target face (check cache by target_cache_key, path, or image hash)
+        resolved_target_face = None
+        effective_tgt_key = target_cache_key
+        if not effective_tgt_key:
+            if isinstance(target_image, (str, Path)):
+                effective_tgt_key = str(target_image)
+            elif isinstance(target_image, bytes):
+                import hashlib
+                effective_tgt_key = hashlib.md5(target_image[:8192]).hexdigest()
 
-        source_face = self.select_source_face(source_faces, context_desc="source child photo")
-        target_face = self.select_target_face(target_faces, anchor=anchor, context_desc="target storybook illustration")
+        if effective_tgt_key and effective_tgt_key in self._target_face_cache:
+            resolved_target_face = self._target_face_cache[effective_tgt_key]
 
-        should_enhance = enhance if enhance is not None else getattr(settings, "FACE_SWAP_ENHANCE", True)
+        if resolved_target_face is None:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=FutureWarning)
+                target_faces = detector.get(target_bgr)
+
+            if not target_faces:
+                logger.info("RetinaFace detected 0 faces on target; trying YuNet fallback detector...")
+                target_faces = self._detect_faces_yunet(target_bgr, anchor=anchor)
+
+            resolved_target_face = self.select_target_face(target_faces, anchor=anchor, context_desc="target storybook illustration")
+            if effective_tgt_key and resolved_target_face:
+                self._target_face_cache[effective_tgt_key] = resolved_target_face
+
+        target_face = resolved_target_face
+
+        # 3. Determine HD enhancement: on CPU, bypass heavy GFPGAN UNet unless explicitly requested
+        default_enhance = getattr(settings, "FACE_SWAP_ENHANCE", False)
+        should_enhance = enhance if enhance is not None else default_enhance
+        if should_enhance and self.execution_provider == "CPUExecutionProvider" and enhance is not True:
+            should_enhance = False
+
         try:
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -1045,6 +1084,8 @@ class InsightFaceSwapService:
             self._app = None
             self._swapper = None
             self._gfpgan_session = None
+            self._target_face_cache.clear()
+            self._source_face_cache.clear()
             logger.info("InsightFaceSwapService sessions unloaded.")
 
 

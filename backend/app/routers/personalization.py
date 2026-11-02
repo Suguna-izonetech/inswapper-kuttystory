@@ -366,9 +366,8 @@ def download_full_print_pdf(
     from app.models import Book
     existing_book = db.query(Book).filter(
         Book.job_id == job.id,
-        Book.book_type == "final",
-        Book.page_count == expected_page_count
-    ).first()
+        Book.book_type == "final"
+    ).order_by(Book.id.desc()).first()
 
     if existing_book and existing_book.pdf_storage_path:
         cat, fn = storage._parse_category_and_filename(existing_book.pdf_storage_path)
@@ -380,7 +379,8 @@ def download_full_print_pdf(
             f"final_books/{print_filename}",
             f"final_books/final_book_{job.id}_{lang_str}_{size_str}_rgb.pdf",
             f"final_books/final_book_{job.id}_{lang_str}_8x8_rgb.pdf",
-            f"final_books/final_book_{job.id}_english_8x8_rgb.pdf"
+            f"final_books/final_book_{job.id}_english_8x8_rgb.pdf",
+            f"final_books/final_book_{job.id}_{lang_str}_8x8_cmyk.pdf"
         ]
         for key in candidate_keys:
             cat, fn = storage._parse_category_and_filename(key)
@@ -425,6 +425,22 @@ def download_full_print_pdf(
         )
         cat, fn = storage._parse_category_and_filename(storage_key)
         target_key = (cat or "final_books", fn or print_filename)
+
+        # Cache book record in database so subsequent downloads are instantaneous
+        if existing_book:
+            existing_book.pdf_storage_path = storage_key
+            existing_book.page_count = len(all_pages_data)
+            existing_book.validation_status = "valid"
+        else:
+            new_book = Book(
+                job_id=job.id,
+                book_type="final",
+                pdf_storage_path=storage_key,
+                page_count=len(all_pages_data),
+                validation_status="valid"
+            )
+            db.add(new_book)
+        db.commit()
 
     stream, media_type, content_length = storage.get_object_stream(target_key[0], target_key[1])
 

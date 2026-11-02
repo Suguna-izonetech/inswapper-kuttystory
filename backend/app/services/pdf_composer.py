@@ -138,9 +138,16 @@ class PDFComposerService:
             for tag in ["[Name]", "[name]", "{name}", "[child_name]", "{child_name}"]:
                 story_text = story_text.replace(tag, child_name)
 
-            # Retrieve image from MinIO storage directly in-memory
+            # Retrieve image: use in-memory bytes first if available to avoid duplicate MinIO HTTP round-trips
             pil_img = None
-            if raw_img_path:
+            if page_info.get("image_bytes"):
+                try:
+                    pil_img = Image.open(io.BytesIO(page_info["image_bytes"]))
+                except Exception as e_mem:
+                    logger.warning(f"Could not open in-memory image_bytes for page {page_num}: {e_mem}")
+                    pil_img = None
+
+            if pil_img is None and raw_img_path:
                 if os.path.exists(str(raw_img_path)):
                     try:
                         pil_img = Image.open(str(raw_img_path))
@@ -190,9 +197,9 @@ class PDFComposerService:
                 if is_cmyk:
                     c.drawImage(ImageReader(draw_img), 0, 0, width=page_w_pt, height=page_h_pt, preserveAspectRatio=True)
                 else:
-                    # High-fidelity accelerated JPEG embedding (5x faster compilation, 7x smaller PDF with 300 DPI clarity)
+                    # High-fidelity accelerated JPEG embedding (5x faster compilation with 300 DPI clarity)
                     img_buf = io.BytesIO()
-                    draw_img.save(img_buf, format="JPEG", quality=95, optimize=True)
+                    draw_img.save(img_buf, format="JPEG", quality=92)
                     img_buf.seek(0)
                     c.drawImage(ImageReader(img_buf), 0, 0, width=page_w_pt, height=page_h_pt, preserveAspectRatio=True)
                 image_drawn = True

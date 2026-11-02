@@ -188,7 +188,7 @@ export default function PdfDownloadModal({
     const fetchTimer = setTimeout(() => {
       fetchTimedOut = true;
       controller.abort();
-    }, 180000);
+    }, 600000);
 
     try {
       const effectiveUrl = resolveBackendUrl(downloadUrl);
@@ -198,11 +198,11 @@ export default function PdfDownloadModal({
       clearTimeout(fetchTimer);
 
       if (response.status === 202) {
-        // Server still compiling PDF in background, retry in 3 seconds
-        setCurrentActionLabel("Compiling 300 DPI archival PDF stream...");
+        // Server still compiling PDF in background, retry in 2 seconds
+        setCurrentActionLabel("Archival PDF Compilation...");
         setCurrentStageDetail("Almost ready! Packaging print-grade volume...");
-        setProgress(92);
-        await new Promise((r) => setTimeout(r, 3000));
+        setProgress(93);
+        await new Promise((r) => setTimeout(r, 2000));
         return startDownload();
       }
 
